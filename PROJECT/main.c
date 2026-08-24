@@ -38,7 +38,7 @@ u8 ErrorState[]={0xFE,0x01};
 //extern u8 RS485_RX_BUFF[30];
 u8 NRF2401_RX_BUFF[4];
 extern uint16_t ADC_ConvertedValue[5];
-//#define ALARM_POLL_INTERVAL_MS  1000   // 1ÃëÂÖÑ¯Ò»´Î
+//#define ALARM_POLL_INTERVAL_MS  1000   // 1ç§’è½®è¯¢ä¸€æ¬¡
 
 void SysTickInit(void)
 {
@@ -49,7 +49,7 @@ u8 a =8;
 u8 b =0;
 /*==================================================================================
 Procedure description: main program entry
-Parameter description£ºnone
+Parameter descriptionï¼šnone
 use in: none
 Transfer procedure: none
 Status: TESTED
@@ -62,24 +62,24 @@ int main(void)
 //	SysTickInit();
 	SystemInit();
 	Tick_Init();
-	NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);//ÉèÖÃÏµÍ³ÖĞ¶ÏÓÅÏÈ¼¶·Ö×é2
-//	Delayinit(168);    //³õÊ¼»¯ÑÓÊ±º¯Êı
-	uart4_init(9600);//´®¿Úµ÷ÊÔĞÅÏ¢Êä³öprintf	
+	NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);//è®¾ç½®ç³»ç»Ÿä¸­æ–­ä¼˜å…ˆçº§åˆ†ç»„2
+//	Delayinit(168);    //åˆå§‹åŒ–å»¶æ—¶å‡½æ•°
+	uart4_init(9600);//ä¸²å£è°ƒè¯•ä¿¡æ¯è¾“å‡ºprintf	
 	RS485_Init(9600);
 	Relay_Init();
 	AlarmPoll_Init();
-	OutputPortInit();//ledµÆ²âÊÔ
+	OutputPortInit();//ledç¯æµ‹è¯•
 	TIM5_Init();
 	Timer4Init();
 	Timer3Init();
 	Sequence_Init();
 	bsp_InitTimer();
-	W25QXX_Init();          // ³õÊ¼»¯SPI Flash
-	SwapState_Init();   // ´ÓFlash¶ÁÈ¡¿Õ²ÖºÅ
-  __enable_irq();  /* ¿ªÆôÈ«¾ÖÖĞ¶Ï */
+	W25QXX_Init();          // åˆå§‹åŒ–SPI Flash
+	SwapState_Init();   // ä»Flashè¯»å–ç©ºä»“å·
+  __enable_irq();  /* å¼€å¯å…¨å±€ä¸­æ–­ */
 	delay_ms(1000);
 //	Motor_Reset(MOTOR1_SLAVE_ADDR, MOTOR1_CTRL_REG1, 8);
-	// ¸´Î»Ç°È·±£Ö÷Õ¾×´Ì¬¿ÕÏĞ
+	// å¤ä½å‰ç¡®ä¿ä¸»ç«™çŠ¶æ€ç©ºé—²
 	master_state = MASTER_IDLE;
 	timeout_cnt = 0;
 	__disable_irq();
@@ -89,13 +89,13 @@ int main(void)
 	
 	//GPIO_SetBits(LED_PORT, LED1);
 	
-//		while(W25QXX_ReadID()!=W25Q128)								//¼ì²â²»µ½W25Q128
+//		while(W25QXX_ReadID()!=W25Q128)								//æ£€æµ‹ä¸åˆ°W25Q128
 //	{
 //		printf("W25Q128 Check Failed!");
 //		delay_ms(500);
 //		//LCD_ShowString(30,150,200,16,16,"Please Check!      ");
 //		///delay_ms(500);
-//		//LED0=!LED0;		//DS0ÉÁË¸
+//		//LED0=!LED0;		//DS0é—ªçƒ
 //	}
 //	printf("W25Q128 Check OK");
 	
@@ -106,7 +106,7 @@ int main(void)
 //	W25QXX_Read(&b,0,1);	
 //	delay_ms(500);
 //	
-//	printf("¶ÁÈ¡µç»úµçÁ÷Ê§°Ü£¬´íÎóÂë%d\n", b);
+//	printf("è¯»å–ç”µæœºç”µæµå¤±è´¥ï¼Œé”™è¯¯ç %d\n", b);
 //	a=9;
 //		W25QXX_Write(&a,0,1);
 //	delay_ms(500);
@@ -135,43 +135,43 @@ LeaveCenter2();
 
 
 //printf("\r\n============= MCU RESET DETECTED =============\r\n");
-static uint8_t step = 0;   // ¾²Ì¬±äÁ¿£¬¼ÇÂ¼µ±Ç°²½Öè£¨Ã¿´Îµ÷ÓÃ±£³Ö×´Ì¬£©
+static uint8_t step = 0;   // é™æ€å˜é‡ï¼Œè®°å½•å½“å‰æ­¥éª¤ï¼ˆæ¯æ¬¡è°ƒç”¨ä¿æŒçŠ¶æ€ï¼‰
 
 		while(1)
 		{		
-			MasterPolling_Task();   // Ö÷Õ¾ÂÖÑ¯£¨5ÃëÖÜÆÚ£©
+			MasterPolling_Task();   // ä¸»ç«™è½®è¯¢ï¼ˆ5ç§’å‘¨æœŸï¼‰
 
 			MODS_Poll();   
-			Sequence_Process();   	// ´¦ÀíĞòÁĞ£¨Ò»¼üÆğ·É/½µÂäÍê³É£©
-			SwapState_TrySave();   // Òì²½±£´æ
-			//CheckRemoteOffTask();   // ¼ì²é¶¨Ê±ÈÎÎñ
+			Sequence_Process();   	// å¤„ç†åºåˆ—ï¼ˆä¸€é”®èµ·é£/é™è½å®Œæˆï¼‰
+			SwapState_TrySave();   // å¼‚æ­¥ä¿å­˜
+			//CheckRemoteOffTask();   // æ£€æŸ¥å®šæ—¶ä»»åŠ¡
 			if (stall_triggered) {
-        // Ö´ĞĞ¸´Î»
+        // æ‰§è¡Œå¤ä½
 				Sequence_ForceStop(); 
         Battery_22();
         Battery_15();
         LeaveCenter1();
         stall_triggered = 0;
 			}
-//			PollAndClearMotorAlarms_NonBlocking(); // ·Ç×èÈû±¨¾¯ÂÖÑ¯
+//			PollAndClearMotorAlarms_NonBlocking(); // éé˜»å¡æŠ¥è­¦è½®è¯¢
 //			MotorStallMonitorTask();   
 		}
 }
 
 /*==================================================================================
 Procedure description: timer 6 interrupt
-Parameter description£ºread input port and timer count
+Parameter descriptionï¼šread input port and timer count
 use in: none
 Transfer procedure: none
 Status: TESTED
 Originator: Wan Lei, V0100-0000, 20180105
 History: none
 ===================================================================================*/
-//void TIM2_IRQHandler(void)   //TIM4ÖĞ¶Ï
+//void TIM2_IRQHandler(void)   //TIM4ä¸­æ–­
 //{
-//    if(TIM_GetITStatus(TIM2, TIM_IT_Update) != RESET)  //¼ì²éTIM6¸üĞÂÖĞ¶Ï·¢ÉúÓë·ñ
+//    if(TIM_GetITStatus(TIM2, TIM_IT_Update) != RESET)  //æ£€æŸ¥TIM6æ›´æ–°ä¸­æ–­å‘ç”Ÿä¸å¦
 //    {
-//        TIM_ClearITPendingBit(TIM2, TIM_IT_Update);  //Çå³ıTIM6¸üĞÂÖĞ¶Ï±êÖ¾ 
+//        TIM_ClearITPendingBit(TIM2, TIM_IT_Update);  //æ¸…é™¤TIM6æ›´æ–°ä¸­æ–­æ ‡å¿— 
 //        //the input module read the signal every 1ms
 ////        ReadInputSignal(&ipc);
 //        //the timer module updata
@@ -207,7 +207,7 @@ History: none
 
 /*==================================================================================
 Procedure description: timer 7 interrupt
-Parameter description£ºread motor current and calculate the pwm
+Parameter descriptionï¼šread motor current and calculate the pwm
 use in: none
 Transfer procedure: none
 Status: TESTED
@@ -216,9 +216,9 @@ History: none
 ===================================================================================*/
 //void TIM4_IRQHandler(void)
 //{
-//    if (TIM_GetITStatus(TIM4, TIM_IT_Update) != RESET)  //¼ì²éTIM7¸üĞÂÖĞ¶Ï·¢ÉúÓë·ñ
+//    if (TIM_GetITStatus(TIM4, TIM_IT_Update) != RESET)  //æ£€æŸ¥TIM7æ›´æ–°ä¸­æ–­å‘ç”Ÿä¸å¦
 //    {
-//        TIM_ClearITPendingBit(TIM4, TIM_IT_Update);  //Çå³ıTIM7¸üĞÂÖĞ¶Ï±êÖ¾ 
+//        TIM_ClearITPendingBit(TIM4, TIM_IT_Update);  //æ¸…é™¤TIM7æ›´æ–°ä¸­æ–­æ ‡å¿— 
 //        UpdateCurrent(&lmc, &adc1);
 //        CalcPWM(&lmc, &rmc, &tmr);
 //    }	
@@ -226,7 +226,7 @@ History: none
 
 /*==================================================================================
 Procedure description: adc1/2 interrupt
-Parameter description£ºread adc current and maximum current
+Parameter descriptionï¼šread adc current and maximum current
 use in: none
 Transfer procedure: none
 Status: TESTED

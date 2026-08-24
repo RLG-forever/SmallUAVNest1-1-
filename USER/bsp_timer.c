@@ -1,47 +1,47 @@
 #include "bsp_timer.h"
 
-/* Ñ¡Ôñ TIM2 ×÷ÎªÓ²¼ş¶¨Ê±Æ÷ */
+/* é€‰æ‹© TIM2 ä½œä¸ºç¡¬ä»¶å®šæ—¶å™¨ */
 #ifdef USE_TIM2
     #define TIM_HARD        TIM2
     #define TIM_HARD_IRQn   TIM2_IRQn
     #define TIM_HARD_RCC    RCC_APB1Periph_TIM2
 #endif
 
-/* Èí¼ş¶¨Ê±Æ÷Êı×é£¨Èç¹ûĞèÒª£©*/
+/* è½¯ä»¶å®šæ—¶å™¨æ•°ç»„ï¼ˆå¦‚æœéœ€è¦ï¼‰*/
 static SOFT_TMR s_tTmr[TMR_COUNT];
 
-/* Ó²¼ş¶¨Ê±Æ÷»Øµ÷º¯ÊıÖ¸Õë */
+/* ç¡¬ä»¶å®šæ—¶å™¨å›è°ƒå‡½æ•°æŒ‡é’ˆ */
 static void (*s_TIM_CallBack1)(void);
 static void (*s_TIM_CallBack2)(void);
 static void (*s_TIM_CallBack3)(void);
 static void (*s_TIM_CallBack4)(void);
 
-/* ÏµÍ³ÔËĞĞÊ±¼ä£¨ºÁÃë£©£¬ÓÃÓÚ GetTick */
+/* ç³»ç»Ÿè¿è¡Œæ—¶é—´ï¼ˆæ¯«ç§’ï¼‰ï¼Œç”¨äº GetTick */
 volatile int32_t g_iRunTime = 0;
 
 /*
 *********************************************************************************************************
-*    º¯ÊıÃû: bsp_InitSysTick
-*    ¹¦ÄÜËµÃ÷: ÅäÖÃ SysTick Îª 1ms ÖĞ¶Ï£¬ÓÃÓÚÈí¼ş¶¨Ê±Æ÷ºÍÏµÍ³Ê±¼ä
-*    ĞÎ    ²Î: ÎŞ
-*    ·µ »Ø Öµ: ÎŞ
+*    å‡½æ•°å: bsp_InitSysTick
+*    åŠŸèƒ½è¯´æ˜: é…ç½® SysTick ä¸º 1ms ä¸­æ–­ï¼Œç”¨äºè½¯ä»¶å®šæ—¶å™¨å’Œç³»ç»Ÿæ—¶é—´
+*    å½¢    å‚: æ— 
+*    è¿” å› å€¼: æ— 
 *********************************************************************************************************
 */
 void bsp_InitSysTick(void)
 {
-    /* ÏµÍ³Ê±ÖÓÆµÂÊ SystemCoreClock£¬ÀıÈç 168MHz */
+    /* ç³»ç»Ÿæ—¶é’Ÿé¢‘ç‡ SystemCoreClockï¼Œä¾‹å¦‚ 168MHz */
 //    if (SysTick_Config(SystemCoreClock / 1000)) {
-//        /* ÅäÖÃÊ§°Ü£¬ËÀÑ­»· */
+//        /* é…ç½®å¤±è´¥ï¼Œæ­»å¾ªç¯ */
 //        while(1);
 //    }
 }
 
 /*
 *********************************************************************************************************
-*    º¯ÊıÃû: TIM5_IRQHandler
-*    ¹¦ÄÜËµÃ÷: TIM5_IRQHandler ÖĞ¶Ï·şÎñ³ÌĞò
-*    ĞÎ    ²Î: ÎŞ
-*    ·µ »Ø Öµ: ÎŞ
+*    å‡½æ•°å: TIM5_IRQHandler
+*    åŠŸèƒ½è¯´æ˜: TIM5_IRQHandler ä¸­æ–­æœåŠ¡ç¨‹åº
+*    å½¢    å‚: æ— 
+*    è¿” å› å€¼: æ— 
 *********************************************************************************************************
 */
 
@@ -50,30 +50,30 @@ void TIM5_Init(void)
     TIM_TimeBaseInitTypeDef TIM_TimeBaseStructure;
     NVIC_InitTypeDef NVIC_InitStructure;
     
-    // Ê¹ÄÜ TIM5 Ê±ÖÓ£¨APB1 ×ÜÏß£©
+    // ä½¿èƒ½ TIM5 æ—¶é’Ÿï¼ˆAPB1 æ€»çº¿ï¼‰
     RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM5, ENABLE);
     
-    // ¼ÆËãÔ¤·ÖÆµºÍÖÜÆÚ£ºÏµÍ³Ê±ÖÓ 168MHz£¬APB1 ¶¨Ê±Æ÷Ê±ÖÓ = 84MHz
-    // Ô¤·ÖÆµ 83 ¡ú 84MHz/84 = 1MHz£¬¼ÆÊıÖÜÆÚ 1us
-    // ÒªµÃµ½ 1ms ÖĞ¶Ï£¬ĞèÒª¼ÆÊıÖµ 1000
-    TIM_TimeBaseStructure.TIM_Prescaler = 83;          // 84-1? Êµ¼ÊÉÏ 84-1=83£¬¼ÆÊıÆµÂÊ = 84MHz/84 = 1MHz
-    TIM_TimeBaseStructure.TIM_Period = 1000 - 1;       // 1000 ¸ö¼ÆÊı = 1ms
+    // è®¡ç®—é¢„åˆ†é¢‘å’Œå‘¨æœŸï¼šç³»ç»Ÿæ—¶é’Ÿ 168MHzï¼ŒAPB1 å®šæ—¶å™¨æ—¶é’Ÿ = 84MHz
+    // é¢„åˆ†é¢‘ 83 â†’ 84MHz/84 = 1MHzï¼Œè®¡æ•°å‘¨æœŸ 1us
+    // è¦å¾—åˆ° 1ms ä¸­æ–­ï¼Œéœ€è¦è®¡æ•°å€¼ 1000
+    TIM_TimeBaseStructure.TIM_Prescaler = 83;          // 84-1? å®é™…ä¸Š 84-1=83ï¼Œè®¡æ•°é¢‘ç‡ = 84MHz/84 = 1MHz
+    TIM_TimeBaseStructure.TIM_Period = 1000 - 1;       // 1000 ä¸ªè®¡æ•° = 1ms
     TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;
     TIM_TimeBaseStructure.TIM_ClockDivision = TIM_CKD_DIV1;
     TIM_TimeBaseInit(TIM5, &TIM_TimeBaseStructure);
     
-    // Çå³ıÖĞ¶Ï±êÖ¾²¢Ê¹ÄÜ¸üĞÂÖĞ¶Ï
+    // æ¸…é™¤ä¸­æ–­æ ‡å¿—å¹¶ä½¿èƒ½æ›´æ–°ä¸­æ–­
     TIM_ClearITPendingBit(TIM5, TIM_IT_Update);
     TIM_ITConfig(TIM5, TIM_IT_Update, ENABLE);
     
-    // ÉèÖÃÖĞ¶ÏÓÅÏÈ¼¶£¨ÀıÈç 1£¬µÍÓÚ´®¿ÚÖĞ¶Ï£©
+    // è®¾ç½®ä¸­æ–­ä¼˜å…ˆçº§ï¼ˆä¾‹å¦‚ 1ï¼Œä½äºä¸²å£ä¸­æ–­ï¼‰
     NVIC_InitStructure.NVIC_IRQChannel = TIM5_IRQn;
     NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 1;
     NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
     NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
     NVIC_Init(&NVIC_InitStructure);
     
-    // Æô¶¯ TIM5
+    // å¯åŠ¨ TIM5
     TIM_Cmd(TIM5, ENABLE);
 }
 
@@ -81,10 +81,10 @@ void TIM5_IRQHandler(void)
 {
     if (TIM_GetITStatus(TIM5, TIM_IT_Update) != RESET)
     {
-        // Çå³ıÖĞ¶Ï±êÖ¾
+        // æ¸…é™¤ä¸­æ–­æ ‡å¿—
         TIM_ClearITPendingBit(TIM5, TIM_IT_Update);
 				uint8_t i;
-        // Í£Ö¹¶¨Ê±Æ÷£¬µÈ´ıÏÂÒ»Ö¡½ÓÊÕ¿ªÊ¼
+        // åœæ­¢å®šæ—¶å™¨ï¼Œç­‰å¾…ä¸‹ä¸€å¸§æ¥æ”¶å¼€å§‹
 				g_iRunTime++;
 				for (i = 0; i < TMR_COUNT; i++) {
         if (s_tTmr[i].Count > 0) {
@@ -103,10 +103,10 @@ void TIM5_IRQHandler(void)
 
 /*
 *********************************************************************************************************
-*    º¯ÊıÃû: bsp_InitHardTimer
-*    ¹¦ÄÜËµÃ÷: ³õÊ¼»¯Ó²¼ş¶¨Ê±Æ÷£¨TIM2£©£¬ÅäÖÃÎª1us¼ÆÊıÖÜÆÚ£¬×ÔÓÉÔËĞĞ
-*    ĞÎ    ²Î: ÎŞ
-*    ·µ »Ø Öµ: ÎŞ
+*    å‡½æ•°å: bsp_InitHardTimer
+*    åŠŸèƒ½è¯´æ˜: åˆå§‹åŒ–ç¡¬ä»¶å®šæ—¶å™¨ï¼ˆTIM2ï¼‰ï¼Œé…ç½®ä¸º1usè®¡æ•°å‘¨æœŸï¼Œè‡ªç”±è¿è¡Œ
+*    å½¢    å‚: æ— 
+*    è¿” å› å€¼: æ— 
 *********************************************************************************************************
 */
 void bsp_InitHardTimer(void)
@@ -115,18 +115,18 @@ void bsp_InitHardTimer(void)
     NVIC_InitTypeDef NVIC_InitStructure;
     uint32_t uiTIMxCLK;
     
-    /* Ê¹ÄÜ TIM2 Ê±ÖÓ */
+    /* ä½¿èƒ½ TIM2 æ—¶é’Ÿ */
     RCC_APB1PeriphClockCmd(TIM_HARD_RCC, ENABLE);
     
-    /* APB1 ¶¨Ê±Æ÷Ê±ÖÓ = SystemCoreClock / 2 = 84MHz */
+    /* APB1 å®šæ—¶å™¨æ—¶é’Ÿ = SystemCoreClock / 2 = 84MHz */
     uiTIMxCLK = SystemCoreClock / 2;
-    /* Ô¤·ÖÆµÆ÷£º84MHz / 84 = 1MHz£¬¼ÆÊıÖÜÆÚ 1us */
+    /* é¢„åˆ†é¢‘å™¨ï¼š84MHz / 84 = 1MHzï¼Œè®¡æ•°å‘¨æœŸ 1us */
     uint16_t usPrescaler = (uiTIMxCLK / 1000000) - 1;
     
-    /* ¶¨Ê±Æ÷ÖÜÆÚ£º16Î»¶¨Ê±Æ÷×î´ó 0xFFFF£¬32Î»¶¨Ê±Æ÷¿ÉÉè¸ü´ó£¬ÕâÀïÉèÎª×î´óÖµ */
-    uint32_t usPeriod = 0xFFFFFFFF;   // TIM2 ÊÇ32Î»£¬¿ÉÒÔºÜ´ó
+    /* å®šæ—¶å™¨å‘¨æœŸï¼š16ä½å®šæ—¶å™¨æœ€å¤§ 0xFFFFï¼Œ32ä½å®šæ—¶å™¨å¯è®¾æ›´å¤§ï¼Œè¿™é‡Œè®¾ä¸ºæœ€å¤§å€¼ */
+    uint32_t usPeriod = 0xFFFFFFFF;   // TIM2 æ˜¯32ä½ï¼Œå¯ä»¥å¾ˆå¤§
     #if defined (USE_TIM3) || defined (USE_TIM4)
-        usPeriod = 0xFFFF;            // 16Î»¶¨Ê±Æ÷
+        usPeriod = 0xFFFF;            // 16ä½å®šæ—¶å™¨
     #endif
     
     TIM_TimeBaseStructure.TIM_Period = usPeriod;
@@ -135,10 +135,10 @@ void bsp_InitHardTimer(void)
     TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;
     TIM_TimeBaseInit(TIM_HARD, &TIM_TimeBaseStructure);
     
-    /* Ê¹ÄÜ¶¨Ê±Æ÷¼ÆÊıÆ÷ */
+    /* ä½¿èƒ½å®šæ—¶å™¨è®¡æ•°å™¨ */
     TIM_Cmd(TIM_HARD, ENABLE);
     
-    /* ÅäÖÃÖĞ¶ÏÓÅÏÈ¼¶£¨ÇÀÕ¼ÓÅÏÈ¼¶ 2£¬×ÓÓÅÏÈ¼¶ 0£¬¿É¸ù¾İĞèÒªµ÷Õû£©*/
+    /* é…ç½®ä¸­æ–­ä¼˜å…ˆçº§ï¼ˆæŠ¢å ä¼˜å…ˆçº§ 2ï¼Œå­ä¼˜å…ˆçº§ 0ï¼Œå¯æ ¹æ®éœ€è¦è°ƒæ•´ï¼‰*/
     NVIC_InitStructure.NVIC_IRQChannel = TIM_HARD_IRQn;
     NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 2;
     NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
@@ -151,66 +151,66 @@ void bsp_InitHardTimer(void)
 //    TIM_TimeBaseInitTypeDef TIM_TimeBaseInitStructure;
 //    NVIC_InitTypeDef NVIC_InitStructure;
 //    
-//    // Ê¹ÄÜ TIM4 Ê±ÖÓ£¨APB1 ×ÜÏß£©
+//    // ä½¿èƒ½ TIM4 æ—¶é’Ÿï¼ˆAPB1 æ€»çº¿ï¼‰
 //    RCC_APB1PeriphClockCmd(TIM_HARD_RCC, ENABLE);
 //    
-//    // ¶¨Ê±Æ÷ÅäÖÃ£º¼ÙÉèÏµÍ³Ê±ÖÓ 168MHz£¬APB1 ¶¨Ê±Æ÷Ê±ÖÓ 84MHz£¬·ÖÆµ 83 ¡ú 1MHz ¼ÆÊıÆµÂÊ
-//    // ³¬Ê±Ê±¼ä£º3.5 ×Ö·ûÊ±¼ä @ 9600bps ¡Ö 3.6ms£¬ÉèÖÃ Period = 3600 - 1
-//    TIM_TimeBaseInitStructure.TIM_Period = 9999;   // ×Ô¶¯ÖØ×°ÔØÖµ
-//    TIM_TimeBaseInitStructure.TIM_Prescaler = 83;      // Ô¤·ÖÆµÆ÷
+//    // å®šæ—¶å™¨é…ç½®ï¼šå‡è®¾ç³»ç»Ÿæ—¶é’Ÿ 168MHzï¼ŒAPB1 å®šæ—¶å™¨æ—¶é’Ÿ 84MHzï¼Œåˆ†é¢‘ 83 â†’ 1MHz è®¡æ•°é¢‘ç‡
+//    // è¶…æ—¶æ—¶é—´ï¼š3.5 å­—ç¬¦æ—¶é—´ @ 9600bps â‰ˆ 3.6msï¼Œè®¾ç½® Period = 3600 - 1
+//    TIM_TimeBaseInitStructure.TIM_Period = 9999;   // è‡ªåŠ¨é‡è£…è½½å€¼
+//    TIM_TimeBaseInitStructure.TIM_Prescaler = 83;      // é¢„åˆ†é¢‘å™¨
 //    TIM_TimeBaseInitStructure.TIM_CounterMode = TIM_CounterMode_Up;
 //    TIM_TimeBaseInitStructure.TIM_ClockDivision = TIM_CKD_DIV1;
 //    TIM_TimeBaseInit(TIM_HARD, &TIM_TimeBaseInitStructure);
 //    
 //	
 //	 TIM_Cmd(TIM_HARD, ENABLE);
-//    // Çå³ıÖĞ¶Ï±êÖ¾
+//    // æ¸…é™¤ä¸­æ–­æ ‡å¿—
 //    TIM_ClearITPendingBit(TIM_HARD, TIM_IT_Update);
-//    TIM_ITConfig(TIM_HARD, TIM_IT_Update, ENABLE);   // Ê¹ÄÜ¸üĞÂÖĞ¶Ï
+//    TIM_ITConfig(TIM_HARD, TIM_IT_Update, ENABLE);   // ä½¿èƒ½æ›´æ–°ä¸­æ–­
 //    
-//    // ÖĞ¶ÏÓÅÏÈ¼¶ÅäÖÃ£ºÇÀÕ¼ÓÅÏÈ¼¶µÍÓÚ UART1£¬¸ßÓÚÖ÷Ñ­»·£¨ÀıÈçÇÀÕ¼ 1£¬×ÓÓÅÏÈ¼¶ 1£©
+//    // ä¸­æ–­ä¼˜å…ˆçº§é…ç½®ï¼šæŠ¢å ä¼˜å…ˆçº§ä½äº UART1ï¼Œé«˜äºä¸»å¾ªç¯ï¼ˆä¾‹å¦‚æŠ¢å  1ï¼Œå­ä¼˜å…ˆçº§ 1ï¼‰
 //    NVIC_InitStructure.NVIC_IRQChannel = TIM_HARD_IRQn;
 //    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 2;
 //    NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
 //    NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
 //    NVIC_Init(&NVIC_InitStructure);
 //    
-//    // ×¢Òâ£º¶¨Ê±Æ÷Ä¬ÈÏ²»Æô¶¯£¬µÈ´ıÊÕµ½µÚÒ»¸ö×Ö½ÚºóÓÉÖĞ¶ÏÆô¶¯
+//    // æ³¨æ„ï¼šå®šæ—¶å™¨é»˜è®¤ä¸å¯åŠ¨ï¼Œç­‰å¾…æ”¶åˆ°ç¬¬ä¸€ä¸ªå­—èŠ‚åç”±ä¸­æ–­å¯åŠ¨
 //   
 ////		TIM_Cmd(TIM4, ENABLE);
 //}
 /*
 *********************************************************************************************************
-*	º¯ Êı Ãû: bsp_InitTimer
-*	¹¦ÄÜËµÃ÷: ÅäÖÃsystickÖĞ¶Ï£¬²¢³õÊ¼»¯Èí¼ş¶¨Ê±Æ÷±äÁ¿
-*	ĞÎ    ²Î:  ÎŞ
-*	·µ »Ø Öµ: ÎŞ
+*	å‡½ æ•° å: bsp_InitTimer
+*	åŠŸèƒ½è¯´æ˜: é…ç½®systickä¸­æ–­ï¼Œå¹¶åˆå§‹åŒ–è½¯ä»¶å®šæ—¶å™¨å˜é‡
+*	å½¢    å‚:  æ— 
+*	è¿” å› å€¼: æ— 
 *********************************************************************************************************
 */
 void bsp_InitTimer(void)
 {
 	uint8_t i;
 
-	/* ÇåÁãËùÓĞµÄÈí¼ş¶¨Ê±Æ÷ */
+	/* æ¸…é›¶æ‰€æœ‰çš„è½¯ä»¶å®šæ—¶å™¨ */
 	for (i = 0; i < TMR_COUNT; i++)
 	{
 		s_tTmr[i].Count = 0;
 		s_tTmr[i].PreLoad = 0;
 		s_tTmr[i].Flag = 0;
-		s_tTmr[i].Mode = TMR_ONCE_MODE;	/* È±Ê¡ÊÇ1´ÎĞÔ¹¤×÷Ä£Ê½ */
+		s_tTmr[i].Mode = TMR_ONCE_MODE;	/* ç¼ºçœæ˜¯1æ¬¡æ€§å·¥ä½œæ¨¡å¼ */
 	}
 
 	/*
-		ÅäÖÃsysticÖĞ¶ÏÖÜÆÚÎª1ms£¬²¢Æô¶¯systickÖĞ¶Ï¡£
+		é…ç½®systicä¸­æ–­å‘¨æœŸä¸º1msï¼Œå¹¶å¯åŠ¨systickä¸­æ–­ã€‚
 
-    	SystemCoreClock ÊÇ¹Ì¼şÖĞ¶¨ÒåµÄÏµÍ³ÄÚºËÊ±ÖÓ£¬¶ÔÓÚSTM32F4XX,Ò»°ãÎª 168MHz
+    	SystemCoreClock æ˜¯å›ºä»¶ä¸­å®šä¹‰çš„ç³»ç»Ÿå†…æ ¸æ—¶é’Ÿï¼Œå¯¹äºSTM32F4XX,ä¸€èˆ¬ä¸º 168MHz
 
-    	SysTick_Config() º¯ÊıµÄĞÎ²Î±íÊ¾ÄÚºËÊ±ÖÓ¶àÉÙ¸öÖÜÆÚºó´¥·¢Ò»´ÎSystick¶¨Ê±ÖĞ¶Ï.
-	    	-- SystemCoreClock / 1000  ±íÊ¾¶¨Ê±ÆµÂÊÎª 1000Hz£¬ Ò²¾ÍÊÇ¶¨Ê±ÖÜÆÚÎª  1ms
-	    	-- SystemCoreClock / 500   ±íÊ¾¶¨Ê±ÆµÂÊÎª 500Hz£¬  Ò²¾ÍÊÇ¶¨Ê±ÖÜÆÚÎª  2ms
-	    	-- SystemCoreClock / 2000  ±íÊ¾¶¨Ê±ÆµÂÊÎª 2000Hz£¬ Ò²¾ÍÊÇ¶¨Ê±ÖÜÆÚÎª  500us
+    	SysTick_Config() å‡½æ•°çš„å½¢å‚è¡¨ç¤ºå†…æ ¸æ—¶é’Ÿå¤šå°‘ä¸ªå‘¨æœŸåè§¦å‘ä¸€æ¬¡Systickå®šæ—¶ä¸­æ–­.
+	    	-- SystemCoreClock / 1000  è¡¨ç¤ºå®šæ—¶é¢‘ç‡ä¸º 1000Hzï¼Œ ä¹Ÿå°±æ˜¯å®šæ—¶å‘¨æœŸä¸º  1ms
+	    	-- SystemCoreClock / 500   è¡¨ç¤ºå®šæ—¶é¢‘ç‡ä¸º 500Hzï¼Œ  ä¹Ÿå°±æ˜¯å®šæ—¶å‘¨æœŸä¸º  2ms
+	    	-- SystemCoreClock / 2000  è¡¨ç¤ºå®šæ—¶é¢‘ç‡ä¸º 2000Hzï¼Œ ä¹Ÿå°±æ˜¯å®šæ—¶å‘¨æœŸä¸º  500us
 
-    	¶ÔÓÚ³£¹æµÄÓ¦ÓÃ£¬ÎÒÃÇÒ»°ãÈ¡¶¨Ê±ÖÜÆÚ1ms¡£¶ÔÓÚµÍËÙCPU»òÕßµÍ¹¦ºÄÓ¦ÓÃ£¬¿ÉÒÔÉèÖÃ¶¨Ê±ÖÜÆÚÎª 10ms
+    	å¯¹äºå¸¸è§„çš„åº”ç”¨ï¼Œæˆ‘ä»¬ä¸€èˆ¬å–å®šæ—¶å‘¨æœŸ1msã€‚å¯¹äºä½é€ŸCPUæˆ–è€…ä½åŠŸè€—åº”ç”¨ï¼Œå¯ä»¥è®¾ç½®å®šæ—¶å‘¨æœŸä¸º 10ms
     */
 //	SysTick_Config(SystemCoreClock / 1000);
 	
@@ -221,12 +221,12 @@ void bsp_InitTimer(void)
 
 /*
 *********************************************************************************************************
-*    º¯ÊıÃû: bsp_StartHardTimer
-*    ¹¦ÄÜËµÃ÷: Æô¶¯Ò»¸öÓ²¼ş¶¨Ê±Æ÷£¨µ¥´ÎÄ£Ê½£©
-*    ĞÎ    ²Î: _CC         : ±È½ÏÍ¨µÀ£¨1~4£©£¬Í¨³£ÓÃ1
-*              _uiTimeOut  : ³¬Ê±Ê±¼ä£¨Î¢Ãë£©£¬²»ÄÜ³¬¹ı¶¨Ê±Æ÷×î´óÖÜÆÚ
-*              _pCallBack  : ³¬Ê±»Øµ÷º¯Êı
-*    ·µ »Ø Öµ: ÎŞ
+*    å‡½æ•°å: bsp_StartHardTimer
+*    åŠŸèƒ½è¯´æ˜: å¯åŠ¨ä¸€ä¸ªç¡¬ä»¶å®šæ—¶å™¨ï¼ˆå•æ¬¡æ¨¡å¼ï¼‰
+*    å½¢    å‚: _CC         : æ¯”è¾ƒé€šé“ï¼ˆ1~4ï¼‰ï¼Œé€šå¸¸ç”¨1
+*              _uiTimeOut  : è¶…æ—¶æ—¶é—´ï¼ˆå¾®ç§’ï¼‰ï¼Œä¸èƒ½è¶…è¿‡å®šæ—¶å™¨æœ€å¤§å‘¨æœŸ
+*              _pCallBack  : è¶…æ—¶å›è°ƒå‡½æ•°
+*    è¿” å› å€¼: æ— 
 *********************************************************************************************************
 */
 void bsp_StartHardTimer(uint8_t _CC, uint32_t _uiTimeOut, void (*_pCallBack)(void))
@@ -234,7 +234,7 @@ void bsp_StartHardTimer(uint8_t _CC, uint32_t _uiTimeOut, void (*_pCallBack)(voi
     uint32_t cnt_now = TIM_GetCounter(TIM_HARD);
     uint32_t cnt_tar = cnt_now + _uiTimeOut;
     
-    /* ²¹³¥º¯Êıµ÷ÓÃÊ±¼ä£¨¿ÉÑ¡£©*/
+    /* è¡¥å¿å‡½æ•°è°ƒç”¨æ—¶é—´ï¼ˆå¯é€‰ï¼‰*/
     if (_uiTimeOut > 5) cnt_tar -= 5;
     
     if (_CC == 1) {
@@ -262,10 +262,10 @@ void bsp_StartHardTimer(uint8_t _CC, uint32_t _uiTimeOut, void (*_pCallBack)(voi
 
 /*
 *********************************************************************************************************
-*    º¯ÊıÃû: TIM2_IRQHandler
-*    ¹¦ÄÜËµÃ÷: TIM2 ÖĞ¶Ï·şÎñ³ÌĞò£¨ĞèÒªÔÚ stm32f4xx_it.c ÖĞµ÷ÓÃ±¾º¯Êı£¬»òÕßÖ±½ÓÔÚ´ËÊµÏÖ£©
-*    ĞÎ    ²Î: ÎŞ
-*    ·µ »Ø Öµ: ÎŞ
+*    å‡½æ•°å: TIM2_IRQHandler
+*    åŠŸèƒ½è¯´æ˜: TIM2 ä¸­æ–­æœåŠ¡ç¨‹åºï¼ˆéœ€è¦åœ¨ stm32f4xx_it.c ä¸­è°ƒç”¨æœ¬å‡½æ•°ï¼Œæˆ–è€…ç›´æ¥åœ¨æ­¤å®ç°ï¼‰
+*    å½¢    å‚: æ— 
+*    è¿” å› å€¼: æ— 
 *********************************************************************************************************
 */
 void TIM2_IRQHandler(void)
@@ -294,7 +294,7 @@ void TIM2_IRQHandler(void)
 
 /*
 *********************************************************************************************************
-*    ÒÔÏÂÎªÈí¼ş¶¨Ê±Æ÷º¯Êı£¨Èç¹ûĞèÒª³¤ÑÓÊ±£¬ÍÆ¼öÊ¹ÓÃÈí¼ş¶¨Ê±Æ÷£©
+*    ä»¥ä¸‹ä¸ºè½¯ä»¶å®šæ—¶å™¨å‡½æ•°ï¼ˆå¦‚æœéœ€è¦é•¿å»¶æ—¶ï¼Œæ¨èä½¿ç”¨è½¯ä»¶å®šæ—¶å™¨ï¼‰
 *********************************************************************************************************
 */
 void bsp_StartTimer(uint8_t _id, uint32_t _period)

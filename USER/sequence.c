@@ -4,60 +4,60 @@
 
 
 volatile uint8_t relay_stop = 0;
-// Íâ²¿Ö÷Õ¾Ğ´º¯Êı
+// å¤–éƒ¨ä¸»ç«™å†™å‡½æ•°
 extern uint8_t Modbus_06_WriteSingleReg(uint8_t slave_addr, uint16_t reg_addr, uint16_t reg_data);
 
-// ĞòÁĞ¿ØÖÆ±äÁ¿
-static volatile uint8_t seq_active = 0;       // ÊÇ·ñÓĞĞòÁĞÕıÔÚÖ´ĞĞ
-static volatile uint8_t seq_paused = 0;       // 1=ÔİÍ££¬0=ÔËĞĞ
-static uint8_t current_seq_id;                // µ±Ç°ĞòÁĞID
-static uint8_t current_step;                  // µ±Ç°²½ÖèË÷Òı£¨0¿ªÊ¼£©
-static uint8_t action_in_progress = 0;        // ÊÇ·ñÓĞµç»ú¶¯×÷ÕıÔÚÖ´ĞĞ
+// åºåˆ—æ§åˆ¶å˜é‡
+static volatile uint8_t seq_active = 0;       // æ˜¯å¦æœ‰åºåˆ—æ­£åœ¨æ‰§è¡Œ
+static volatile uint8_t seq_paused = 0;       // 1=æš‚åœï¼Œ0=è¿è¡Œ
+static uint8_t current_seq_id;                // å½“å‰åºåˆ—ID
+static uint8_t current_step;                  // å½“å‰æ­¥éª¤ç´¢å¼•ï¼ˆ0å¼€å§‹ï¼‰
+static uint8_t action_in_progress = 0;        // æ˜¯å¦æœ‰ç”µæœºåŠ¨ä½œæ­£åœ¨æ‰§è¡Œ
 
-// ²½Öè¶¨Òå
+// æ­¥éª¤å®šä¹‰
 typedef struct {
-    uint8_t motor_addr;   // µç»ú´ÓÕ¾µØÖ·
-    uint16_t reg_addr;    // ¼Ä´æÆ÷µØÖ·
-    uint16_t reg_data;    // Ğ´ÈëÖµ
-    uint16_t check_reg;   // ÓÃÓÚ¼ì²éÍê³ÉµÄ×´Ì¬¼Ä´æÆ÷µØÖ·
-    uint16_t expected_val;// ÆÚÍûÍê³ÉÊ±µÄÖµ
+    uint8_t motor_addr;   // ç”µæœºä»ç«™åœ°å€
+    uint16_t reg_addr;    // å¯„å­˜å™¨åœ°å€
+    uint16_t reg_data;    // å†™å…¥å€¼
+    uint16_t check_reg;   // ç”¨äºæ£€æŸ¥å®Œæˆçš„çŠ¶æ€å¯„å­˜å™¨åœ°å€
+    uint16_t expected_val;// æœŸæœ›å®Œæˆæ—¶çš„å€¼
 } SequenceStep;
 
-// µ±Ç°ÔËĞĞµÄĞòÁĞ
+// å½“å‰è¿è¡Œçš„åºåˆ—
 struct {
     SeqId id;
     const StepDef *steps;
     uint8_t step_count;
     uint8_t current_index;
     uint32_t wait_until;
-    uint8_t busy;          // ÊÇ·ñÕıÔÚÖ´ĞĞ
-    uint8_t error;         // ´íÎó±êÖ¾
-		uint8_t paused;        // ÔİÍ£±êÖ¾
+    uint8_t busy;          // æ˜¯å¦æ­£åœ¨æ‰§è¡Œ
+    uint8_t error;         // é”™è¯¯æ ‡å¿—
+		uint8_t paused;        // æš‚åœæ ‡å¿—
 		uint16_t pending_update_addr;
     uint16_t pending_update_value;
-		uint8_t retry_count;   // ĞÂÔö£ºµ±Ç°ĞòÁĞµÄÖØÊÔ´ÎÊı
+		uint8_t retry_count;   // æ–°å¢ï¼šå½“å‰åºåˆ—çš„é‡è¯•æ¬¡æ•°
 }seq_runner; 
 
-// ²½Öèµç»úÁĞ±íÓ³Éä
+// æ­¥éª¤ç”µæœºåˆ—è¡¨æ˜ å°„
 typedef struct {
-    uint8_t seq_id;          // ĞòÁĞID
-    uint8_t step_index;      // ²½ÖèË÷Òı£¨´Ó0¿ªÊ¼£©
-    const uint8_t *motor_addrs; // µç»úµØÖ·ÁĞ±í£¬ÒÔ 0 ½áÎ²
+    uint8_t seq_id;          // åºåˆ—ID
+    uint8_t step_index;      // æ­¥éª¤ç´¢å¼•ï¼ˆä»0å¼€å§‹ï¼‰
+    const uint8_t *motor_addrs; // ç”µæœºåœ°å€åˆ—è¡¨ï¼Œä»¥ 0 ç»“å°¾
 } StepMotorMap;
 
-// ¶¨Òå¸÷²½ÖèµÄµç»úµØÖ·ÁĞ±í
+// å®šä¹‰å„æ­¥éª¤çš„ç”µæœºåœ°å€åˆ—è¡¨
 static const uint8_t motors_center1[]   = {0x0A, 0x0C, 0x09, 0x0B, 0x00}; // Center_1
 static const uint8_t motors_center2[]   = {0x05, 0x06, 0x07, 0x08, 0x00}; // Center_2
 static const uint8_t motors_leave[]     = {0x05,0x06,0x07,0x08,0x0A,0x0C,0x09,0x0B,0x00}; // LeaveCenter / LeaveCenter1
-static const uint8_t motors_battery1[]  = {0x03, 0x00}; // Battery_1 / µÈµç»ú1µ¥¶¯
-static const uint8_t motors_battery2[]  = {0x02, 0x00}; // Battery_3 / µÈµç»ú2µ¥¶¯
-static const uint8_t motors_battery3[]  = {0x00}; // Battery_4 / µÈµç»ú3µ¥¶¯
-static const uint8_t motors_battery4[]  = {0x05,0x06,0x07,0x08,0x00}; // Battery_2,6,21 µÈ
+static const uint8_t motors_battery1[]  = {0x03, 0x00}; // Battery_1 / ç­‰ç”µæœº1å•åŠ¨
+static const uint8_t motors_battery2[]  = {0x02, 0x00}; // Battery_3 / ç­‰ç”µæœº2å•åŠ¨
+static const uint8_t motors_battery3[]  = {0x00}; // Battery_4 / ç­‰ç”µæœº3å•åŠ¨
+static const uint8_t motors_battery4[]  = {0x05,0x06,0x07,0x08,0x00}; // Battery_2,6,21 ç­‰
 static const uint8_t motors_door[]      = {0x00}; // OpenDr, CloseDr, StopDr
-static const uint8_t motors_none[]      = {0x00};       // ÎŞµç»ú
+static const uint8_t motors_none[]      = {0x00};       // æ— ç”µæœº
 
 static const StepMotorMap step_motor_map[] = {
-    // ========== ĞòÁĞ0£ºÒ»¼üÆğ·É (TAKEOFF) ==========
+    // ========== åºåˆ—0ï¼šä¸€é”®èµ·é£ (TAKEOFF) ==========
     {0, 0, motors_center1},
     {0, 1, motors_center2},
     {0, 2, motors_battery1},   // Battery_8 / 23 / 14
@@ -78,7 +78,7 @@ static const StepMotorMap step_motor_map[] = {
     {0,17, motors_leave},      // LeaveCenter
     {0,18, motors_none},       // UpdateEmptyBay
 
-    // ========== ĞòÁĞ1£º½µÂä (LANDING) ==========
+    // ========== åºåˆ—1ï¼šé™è½ (LANDING) ==========
     {1, 0, motors_center1},
     {1, 1, motors_center2},
     {1, 2, motors_battery1},   // Battery_1
@@ -97,14 +97,14 @@ static const StepMotorMap step_motor_map[] = {
     {1,15, motors_battery4},   // Battery_21
     {1,16, motors_leave},      // LeaveCenter
 
-    // ========== ĞòÁĞ2£º¾ÓÖĞ (CLOSECENTER) ==========
+    // ========== åºåˆ—2ï¼šå±…ä¸­ (CLOSECENTER) ==========
     {2, 0, motors_center1},
     {2, 1, motors_center2},
 
-    // ========== ĞòÁĞ3£ºÊÍ·Å (LEAVECENTER) ==========
+    // ========== åºåˆ—3ï¼šé‡Šæ”¾ (LEAVECENTER) ==========
     {3, 0, motors_leave},      // LeaveCenter1
 
-    // ========== ĞòÁĞ4£º×°µç³Ø (LOADBATTERY) ==========
+    // ========== åºåˆ—4ï¼šè£…ç”µæ±  (LOADBATTERY) ==========
     {4, 0, motors_center1},
     {4, 1, motors_center2},
     {4, 2, motors_battery1},   // Battery_8 / 23 / 14
@@ -124,7 +124,7 @@ static const StepMotorMap step_motor_map[] = {
     {4,16, motors_battery4},   // Battery_21
     {4,17, motors_leave},      // LeaveCenter
 
-    // ========== ĞòÁĞ5£ºÏÂµç³Ø (DOWNBATTERY) ==========
+    // ========== åºåˆ—5ï¼šä¸‹ç”µæ±  (DOWNBATTERY) ==========
     {5, 0, motors_center1},
     {5, 1, motors_center2},
     {5, 2, motors_battery1},   // Battery_1
@@ -143,7 +143,7 @@ static const StepMotorMap step_motor_map[] = {
     {5,15, motors_battery4},   // Battery_21
     {5,16, motors_leave},      // LeaveCenter
 
-    // ========== ĞòÁĞ8£º·É»ú¿ª»ú (OPENFLY) ==========
+    // ========== åºåˆ—8ï¼šé£æœºå¼€æœº (OPENFLY) ==========
     {8, 0, motors_center1},
     {8, 1, motors_center2},
     {8, 2, motors_battery1},   // Battery_1
@@ -158,7 +158,7 @@ static const StepMotorMap step_motor_map[] = {
     {8,11, motors_battery4},   // Battery_21
     {8,12, motors_leave},      // LeaveCenter
 
-    // ========== ĞòÁĞ9£º·É»ú¹Ø»ú (CLOSEFLY) ==========
+    // ========== åºåˆ—9ï¼šé£æœºå…³æœº (CLOSEFLY) ==========
     {9, 0, motors_center1},
     {9, 1, motors_center2},
     {9, 2, motors_battery1},   // Battery_1
@@ -173,47 +173,47 @@ static const StepMotorMap step_motor_map[] = {
     {9,11, motors_battery4},   // Battery_21
     {9,12, motors_leave},      // LeaveCenter
 
-    // ========== ĞòÁĞ10£º´ò¿ª²ÕÃÅ (OPENDR) ==========
+    // ========== åºåˆ—10ï¼šæ‰“å¼€èˆ±é—¨ (OPENDR) ==========
     {10, 0, motors_door},      // OpenDr
     {10, 1, motors_door},      // StopDr
 
-    // ========== ĞòÁĞ11£º¹Ø±Õ²ÕÃÅ (CLOSEDR) ==========
+    // ========== åºåˆ—11ï¼šå…³é—­èˆ±é—¨ (CLOSEDR) ==========
     {11, 0, motors_door},      // CloseDr
     {11, 1, motors_door},      // StopDr
 };
 
 #define MAP_SIZE (sizeof(step_motor_map)/sizeof(step_motor_map[0]))
 
-volatile uint8_t g_step_timer_expired = 0;   // ¶¨Ê±Æ÷³¬Ê±±êÖ¾
+volatile uint8_t g_step_timer_expired = 0;   // å®šæ—¶å™¨è¶…æ—¶æ ‡å¿—
 
-// ¶¨Ê±Æ÷»Øµ÷º¯Êı£¨ÔÚÖĞ¶ÏÉÏÏÂÎÄÖĞÖ´ĞĞ£©
+// å®šæ—¶å™¨å›è°ƒå‡½æ•°ï¼ˆåœ¨ä¸­æ–­ä¸Šä¸‹æ–‡ä¸­æ‰§è¡Œï¼‰
 static void StepTimerCallback(void)
 {
     g_step_timer_expired = 1;
 }
 
-// ÔİÍ£ĞòÁĞ
+// æš‚åœåºåˆ—
 void Sequence_Pause(void) {
     if (seq_runner.busy && !seq_runner.paused) {
         seq_runner.paused = 1;
-        printf("ĞòÁĞÒÑÔİÍ£\r\n");
+        printf("åºåˆ—å·²æš‚åœ\r\n");
     }
 }
 
-// »Ö¸´ĞòÁĞ
+// æ¢å¤åºåˆ—
 void Sequence_Resume(void) {
     if (seq_runner.busy && seq_runner.paused) 
 		{
         seq_runner.paused = 0;
-        printf("ĞòÁĞÒÑ»Ö¸´\r\n");
-        // Èôµ±Ç°Ã»ÓĞµÈ´ı¼ÆÊ±Æ÷£¨¼´´¦ÓÚ²½Öè±ß½ç£©£¬ÏÂÒ»´Î Sequence_Process »áÁ¢¼´Ö´ĞĞÏÂÒ»²½
-        // ÈôÕı´¦ÓÚµÈ´ıÆÚ¼ä£¬µÈ´ı½áÊøºóÒ²»á×Ô¶¯¼ÌĞø
+        printf("åºåˆ—å·²æ¢å¤\r\n");
+        // è‹¥å½“å‰æ²¡æœ‰ç­‰å¾…è®¡æ—¶å™¨ï¼ˆå³å¤„äºæ­¥éª¤è¾¹ç•Œï¼‰ï¼Œä¸‹ä¸€æ¬¡ Sequence_Process ä¼šç«‹å³æ‰§è¡Œä¸‹ä¸€æ­¥
+        // è‹¥æ­£å¤„äºç­‰å¾…æœŸé—´ï¼Œç­‰å¾…ç»“æŸåä¹Ÿä¼šè‡ªåŠ¨ç»§ç»­
     }
 }
 
-// ---------- ·É»ú½µÂä²½Öèº¯Êı¶¨Òå ----------
+// ---------- é£æœºé™è½æ­¥éª¤å‡½æ•°å®šä¹‰ ----------
 
-//1.´ò¿ª²ÕÃÅ
+//1.æ‰“å¼€èˆ±é—¨
 static uint8_t OpenDoor(void)
 {
 //	  uint8_t ret;
@@ -224,7 +224,7 @@ static uint8_t OpenDoor(void)
 	
 }
 
-//1.¹Ø±Õ²ÕÃÅ
+//1.å…³é—­èˆ±é—¨
 static uint8_t CloseDoor(void)
 {
 //	  uint8_t ret;
@@ -238,17 +238,17 @@ static uint8_t CloseDoor(void)
 
 
 
-//2.µç»ú1ÉÏÉı1 
+//2.ç”µæœº1ä¸Šå‡1 
 static uint8_t Motor1Up1(void)
 {
-		uint8_t Reg_num = 2;   // ¼Ä´æÆ÷ÊıÁ¿
-		uint16_t slave2_cmds[2] = {Pulse_num2, Pulse_num1};//¼Ä´æÆ÷Ö¸Áî
+		uint8_t Reg_num = 2;   // å¯„å­˜å™¨æ•°é‡
+		uint16_t slave2_cmds[2] = {Pulse_num2, Pulse_num1};//å¯„å­˜å™¨æŒ‡ä»¤
 		if (master_state != MASTER_IDLE) 
 		{
 				master_state = MASTER_IDLE;
 				timeout_cnt = 0;
     }
-		uint8_t ret = Motor_Batch_Control(MOTOR1_SLAVE_ADDR, MOTOR1_CTRL_REG1, Reg_num, slave2_cmds);// Ö¸Áî·¢ËÍ·µ»ØÖµ 
+		uint8_t ret = Motor_Batch_Control(MOTOR1_SLAVE_ADDR, MOTOR1_CTRL_REG1, Reg_num, slave2_cmds);// æŒ‡ä»¤å‘é€è¿”å›å€¼ 
 		printf("ret= %d\r\n", ret);
 		if (ret != 0) return ret;
     master_state = MASTER_IDLE;
@@ -257,19 +257,19 @@ static uint8_t Motor1Up1(void)
 		return 0;
 }
 
-//3.·É»úÇ°½ø
+//3.é£æœºå‰è¿›
 
-//4.µç»ú2Ç°½ø
+//4.ç”µæœº2å‰è¿›
 static uint8_t Motor2Forward(void)
 {
-		uint8_t Reg_num = 5;   // ¼Ä´æÆ÷ÊıÁ¿
-		uint16_t slave2_cmds[5] = {Direction,Speed,Pulse_num11, Pulse_num12,Position1};//¼Ä´æÆ÷Ö¸Áî
+		uint8_t Reg_num = 5;   // å¯„å­˜å™¨æ•°é‡
+		uint16_t slave2_cmds[5] = {Direction,Speed,Pulse_num11, Pulse_num12,Position1};//å¯„å­˜å™¨æŒ‡ä»¤
 		if (master_state != MASTER_IDLE) 
 		{
 				master_state = MASTER_IDLE;
 				timeout_cnt = 0;
     }
-		uint8_t ret = Motor_Batch_Control(MOTOR2_SLAVE_ADDR, MOTOR2_CTRL_REG5, Reg_num, slave2_cmds);// Ö¸Áî·¢ËÍ·µ»ØÖµ 
+		uint8_t ret = Motor_Batch_Control(MOTOR2_SLAVE_ADDR, MOTOR2_CTRL_REG5, Reg_num, slave2_cmds);// æŒ‡ä»¤å‘é€è¿”å›å€¼ 
 		if (ret != 0) return ret;
     master_state = MASTER_IDLE;
     timeout_cnt = 0;
@@ -277,11 +277,11 @@ static uint8_t Motor2Forward(void)
 		return 0;
 }
 
-//5.µç»ú3¼Ğ×¡µç³Ø
+//5.ç”µæœº3å¤¹ä½ç”µæ± 
 static uint8_t Motor3Clamp(void)
 {
     uint8_t ret;
-    // ÉèÖÃ³õÊ¼ËÙ¶È 
+    // è®¾ç½®åˆå§‹é€Ÿåº¦ 
     ret = Motor_Control(MOTOR3_SLAVE_ADDR, 2, Clamp);
     if (ret != 0) return ret;
     master_state = MASTER_IDLE;
@@ -290,19 +290,19 @@ static uint8_t Motor3Clamp(void)
     return 0;
 }
 
-//6.·É»úºóÍË
+//6.é£æœºåé€€
 
-//7.µç»ú2ºóÍË
+//7.ç”µæœº2åé€€
 static uint8_t Motor2Back(void)
 {
-		uint8_t Reg_num = 5;   // ¼Ä´æÆ÷ÊıÁ¿
-		uint16_t slave2_cmds[5] = {Direction_back,Speed,Pulse_num11, Pulse_num12,Position1};//¼Ä´æÆ÷Ö¸Áî
+		uint8_t Reg_num = 5;   // å¯„å­˜å™¨æ•°é‡
+		uint16_t slave2_cmds[5] = {Direction_back,Speed,Pulse_num11, Pulse_num12,Position1};//å¯„å­˜å™¨æŒ‡ä»¤
 		if (master_state != MASTER_IDLE) 
 		{
 				master_state = MASTER_IDLE;
 				timeout_cnt = 0;
     }
-		uint8_t ret = Motor_Batch_Control(MOTOR2_SLAVE_ADDR, MOTOR2_CTRL_REG5, Reg_num, slave2_cmds);// Ö¸Áî·¢ËÍ·µ»ØÖµ 
+		uint8_t ret = Motor_Batch_Control(MOTOR2_SLAVE_ADDR, MOTOR2_CTRL_REG5, Reg_num, slave2_cmds);// æŒ‡ä»¤å‘é€è¿”å›å€¼ 
 		if (ret != 0) return ret;
     master_state = MASTER_IDLE;
     timeout_cnt = 0;
@@ -310,17 +310,17 @@ static uint8_t Motor2Back(void)
 		return 0;
 }
 
-//8.µç»ú1ÏÂ½µ 
+//8.ç”µæœº1ä¸‹é™ 
 static uint8_t Motor1Down1(void)
 {
-		uint8_t Reg_num = 2;   // ¼Ä´æÆ÷ÊıÁ¿
-		uint16_t slave2_cmds[2] = {Pulse_num4, Pulse_num3};//¼Ä´æÆ÷Ö¸Áî
+		uint8_t Reg_num = 2;   // å¯„å­˜å™¨æ•°é‡
+		uint16_t slave2_cmds[2] = {Pulse_num4, Pulse_num3};//å¯„å­˜å™¨æŒ‡ä»¤
 		if (master_state != MASTER_IDLE) 
 		{
 				master_state = MASTER_IDLE;
 				timeout_cnt = 0;
     }
-		uint8_t ret = Motor_Batch_Control(MOTOR1_SLAVE_ADDR, MOTOR1_CTRL_REG1, Reg_num, slave2_cmds);// Ö¸Áî·¢ËÍ·µ»ØÖµ 
+		uint8_t ret = Motor_Batch_Control(MOTOR1_SLAVE_ADDR, MOTOR1_CTRL_REG1, Reg_num, slave2_cmds);// æŒ‡ä»¤å‘é€è¿”å›å€¼ 
 		printf("ret= %d\r\n", ret);
 		if (ret != 0) return ret;
     master_state = MASTER_IDLE;
@@ -329,9 +329,9 @@ static uint8_t Motor1Down1(void)
 		return 0;
 }
 
-//9.µç»ú2Ç°½ø
+//9.ç”µæœº2å‰è¿›
 
-//10.µç»ú3ËÉ¿ªµç³Ø
+//10.ç”µæœº3æ¾å¼€ç”µæ± 
 static uint8_t Motor3Lossen(void)
 {
     uint8_t ret;
@@ -343,19 +343,19 @@ static uint8_t Motor3Lossen(void)
     return 0;
 }
 
-//11.µç»ú2ºóÍË
+//11.ç”µæœº2åé€€
 
-//12.µç»ú1ÉÏÉı2 
+//12.ç”µæœº1ä¸Šå‡2 
 static uint8_t Motor1Up2(void)
 {
-		uint8_t Reg_num = 2;   // ¼Ä´æÆ÷ÊıÁ¿
-		uint16_t slave2_cmds[2] = {Pulse_num6, Pulse_num5};//¼Ä´æÆ÷Ö¸Áî
+		uint8_t Reg_num = 2;   // å¯„å­˜å™¨æ•°é‡
+		uint16_t slave2_cmds[2] = {Pulse_num6, Pulse_num5};//å¯„å­˜å™¨æŒ‡ä»¤
 		if (master_state != MASTER_IDLE) 
 		{
 				master_state = MASTER_IDLE;
 				timeout_cnt = 0;
     }
-		uint8_t ret = Motor_Batch_Control(MOTOR1_SLAVE_ADDR, MOTOR1_CTRL_REG1, Reg_num, slave2_cmds);// Ö¸Áî·¢ËÍ·µ»ØÖµ 
+		uint8_t ret = Motor_Batch_Control(MOTOR1_SLAVE_ADDR, MOTOR1_CTRL_REG1, Reg_num, slave2_cmds);// æŒ‡ä»¤å‘é€è¿”å›å€¼ 
 		printf("ret= %d\r\n", ret);
 		if (ret != 0) return ret;
     master_state = MASTER_IDLE;
@@ -364,21 +364,21 @@ static uint8_t Motor1Up2(void)
 		return 0;
 }
 
-//13.µç»ú2Ç°½ø
-//14.µç»ú3¼Ğ×¡µç³Ø
-//15.µç»ú2ºóÍË
+//13.ç”µæœº2å‰è¿›
+//14.ç”µæœº3å¤¹ä½ç”µæ± 
+//15.ç”µæœº2åé€€
 
-//16.µç»ú1ÉÏÉı3 
+//16.ç”µæœº1ä¸Šå‡3 
 static uint8_t Motor1Up3(void)
 {
-		uint8_t Reg_num = 2;   // ¼Ä´æÆ÷ÊıÁ¿
-		uint16_t slave2_cmds[2] = {Pulse_num8, Pulse_num7};//¼Ä´æÆ÷Ö¸Áî
+		uint8_t Reg_num = 2;   // å¯„å­˜å™¨æ•°é‡
+		uint16_t slave2_cmds[2] = {Pulse_num8, Pulse_num7};//å¯„å­˜å™¨æŒ‡ä»¤
 		if (master_state != MASTER_IDLE) 
 		{
 				master_state = MASTER_IDLE;
 				timeout_cnt = 0;
     }
-		uint8_t ret = Motor_Batch_Control(MOTOR1_SLAVE_ADDR, MOTOR1_CTRL_REG1, Reg_num, slave2_cmds);// Ö¸Áî·¢ËÍ·µ»ØÖµ 
+		uint8_t ret = Motor_Batch_Control(MOTOR1_SLAVE_ADDR, MOTOR1_CTRL_REG1, Reg_num, slave2_cmds);// æŒ‡ä»¤å‘é€è¿”å›å€¼ 
 		printf("ret= %d\r\n", ret);
 		if (ret != 0) return ret;
     master_state = MASTER_IDLE;
@@ -386,18 +386,18 @@ static uint8_t Motor1Up3(void)
 		
 		return 0;
 }
-//17.·É»úÇ°½ø
-//18.µç»ú2Ç°½ø
-//19.µç»ú3ËÉ¿ªµç³Ø
-//20.·É»úºóÍË
-//21.µç»ú2ºóÍË
-//22.µç»ú1ÏÂ½µ
+//17.é£æœºå‰è¿›
+//18.ç”µæœº2å‰è¿›
+//19.ç”µæœº3æ¾å¼€ç”µæ± 
+//20.é£æœºåé€€
+//21.ç”µæœº2åé€€
+//22.ç”µæœº1ä¸‹é™
 
 
-//¾ÓÖĞ1
+//å±…ä¸­1
 static uint8_t CloseCenter1(void)
 {
-		//ĞèÒªĞŞ¸Ä¾ßÌå²ÎÊı  
+		//éœ€è¦ä¿®æ”¹å…·ä½“å‚æ•°  
 		MotorControlParams motors[4] = 
 		{
 			{MOTOR10_SLAVE_ADDR, MOTOR5_CTRL_REG1, MOTOR10_length_l, MOTOR10_length_h},
@@ -405,7 +405,7 @@ static uint8_t CloseCenter1(void)
 			{MOTOR9_SLAVE_ADDR, MOTOR5_CTRL_REG1, MOTOR9_length_l, MOTOR9_length_h},
 			{MOTOR11_SLAVE_ADDR, MOTOR5_CTRL_REG1, MOTOR9_length_l, MOTOR9_length_h}
     };
-    // Í¬²½·¢ËÍËùÓĞµç»úÖ¸Áî£¨²»µÈ´ıÏìÓ¦£©
+    // åŒæ­¥å‘é€æ‰€æœ‰ç”µæœºæŒ‡ä»¤ï¼ˆä¸ç­‰å¾…å“åº”ï¼‰
     Sync_Motors_Control(motors, 4);
 		
 		master_state = MASTER_IDLE;
@@ -414,29 +414,29 @@ static uint8_t CloseCenter1(void)
 }
 
 
-//¾ÓÖĞ2
+//å±…ä¸­2
 static uint8_t CloseCenter2(void)
 {
-		//ĞèÒªĞŞ¸Ä¾ßÌå²ÎÊı  
+		//éœ€è¦ä¿®æ”¹å…·ä½“å‚æ•°  
 		MotorControlParams motors[2] = 
 		{
 			{MOTOR7_SLAVE_ADDR, MOTOR5_CTRL_REG1, MOTOR8_length_l, MOTOR8_length_h},
 			{MOTOR8_SLAVE_ADDR, MOTOR5_CTRL_REG1, MOTOR8_length_l, MOTOR8_length_h}
     };
     uint8_t results[2];
-    // Í¬²½·¢ËÍËùÓĞµç»úÖ¸Áî£¨²»µÈ´ıÏìÓ¦£©
+    // åŒæ­¥å‘é€æ‰€æœ‰ç”µæœºæŒ‡ä»¤ï¼ˆä¸ç­‰å¾…å“åº”ï¼‰
     Sync_Motors_Control(motors, 2);
-//		StatusRegs_Update(0x15, 4); //½«¾ÓÖĞ×´Ì¬Ğ´Èë¼Ä´æÆ÷
+//		StatusRegs_Update(0x15, 4); //å°†å±…ä¸­çŠ¶æ€å†™å…¥å¯„å­˜å™¨
 		master_state = MASTER_IDLE;
     timeout_cnt = 0;
     return 0; 
 }
 
 
-//·É»úÇ°½ø
+//é£æœºå‰è¿›
 static uint8_t FlyForward(void)
 {
-		//ĞèÒªĞŞ¸Ä¾ßÌå²ÎÊı  
+		//éœ€è¦ä¿®æ”¹å…·ä½“å‚æ•°  
 		MotorControlParams motors[4] = 
 		{
 			{MOTOR5_SLAVE_ADDR, MOTOR5_CTRL_REG1, MOTOR6_length_l, MOTOR6_length_h},
@@ -445,18 +445,18 @@ static uint8_t FlyForward(void)
 			{MOTOR8_SLAVE_ADDR, MOTOR5_CTRL_REG1, MOTOR5_length_l, MOTOR5_length_h}
     };
     uint8_t results[4];
-    // Í¬²½·¢ËÍËùÓĞµç»úÖ¸Áî£¨²»µÈ´ıÏìÓ¦£©
+    // åŒæ­¥å‘é€æ‰€æœ‰ç”µæœºæŒ‡ä»¤ï¼ˆä¸ç­‰å¾…å“åº”ï¼‰
     Sync_Motors_Control(motors, 4);
-//		StatusRegs_Update(0x15, 4); //½«¾ÓÖĞ×´Ì¬Ğ´Èë¼Ä´æÆ÷
+//		StatusRegs_Update(0x15, 4); //å°†å±…ä¸­çŠ¶æ€å†™å…¥å¯„å­˜å™¨
 		master_state = MASTER_IDLE;
     timeout_cnt = 0;
     return 0; 
 }
 
-//·É»úºóÍË
+//é£æœºåé€€
 uint8_t FlyBack(void)
 {
-		//ĞèÒªĞŞ¸Ä¾ßÌå²ÎÊı  
+		//éœ€è¦ä¿®æ”¹å…·ä½“å‚æ•°  
 		MotorControlParams motors[4] = 
 		{
 			{MOTOR5_SLAVE_ADDR, MOTOR5_CTRL_REG1, MOTOR5_length_l, MOTOR5_length_h},
@@ -467,9 +467,9 @@ uint8_t FlyBack(void)
     uint8_t results[4];
     uint8_t ret = Control_Motors_Complete(motors, 4, results);
     if (ret == 0) {
-        printf("×İÏò¹éÖĞ¿ØÖÆ³É¹¦\r\n");
+        printf("çºµå‘å½’ä¸­æ§åˆ¶æˆåŠŸ\r\n");
     } else {
-        printf("×İÏò¹éÖĞ¿ØÖÆÓĞ %d ¸öÊ§°Ü\r\n", ret);
+        printf("çºµå‘å½’ä¸­æ§åˆ¶æœ‰ %d ä¸ªå¤±è´¥\r\n", ret);
     }
 //		StatusRegs_Update(0x15, 2);
 		master_state = MASTER_IDLE;
@@ -478,11 +478,11 @@ uint8_t FlyBack(void)
 }
 
 
-// ¿ØÖÆÆ÷¼ÌµçÆ÷¹ØÆô
+// æ§åˆ¶å™¨ç»§ç”µå™¨å…³å¯
 uint8_t RelayCtrl(void)
 {
 		Relay_Forward();
-		delay_ms(3000);   // Õı×ª3Ãë
+		delay_ms(3000);   // æ­£è½¬3ç§’
 		Relay_Stop();
 		return 0;
 }
@@ -490,288 +490,288 @@ uint8_t RelayCtrl(void)
 
 static const StepDef opendr1_steps[] = 
 {
-//      {OpenDr, 15250, 0xFFFF, 0},      //1.´ò¿ª²ÕÃÅ      
-			{StopDr, 1000, 0x11, 2},       //2.Í£Ö¹
-			{CloseAC, 0, 0xFFFF, 0},   // ¹Ø±Õ¿Õµ÷
+//      {OpenDr, 15250, 0xFFFF, 0},      //1.æ‰“å¼€èˆ±é—¨      
+			{StopDr, 1000, 0x11, 2},       //2.åœæ­¢
+			{CloseAC, 0, 0xFFFF, 0},   // å…³é—­ç©ºè°ƒ
 
 };
 #define OPENDR1_STEP_COUNT (sizeof(opendr1_steps) / sizeof(opendr1_steps[0]))
-// ´ò¿ª²ÕÃÅ²½Öè±í
+// æ‰“å¼€èˆ±é—¨æ­¥éª¤è¡¨
 static const StepDef opendr_steps[] = 
 {
-      {OpenDr, 15250, 0x11, 2},      //1.´ò¿ª²ÕÃÅ      
-//			{StopDr, 1000, 0x11, 2},       //2.Í£Ö¹
-			{CloseAC, 0, 0xFFFF, 0},   // ¹Ø±Õ¿Õµ÷
+      {OpenDr, 15250, 0x11, 2},      //1.æ‰“å¼€èˆ±é—¨      
+//			{StopDr, 1000, 0x11, 2},       //2.åœæ­¢
+			{CloseAC, 0, 0xFFFF, 0},   // å…³é—­ç©ºè°ƒ
 
 };
 #define OPENDR_STEP_COUNT (sizeof(opendr_steps) / sizeof(opendr_steps[0]))
 
 
-// ¹Ø±Õ²ÕÃÅ²½Öè±í
+// å…³é—­èˆ±é—¨æ­¥éª¤è¡¨
 static const StepDef closedr_steps[] = 
 {
-      {CloseDr, 16250, 0x11, 2},      //1.¹Ø±Õ²ÕÃÅ      
-//			{StopDr, 1000, 0x11, 4},       //2.Í£Ö¹
-			{OpenAC, 0, 0xFFFF, 0},   // ´ò¿ª¿Õµ÷
+      {CloseDr, 16250, 0x11, 2},      //1.å…³é—­èˆ±é—¨      
+//			{StopDr, 1000, 0x11, 4},       //2.åœæ­¢
+			{OpenAC, 0, 0xFFFF, 0},   // æ‰“å¼€ç©ºè°ƒ
 
 };
 #define CLOSEDR_STEP_COUNT (sizeof(closedr_steps) / sizeof(closedr_steps[0]))
 
-// ·É»ú¿ª»ú²½Öè±í
+// é£æœºå¼€æœºæ­¥éª¤è¡¨
 static const StepDef openfly_steps[] = 
 {
-      {Center_1, 5000, 0xFFFF, 0},        //1.×óÓÒ¾ÓÖĞ      
-			{Center_2, 13000, 0x15, 4},       //2.Ç°ºó¾ÓÖĞ
-			{Battery_27, 16000, 0xFFFF, 0},      //3.µç»ú1ÉÏÉı
-			{Battery_2, 5000, 0xFFFF, 0},       //4.·É»úÇ°½ø
-			{Battery_28, 16000, 0xFFFF, 0},      //5.µç»ú2Ç°½ø
-			{Battery_18, 800, 0xFFFF, 0},      //27.µç»ú2Ç°½ø
-			{Battery_19, 1000, 0xFFFF, 0},      //28.µç»ú2ºóÍË
-			{Battery_18, 2000, 0xFFFF, 0},      //29.µç»ú2Ç°½ø
-			{Battery_25, 16000, 0xFFFF, 0},     //30.µç»ú2ºóÍË
-			{Battery_6, 5000, 0xFFFF, 0},       //31.·É»úºóÍË
-			{Battery_7, 16000, 0xFFFF, 0},      //32.µç»ú1ÏÂ½µ
-			{Battery_21, 10000, 0xFFFF, 0},     //33.·É»úÇ°½ø
-			{LeaveCenter, 10000, 0x15, 2},    //34.¾ÓÖĞ¸ËÊÍ·Å
+      {Center_1, 5000, 0xFFFF, 0},        //1.å·¦å³å±…ä¸­      
+			{Center_2, 13000, 0x15, 4},       //2.å‰åå±…ä¸­
+			{Battery_27, 16000, 0xFFFF, 0},      //3.ç”µæœº1ä¸Šå‡
+			{Battery_2, 5000, 0xFFFF, 0},       //4.é£æœºå‰è¿›
+			{Battery_28, 16000, 0xFFFF, 0},      //5.ç”µæœº2å‰è¿›
+			{Battery_18, 800, 0xFFFF, 0},      //27.ç”µæœº2å‰è¿›
+			{Battery_19, 1000, 0xFFFF, 0},      //28.ç”µæœº2åé€€
+			{Battery_18, 2000, 0xFFFF, 0},      //29.ç”µæœº2å‰è¿›
+			{Battery_25, 16000, 0xFFFF, 0},     //30.ç”µæœº2åé€€
+			{Battery_6, 5000, 0xFFFF, 0},       //31.é£æœºåé€€
+			{Battery_7, 16000, 0xFFFF, 0},      //32.ç”µæœº1ä¸‹é™
+			{Battery_21, 10000, 0xFFFF, 0},     //33.é£æœºå‰è¿›
+			{LeaveCenter, 10000, 0x15, 2},    //34.å±…ä¸­æ†é‡Šæ”¾
 
 };
 #define OPENFLY_STEP_COUNT (sizeof(openfly_steps) / sizeof(openfly_steps[0]))
 	
-// ·É»ú¹Ø»ú²½Öè±í
+// é£æœºå…³æœºæ­¥éª¤è¡¨
 static const StepDef closefly_steps[] = 
 {
 
-      {Center_1, 5000, 0xFFFF, 0},        //1.×óÓÒ¾ÓÖĞ      
-			{Center_2, 13000, 0x15, 4},       //2.Ç°ºó¾ÓÖĞ
-			{Battery_27, 16000, 0xFFFF, 0},      //3.µç»ú1ÉÏÉı
-			{Battery_2, 5000, 0xFFFF, 0},       //4.·É»úÇ°½ø
-			{Battery_28, 16000, 0xFFFF, 0},      //5.µç»ú2Ç°½ø
-			{Battery_18, 1000, 0xFFFF, 0},      //27.µç»ú2Ç°½ø
-			{Battery_19, 1000, 0xFFFF, 0},      //28.µç»ú2ºóÍË
-			{Battery_18, 2000, 0xFFFF, 0},      //29.µç»ú2Ç°½ø
-			{Battery_25, 16000, 0xFFFF, 0},     //30.µç»ú2ºóÍË
-			{Battery_6, 5000, 0xFFFF, 0},       //31.·É»úºóÍË
-			{Battery_7, 16000, 0xFFFF, 0},      //32.µç»ú1ÏÂ½µ
-			{Battery_21, 10000, 0xFFFF, 0},     //33.·É»úÇ°½ø
-			{LeaveCenter, 10000, 0x15, 2},    //34.¾ÓÖĞ¸ËÊÍ·Å
+      {Center_1, 5000, 0xFFFF, 0},        //1.å·¦å³å±…ä¸­      
+			{Center_2, 13000, 0x15, 4},       //2.å‰åå±…ä¸­
+			{Battery_27, 16000, 0xFFFF, 0},      //3.ç”µæœº1ä¸Šå‡
+			{Battery_2, 5000, 0xFFFF, 0},       //4.é£æœºå‰è¿›
+			{Battery_28, 16000, 0xFFFF, 0},      //5.ç”µæœº2å‰è¿›
+			{Battery_18, 1000, 0xFFFF, 0},      //27.ç”µæœº2å‰è¿›
+			{Battery_19, 1000, 0xFFFF, 0},      //28.ç”µæœº2åé€€
+			{Battery_18, 2000, 0xFFFF, 0},      //29.ç”µæœº2å‰è¿›
+			{Battery_25, 16000, 0xFFFF, 0},     //30.ç”µæœº2åé€€
+			{Battery_6, 5000, 0xFFFF, 0},       //31.é£æœºåé€€
+			{Battery_7, 16000, 0xFFFF, 0},      //32.ç”µæœº1ä¸‹é™
+			{Battery_21, 10000, 0xFFFF, 0},     //33.é£æœºå‰è¿›
+			{LeaveCenter, 10000, 0x15, 2},    //34.å±…ä¸­æ†é‡Šæ”¾
 			
 };
 #define CLOSEFLY_STEP_COUNT (sizeof(closefly_steps) / sizeof(closefly_steps[0]))
 
-// Ò»¼üÆğ·É²½Öè±í(Ö»½«·É»ú¿ª»ú)
+// ä¸€é”®èµ·é£æ­¥éª¤è¡¨(åªå°†é£æœºå¼€æœº)
 static const StepDef takeoff_steps_1[] = 
 {	
-	    {OpenDr, 15250, 0x11, 2},     	  //1.´ò¿ª²ÕÃÅ      
-//			{StopDr, 1000, 0x11, 2},      		  //2.Í£Ö¹
-			{CloseAC, 500, 0xFFFF, 0},            // ¹Ø±Õ¿Õµ÷
-      {Center_1, 5000, 0xFFFF, 0},        //1.×óÓÒ¾ÓÖĞ      
-			{Center_2, 13000, 0x15, 4},     	  //2.Ç°ºó¾ÓÖĞ
-			{Battery_27, 16000, 0xFFFF, 0},      //3.µç»ú1ÉÏÉı
-			{Battery_2, 5000, 0xFFFF, 0},       //4.·É»úÇ°½ø
-			{Battery_28, 16000, 0xFFFF, 0},      //5.µç»ú2Ç°½ø
-			{Battery_18, 1000, 0xFFFF, 0},      //27.µç»ú2Ç°½ø
-			{Battery_19, 1000, 0xFFFF, 0},      //28.µç»ú2ºóÍË
-			{Battery_18, 2000, 0xFFFF, 0},      //29.µç»ú2Ç°½ø
-			{Battery_25, 16000, 0xFFFF, 0},     //30.µç»ú2ºóÍË
-			{Battery_6, 5000, 0xFFFF, 0},       //31.·É»úºóÍË
-			{Battery_7, 16000, 0xFFFF, 0},      //32.µç»ú1ÏÂ½µ
-			{Battery_21, 10000, 0xFFFF, 0},     //33.·É»úÇ°½ø
-			{LeaveCenter, 10000, 0x15, 2},   	  //34.¾ÓÖĞ¸ËÊÍ·Å
-			{CloseAC, 16000, 0xFFFF, 0},            // ¹Ø±Õ¿Õµ÷
-//      {CheckAndCloseDoor, 16250, 0xFFFF, 0},     	  //1.¹Ø±Õ²ÕÃÅ      
-			{StopDr, 1000, 0x11, 4},      		  //2.Í£Ö¹
+	    {OpenDr, 15250, 0x11, 2},     	  //1.æ‰“å¼€èˆ±é—¨      
+//			{StopDr, 1000, 0x11, 2},      		  //2.åœæ­¢
+			{CloseAC, 500, 0xFFFF, 0},            // å…³é—­ç©ºè°ƒ
+      {Center_1, 5000, 0xFFFF, 0},        //1.å·¦å³å±…ä¸­      
+			{Center_2, 13000, 0x15, 4},     	  //2.å‰åå±…ä¸­
+			{Battery_27, 16000, 0xFFFF, 0},      //3.ç”µæœº1ä¸Šå‡
+			{Battery_2, 5000, 0xFFFF, 0},       //4.é£æœºå‰è¿›
+			{Battery_28, 16000, 0xFFFF, 0},      //5.ç”µæœº2å‰è¿›
+			{Battery_18, 1000, 0xFFFF, 0},      //27.ç”µæœº2å‰è¿›
+			{Battery_19, 1000, 0xFFFF, 0},      //28.ç”µæœº2åé€€
+			{Battery_18, 2000, 0xFFFF, 0},      //29.ç”µæœº2å‰è¿›
+			{Battery_25, 16000, 0xFFFF, 0},     //30.ç”µæœº2åé€€
+			{Battery_6, 5000, 0xFFFF, 0},       //31.é£æœºåé€€
+			{Battery_7, 16000, 0xFFFF, 0},      //32.ç”µæœº1ä¸‹é™
+			{Battery_21, 10000, 0xFFFF, 0},     //33.é£æœºå‰è¿›
+			{LeaveCenter, 10000, 0x15, 2},   	  //34.å±…ä¸­æ†é‡Šæ”¾
+			{CloseAC, 16000, 0xFFFF, 0},            // å…³é—­ç©ºè°ƒ
+//      {CheckAndCloseDoor, 16250, 0xFFFF, 0},     	  //1.å…³é—­èˆ±é—¨      
+			{StopDr, 1000, 0x11, 4},      		  //2.åœæ­¢
       
 };
 #define TAKEOFF_STEPS_1_COUNT  (sizeof(takeoff_steps_1) / sizeof(takeoff_steps_1[0]))
 
 
-// Ò»¼üÆğ·É²½Öè±í(Ö»½«·É»ú¿ª»ú)
+// ä¸€é”®èµ·é£æ­¥éª¤è¡¨(åªå°†é£æœºå¼€æœº)
 static const StepDef takeoff_steps_2[] = 
 {
-	    {OpenDr, 15250, 0x11, 2},     	  //1.´ò¿ª²ÕÃÅ  
-//			{StopDr, 1000, 0x11, 2},      		  //2.Í£Ö¹	
-			{CloseAC, 500, 0xFFFF, 0},            // ¹Ø±Õ¿Õµ÷
-      {Center_1, 5000, 0xFFFF, 0},        //1.×óÓÒ¾ÓÖĞ      
-			{Center_2, 13000, 0x15, 4},     	  //2.Ç°ºó¾ÓÖĞ
-			{Battery_27, 16000, 0xFFFF, 0},      //3.µç»ú1ÉÏÉı
-			{Battery_2, 5000, 0xFFFF, 0},       //4.·É»úÇ°½ø
-			{Battery_28, 16000, 0xFFFF, 0},      //5.µç»ú2Ç°½ø
-			{Battery_18, 1000, 0xFFFF, 0},      //27.µç»ú2Ç°½ø
-			{Battery_19, 1000, 0xFFFF, 0},      //28.µç»ú2ºóÍË
-			{Battery_18, 2000, 0xFFFF, 0},      //29.µç»ú2Ç°½ø
-			{Battery_25, 16000, 0xFFFF, 0},     //30.µç»ú2ºóÍË
-			{Battery_6, 5000, 0xFFFF, 0},       //31.·É»úºóÍË
-			{Battery_7, 16000, 0xFFFF, 0},      //32.µç»ú1ÏÂ½µ
-			{Battery_21, 10000, 0xFFFF, 0},     //33.·É»úÇ°½ø
-			{LeaveCenter, 10000, 0x15, 2},   	  //34.¾ÓÖĞ¸ËÊÍ·Å
-			{CloseAC, 16000, 0xFFFF, 0},            // ¹Ø±Õ¿Õµ÷
-//      {CheckAndCloseDoor, 16250, 0xFFFF, 0},     	  //1.¹Ø±Õ²ÕÃÅ      
-			{StopDr, 1000, 0x11, 4},      		  //2.Í£Ö¹
+	    {OpenDr, 15250, 0x11, 2},     	  //1.æ‰“å¼€èˆ±é—¨  
+//			{StopDr, 1000, 0x11, 2},      		  //2.åœæ­¢	
+			{CloseAC, 500, 0xFFFF, 0},            // å…³é—­ç©ºè°ƒ
+      {Center_1, 5000, 0xFFFF, 0},        //1.å·¦å³å±…ä¸­      
+			{Center_2, 13000, 0x15, 4},     	  //2.å‰åå±…ä¸­
+			{Battery_27, 16000, 0xFFFF, 0},      //3.ç”µæœº1ä¸Šå‡
+			{Battery_2, 5000, 0xFFFF, 0},       //4.é£æœºå‰è¿›
+			{Battery_28, 16000, 0xFFFF, 0},      //5.ç”µæœº2å‰è¿›
+			{Battery_18, 1000, 0xFFFF, 0},      //27.ç”µæœº2å‰è¿›
+			{Battery_19, 1000, 0xFFFF, 0},      //28.ç”µæœº2åé€€
+			{Battery_18, 2000, 0xFFFF, 0},      //29.ç”µæœº2å‰è¿›
+			{Battery_25, 16000, 0xFFFF, 0},     //30.ç”µæœº2åé€€
+			{Battery_6, 5000, 0xFFFF, 0},       //31.é£æœºåé€€
+			{Battery_7, 16000, 0xFFFF, 0},      //32.ç”µæœº1ä¸‹é™
+			{Battery_21, 10000, 0xFFFF, 0},     //33.é£æœºå‰è¿›
+			{LeaveCenter, 10000, 0x15, 2},   	  //34.å±…ä¸­æ†é‡Šæ”¾
+			{CloseAC, 16000, 0xFFFF, 0},            // å…³é—­ç©ºè°ƒ
+//      {CheckAndCloseDoor, 16250, 0xFFFF, 0},     	  //1.å…³é—­èˆ±é—¨      
+			{StopDr, 1000, 0x11, 4},      		  //2.åœæ­¢
       
 };
 #define TAKEOFF_STEPS_2_COUNT (sizeof(takeoff_steps_2) / sizeof(takeoff_steps_2[0]))
 
 
-// Ò»¼üÆğ·É²½Öè±í(Ö»½«·É»ú¿ª»ú)
+// ä¸€é”®èµ·é£æ­¥éª¤è¡¨(åªå°†é£æœºå¼€æœº)
 static const StepDef takeoff_steps_3[] = 
 {	
-	    {OpenDr, 15250, 0x11, 2},     	  //1.´ò¿ª²ÕÃÅ
-//			{StopDr, 1000, 0x11, 2},      		  //2.Í£Ö¹			
-			{CloseAC, 500, 0xFFFF, 0},            // ¹Ø±Õ¿Õµ÷			
-			{StopDr, 1000, 0x11, 2},      		  //2.Í£Ö¹
-      {Center_1, 5000, 0xFFFF, 0},        //1.×óÓÒ¾ÓÖĞ      
-			{Center_2, 13000, 0x15, 4},     	  //2.Ç°ºó¾ÓÖĞ
-			{Battery_27, 16000, 0xFFFF, 0},      //3.µç»ú1ÉÏÉı
-			{Battery_2, 5000, 0xFFFF, 0},       //4.·É»úÇ°½ø
-			{Battery_28, 16000, 0xFFFF, 0},      //5.µç»ú2Ç°½ø
-			{Battery_18, 1000, 0xFFFF, 0},      //27.µç»ú2Ç°½ø
-			{Battery_19, 1000, 0xFFFF, 0},      //28.µç»ú2ºóÍË
-			{Battery_18, 2000, 0xFFFF, 0},      //29.µç»ú2Ç°½ø
-			{Battery_25, 16000, 0xFFFF, 0},     //30.µç»ú2ºóÍË
-			{Battery_6, 5000, 0xFFFF, 0},       //31.·É»úºóÍË
-			{Battery_7, 16000, 0xFFFF, 0},      //32.µç»ú1ÏÂ½µ
-			{Battery_21, 10000, 0xFFFF, 0},     //33.·É»úÇ°½ø
-			{LeaveCenter, 10000, 0x15, 2},   	  //34.¾ÓÖĞ¸ËÊÍ·Å
-			{CloseAC, 18000, 0xFFFF, 0},            // ¹Ø±Õ¿Õµ÷
-//      {CheckAndCloseDoor, 16250, 0xFFFF, 0},     	  //1.¹Ø±Õ²ÕÃÅ      
-			{StopDr, 1000, 0x11, 4},      		  //2.Í£Ö¹
+	    {OpenDr, 15250, 0x11, 2},     	  //1.æ‰“å¼€èˆ±é—¨
+//			{StopDr, 1000, 0x11, 2},      		  //2.åœæ­¢			
+			{CloseAC, 500, 0xFFFF, 0},            // å…³é—­ç©ºè°ƒ			
+			{StopDr, 1000, 0x11, 2},      		  //2.åœæ­¢
+      {Center_1, 5000, 0xFFFF, 0},        //1.å·¦å³å±…ä¸­      
+			{Center_2, 13000, 0x15, 4},     	  //2.å‰åå±…ä¸­
+			{Battery_27, 16000, 0xFFFF, 0},      //3.ç”µæœº1ä¸Šå‡
+			{Battery_2, 5000, 0xFFFF, 0},       //4.é£æœºå‰è¿›
+			{Battery_28, 16000, 0xFFFF, 0},      //5.ç”µæœº2å‰è¿›
+			{Battery_18, 1000, 0xFFFF, 0},      //27.ç”µæœº2å‰è¿›
+			{Battery_19, 1000, 0xFFFF, 0},      //28.ç”µæœº2åé€€
+			{Battery_18, 2000, 0xFFFF, 0},      //29.ç”µæœº2å‰è¿›
+			{Battery_25, 16000, 0xFFFF, 0},     //30.ç”µæœº2åé€€
+			{Battery_6, 5000, 0xFFFF, 0},       //31.é£æœºåé€€
+			{Battery_7, 16000, 0xFFFF, 0},      //32.ç”µæœº1ä¸‹é™
+			{Battery_21, 10000, 0xFFFF, 0},     //33.é£æœºå‰è¿›
+			{LeaveCenter, 10000, 0x15, 2},   	  //34.å±…ä¸­æ†é‡Šæ”¾
+			{CloseAC, 18000, 0xFFFF, 0},            // å…³é—­ç©ºè°ƒ
+//      {CheckAndCloseDoor, 16250, 0xFFFF, 0},     	  //1.å…³é—­èˆ±é—¨      
+			{StopDr, 1000, 0x11, 4},      		  //2.åœæ­¢
       
 };
 #define TAKEOFF_STEPS_3_COUNT  (sizeof(takeoff_steps_3) / sizeof(takeoff_steps_3[0]))
 	
-// ½µÂäÍê³É²½Öè±í£¨È¡µç»»µç¶¼Íê³É£©
+// é™è½å®Œæˆæ­¥éª¤è¡¨ï¼ˆå–ç”µæ¢ç”µéƒ½å®Œæˆï¼‰
 static const StepDef landing_steps_1[] = 
 {
-			//ÏÂµç³Ø²½Öè£¨1ºÅ¿Õ²Ö£¬½«·É»úµç³Ø·ÅÈë1ºÅ²Ö£©£¨È¡µç×°µç¶¼Íê³É£©
-      {Center_1, 5000, 0xFFFF, 0},        //1.×óÓÒ¾ÓÖĞ      
-			{Center_2, 13000, 0x15, 4},      		//2.Ç°ºó¾ÓÖĞ
-			{Battery_1, 16000, 0xFFFF, 0},      //3.µç»ú1ÉÏÉı
-			{Battery_2, 5000, 0xFFFF, 0},       //4.·É»úÇ°½ø
-			{Battery_3, 18000, 0xFFFF, 0},      //5.µç»ú2Ç°½ø
-			{Battery_4, 1000, 0xFFFF, 0},       //6.µç»ú3¼Ğ½ô
-			{Battery_5, 15000, 0xFFFF, 0},      //7.µç»ú2ºóÍË
-			{Battery_6, 5000, 0xFFFF, 0},       //8.·É»úºóÍË
-			{Battery_7, 18000, 0xFFFF, 0},      //9.µç»ú1ÏÂ½µ			
-			{Battery_8, 10000, 0xFFFF, 0},      //10.µç»ú1ÉÏÉı
-			{Battery_9, 19000, 0xFFFF, 0},      //11.µç»ú2Ç°½ø
-			{Battery_10, 1000, 0xFFFF, 0},       //12.µç»ú3ËÉ¿ª
-			{Battery_11, 2000, 0xFFFF, 0},      //13.µç»ú2Ç°½ø
-			{Battery_12, 18000, 0xFFFF, 0},     //14.µç»ú2ºóÍË
-			{Battery_13, 10000, 0x14, 2},     //15.µç»ú1ÏÂ½µ
-			//×°µç³Ø²½Öè(´Ó2ºÅ²ÖÈ¡µç³Ø)
-			{Battery_23, 8000, 0xFFFF, 0},      //16.µç»ú1ÉÏÉı
-			{Battery_9, 18000, 0xFFFF, 0},      //17.µç»ú2Ç°½ø
-			{Battery_4, 1000, 0xFFFF, 0},       //18.µç»ú3¼Ğ½ô
-			{Battery_22, 18000, 0xFFFF, 0},     //19.µç»ú2ºóÍË
-			{Battery_24, 8000, 0xFFFF, 0},      //20.µç»ú1ÏÂ½µ	
-			{Battery_1, 16000, 0xFFFF, 0},      //21.µç»ú1ÉÏÉı
-      {Battery_2, 8000, 0xFFFF, 0},       //22.·É»úÇ°½ø      
-			{Battery_26, 18000, 0xFFFF, 0},      //23.µç»ú2Ç°½ø
-			{Battery_10, 1000, 0xFFFF, 0},      //24.µç»ú3ËÉ¿ª
-			{Battery_16, 2000, 0xFFFF, 0},      //25.µç»ú2Ç°½ø
-			{Battery_20, 15000, 0xFFFF, 0},     //7.µç»ú2ºóÍË
-			{Battery_6, 5000, 0xFFFF, 0},       //31.·É»úºóÍË
-			{Battery_7, 16000, 0xFFFF, 0},      //32.µç»ú1ÏÂ½µ
-			{Battery_21, 10000, 0x14, 4},     	//33.·É»úÇ°½ø
+			//ä¸‹ç”µæ± æ­¥éª¤ï¼ˆ1å·ç©ºä»“ï¼Œå°†é£æœºç”µæ± æ”¾å…¥1å·ä»“ï¼‰ï¼ˆå–ç”µè£…ç”µéƒ½å®Œæˆï¼‰
+      {Center_1, 5000, 0xFFFF, 0},        //1.å·¦å³å±…ä¸­      
+			{Center_2, 13000, 0x15, 4},      		//2.å‰åå±…ä¸­
+			{Battery_1, 16000, 0xFFFF, 0},      //3.ç”µæœº1ä¸Šå‡
+			{Battery_2, 5000, 0xFFFF, 0},       //4.é£æœºå‰è¿›
+			{Battery_3, 18000, 0xFFFF, 0},      //5.ç”µæœº2å‰è¿›
+			{Battery_4, 1000, 0xFFFF, 0},       //6.ç”µæœº3å¤¹ç´§
+			{Battery_5, 15000, 0xFFFF, 0},      //7.ç”µæœº2åé€€
+			{Battery_6, 5000, 0xFFFF, 0},       //8.é£æœºåé€€
+			{Battery_7, 18000, 0xFFFF, 0},      //9.ç”µæœº1ä¸‹é™			
+			{Battery_8, 10000, 0xFFFF, 0},      //10.ç”µæœº1ä¸Šå‡
+			{Battery_9, 19000, 0xFFFF, 0},      //11.ç”µæœº2å‰è¿›
+			{Battery_10, 1000, 0xFFFF, 0},       //12.ç”µæœº3æ¾å¼€
+			{Battery_11, 2000, 0xFFFF, 0},      //13.ç”µæœº2å‰è¿›
+			{Battery_12, 18000, 0xFFFF, 0},     //14.ç”µæœº2åé€€
+			{Battery_13, 10000, 0x14, 2},     //15.ç”µæœº1ä¸‹é™
+			//è£…ç”µæ± æ­¥éª¤(ä»2å·ä»“å–ç”µæ± )
+			{Battery_23, 8000, 0xFFFF, 0},      //16.ç”µæœº1ä¸Šå‡
+			{Battery_9, 18000, 0xFFFF, 0},      //17.ç”µæœº2å‰è¿›
+			{Battery_4, 1000, 0xFFFF, 0},       //18.ç”µæœº3å¤¹ç´§
+			{Battery_22, 18000, 0xFFFF, 0},     //19.ç”µæœº2åé€€
+			{Battery_24, 8000, 0xFFFF, 0},      //20.ç”µæœº1ä¸‹é™	
+			{Battery_1, 16000, 0xFFFF, 0},      //21.ç”µæœº1ä¸Šå‡
+      {Battery_2, 8000, 0xFFFF, 0},       //22.é£æœºå‰è¿›      
+			{Battery_26, 18000, 0xFFFF, 0},      //23.ç”µæœº2å‰è¿›
+			{Battery_10, 1000, 0xFFFF, 0},      //24.ç”µæœº3æ¾å¼€
+			{Battery_16, 2000, 0xFFFF, 0},      //25.ç”µæœº2å‰è¿›
+			{Battery_20, 15000, 0xFFFF, 0},     //7.ç”µæœº2åé€€
+			{Battery_6, 5000, 0xFFFF, 0},       //31.é£æœºåé€€
+			{Battery_7, 16000, 0xFFFF, 0},      //32.ç”µæœº1ä¸‹é™
+			{Battery_21, 10000, 0x14, 4},     	//33.é£æœºå‰è¿›
 			
-			{LeaveCenter, 15000, 0x15, 2},   		//34.¾ÓÖĞ¸ËÊÍ·Å	
-      {CloseDr, 16250, 0x11, 4},     	  //1.¹Ø±Õ²ÕÃÅ      
-//			{StopDr, 1000, 0x11, 4},        		//2.Í£Ö¹
-			{OpenAC, 500, 0xFFFF, 0},             // ´ò¿ª¿Õµ÷
-			{UpdateEmptyBay, 500, 0xFFFF, 0},     // ×îºóÒ»²½¸üĞÂ¿Õ²ÖºÅ
+			{LeaveCenter, 15000, 0x15, 2},   		//34.å±…ä¸­æ†é‡Šæ”¾	
+      {CloseDr, 16250, 0x11, 4},     	  //1.å…³é—­èˆ±é—¨      
+//			{StopDr, 1000, 0x11, 4},        		//2.åœæ­¢
+			{OpenAC, 500, 0xFFFF, 0},             // æ‰“å¼€ç©ºè°ƒ
+			{UpdateEmptyBay, 500, 0xFFFF, 0},     // æœ€åä¸€æ­¥æ›´æ–°ç©ºä»“å·
 		
 };
 #define LANDING_STEPS_1_COUNT (sizeof(landing_steps_1) / sizeof(landing_steps_1[0]))
 	
-// ½µÂäÍê³É²½Öè±í£¨2ºÅ¿Õ²Ö£¬½«·É»úµç³Ø·ÅÈë2ºÅ²Ö£©£¨È¡µç×°µç¶¼Íê³É£©
+// é™è½å®Œæˆæ­¥éª¤è¡¨ï¼ˆ2å·ç©ºä»“ï¼Œå°†é£æœºç”µæ± æ”¾å…¥2å·ä»“ï¼‰ï¼ˆå–ç”µè£…ç”µéƒ½å®Œæˆï¼‰
 static const StepDef landing_steps_2[] = 
 {
-			//ÏÂµç³Ø²½Öè(·ÅÈë2ºÅ²Ö)
-      {Center_1, 5000, 0xFFFF, 0},        //1.×óÓÒ¾ÓÖĞ      
-			{Center_2, 13000, 0x15, 4},        //2.Ç°ºó¾ÓÖĞ
-			{Battery_1, 16000, 0xFFFF, 0},      //3.µç»ú1ÉÏÉı
-			{Battery_2, 5000, 0xFFFF, 0},       //4.·É»úÇ°½ø
-			{Battery_3, 18000, 0xFFFF, 0},      //5.µç»ú2Ç°½ø
-			{Battery_4, 1000, 0xFFFF, 0},        //6.µç»ú3¼Ğ½ô
-			{Battery_5, 15000, 0xFFFF, 0},      //7.µç»ú2ºóÍË
-			{Battery_6, 5000, 0xFFFF, 0},       //8.·É»úºóÍË
-			{Battery_7, 18000, 0xFFFF, 0},      //9.µç»ú1ÏÂ½µ			
-			{Battery_23, 8000, 0xFFFF, 0},       //10.µç»ú1ÉÏÉı
-			{Battery_9, 19000, 0xFFFF, 0},      //11.µç»ú2Ç°½ø
-			{Battery_10, 1000, 0xFFFF, 0},       //12.µç»ú3ËÉ¿ª
-			{Battery_11, 2000, 0xFFFF, 0},      //13.µç»ú2Ç°½ø
-			{Battery_12, 18000, 0xFFFF, 0},     //14.µç»ú2ºóÍË
-			{Battery_24, 8000, 0x14, 2},      //15.µç»ú1ÏÂ½µ
-			//×°µç³Ø²½Öè(´Ó3ºÅ²ÖÈ¡µç³Ø)
-		  {Battery_14, 1000, 0xFFFF, 0},       //16.µç»ú1ÉÏÉı
-			{Battery_9, 18000, 0xFFFF, 0},       //17.µç»ú2Ç°½ø
-			{Battery_4, 1000, 0xFFFF, 0},         //18.µç»ú3¼Ğ½ô
-			{Battery_22, 18000, 0xFFFF, 0},       //19.µç»ú2ºóÍË
-			{Battery_15, 1000, 0xFFFF, 0},       //20.µç»ú1ÏÂ½µ	
-			{Battery_1, 16000, 0xFFFF, 0},       //21.µç»ú1ÉÏÉı
-      {Battery_2, 8000, 0xFFFF, 0},        //22.·É»úÇ°½ø      
-			{Battery_26, 18000, 0xFFFF, 0},       //23.µç»ú2Ç°½ø
-			{Battery_10, 1000, 0xFFFF, 0},        //24.µç»ú3ËÉ¿ª
-			{Battery_16, 2000, 0xFFFF, 0},       //25.µç»ú2Ç°½ø
-			{Battery_20, 15000, 0xFFFF, 0},      //7.µç»ú2ºóÍË
-			{Battery_6, 5000, 0xFFFF, 0},        //31.·É»úºóÍË
-			{Battery_7, 16000, 0xFFFF, 0},        //32.µç»ú1ÏÂ½µ
-			{Battery_21, 10000, 0x14, 4},      //33.·É»úÇ°½ø
+			//ä¸‹ç”µæ± æ­¥éª¤(æ”¾å…¥2å·ä»“)
+      {Center_1, 5000, 0xFFFF, 0},        //1.å·¦å³å±…ä¸­      
+			{Center_2, 13000, 0x15, 4},        //2.å‰åå±…ä¸­
+			{Battery_1, 16000, 0xFFFF, 0},      //3.ç”µæœº1ä¸Šå‡
+			{Battery_2, 5000, 0xFFFF, 0},       //4.é£æœºå‰è¿›
+			{Battery_3, 18000, 0xFFFF, 0},      //5.ç”µæœº2å‰è¿›
+			{Battery_4, 1000, 0xFFFF, 0},        //6.ç”µæœº3å¤¹ç´§
+			{Battery_5, 15000, 0xFFFF, 0},      //7.ç”µæœº2åé€€
+			{Battery_6, 5000, 0xFFFF, 0},       //8.é£æœºåé€€
+			{Battery_7, 18000, 0xFFFF, 0},      //9.ç”µæœº1ä¸‹é™			
+			{Battery_23, 8000, 0xFFFF, 0},       //10.ç”µæœº1ä¸Šå‡
+			{Battery_9, 19000, 0xFFFF, 0},      //11.ç”µæœº2å‰è¿›
+			{Battery_10, 1000, 0xFFFF, 0},       //12.ç”µæœº3æ¾å¼€
+			{Battery_11, 2000, 0xFFFF, 0},      //13.ç”µæœº2å‰è¿›
+			{Battery_12, 18000, 0xFFFF, 0},     //14.ç”µæœº2åé€€
+			{Battery_24, 8000, 0x14, 2},      //15.ç”µæœº1ä¸‹é™
+			//è£…ç”µæ± æ­¥éª¤(ä»3å·ä»“å–ç”µæ± )
+		  {Battery_14, 1000, 0xFFFF, 0},       //16.ç”µæœº1ä¸Šå‡
+			{Battery_9, 18000, 0xFFFF, 0},       //17.ç”µæœº2å‰è¿›
+			{Battery_4, 1000, 0xFFFF, 0},         //18.ç”µæœº3å¤¹ç´§
+			{Battery_22, 18000, 0xFFFF, 0},       //19.ç”µæœº2åé€€
+			{Battery_15, 1000, 0xFFFF, 0},       //20.ç”µæœº1ä¸‹é™	
+			{Battery_1, 16000, 0xFFFF, 0},       //21.ç”µæœº1ä¸Šå‡
+      {Battery_2, 8000, 0xFFFF, 0},        //22.é£æœºå‰è¿›      
+			{Battery_26, 18000, 0xFFFF, 0},       //23.ç”µæœº2å‰è¿›
+			{Battery_10, 1000, 0xFFFF, 0},        //24.ç”µæœº3æ¾å¼€
+			{Battery_16, 2000, 0xFFFF, 0},       //25.ç”µæœº2å‰è¿›
+			{Battery_20, 15000, 0xFFFF, 0},      //7.ç”µæœº2åé€€
+			{Battery_6, 5000, 0xFFFF, 0},        //31.é£æœºåé€€
+			{Battery_7, 16000, 0xFFFF, 0},        //32.ç”µæœº1ä¸‹é™
+			{Battery_21, 10000, 0x14, 4},      //33.é£æœºå‰è¿›
 			
-			{LeaveCenter, 15000, 0x15, 2},     //34.¾ÓÖĞ¸ËÊÍ·Å	
-      {CloseDr, 16250, 0x11, 4},     	  //1.¹Ø±Õ²ÕÃÅ      
-//			{StopDr, 1000, 0x11, 4},        		//2.Í£Ö¹
-			{OpenAC, 500, 0xFFFF, 0},           // ´ò¿ª¿Õµ÷
-			{UpdateEmptyBay, 500, 0xFFFF, 0},   // ×îºóÒ»²½¸üĞÂ¿Õ²ÖºÅ
+			{LeaveCenter, 15000, 0x15, 2},     //34.å±…ä¸­æ†é‡Šæ”¾	
+      {CloseDr, 16250, 0x11, 4},     	  //1.å…³é—­èˆ±é—¨      
+//			{StopDr, 1000, 0x11, 4},        		//2.åœæ­¢
+			{OpenAC, 500, 0xFFFF, 0},           // æ‰“å¼€ç©ºè°ƒ
+			{UpdateEmptyBay, 500, 0xFFFF, 0},   // æœ€åä¸€æ­¥æ›´æ–°ç©ºä»“å·
 		
 };
 #define LANDING_STEPS_2_COUNT (sizeof(landing_steps_2) / sizeof(landing_steps_2[0]))
 	
-// ½µÂäÍê³É²½Öè±í£¨3ºÅ¿Õ²Ö£¬½«·É»úµç³Ø·ÅÈë3ºÅ²Ö£©£¨È¡µç×°µç¶¼Íê³É£©
+// é™è½å®Œæˆæ­¥éª¤è¡¨ï¼ˆ3å·ç©ºä»“ï¼Œå°†é£æœºç”µæ± æ”¾å…¥3å·ä»“ï¼‰ï¼ˆå–ç”µè£…ç”µéƒ½å®Œæˆï¼‰
 static const StepDef landing_steps_3[] = 
 {
-			//ÏÂµç³Ø²½Öè(·ÅÈë3ºÅ²Ö)
-      {Center_1, 5000, 0xFFFF, 0},        //1.×óÓÒ¾ÓÖĞ      
-			{Center_2, 13000, 0x15, 4},       //2.Ç°ºó¾ÓÖĞ
-			{Battery_1, 16000, 0xFFFF, 0},      //3.µç»ú1ÉÏÉı
-			{Battery_2, 5000, 0xFFFF, 0},       //4.·É»úÇ°½ø
-			{Battery_3, 18000, 0xFFFF, 0},      //5.µç»ú2Ç°½ø
-			{Battery_4, 1000, 0xFFFF, 0},        //6.µç»ú3¼Ğ½ô
-			{Battery_5, 15000, 0xFFFF, 0},      //7.µç»ú2ºóÍË
-			{Battery_6, 5000, 0xFFFF, 0},       //8.·É»úºóÍË
-			{Battery_7, 18000, 0xFFFF, 0},      //9.µç»ú1ÏÂ½µ			
-			{Battery_14, 1000, 0xFFFF, 0},       //10.µç»ú1ÉÏÉı
-			{Battery_9, 19000, 0xFFFF, 0},      //11.µç»ú2Ç°½ø
-			{Battery_10, 1000, 0xFFFF, 0},       //12.µç»ú3ËÉ¿ª
-			{Battery_11, 2000, 0xFFFF, 0},      //13.µç»ú2Ç°½ø
-			{Battery_12, 18000, 0xFFFF, 0},     //14.µç»ú2ºóÍË
-			{Battery_15, 1000, 0x14, 2},      //15.µç»ú1ÏÂ½µ
-			//×°µç³Ø²½Öè(´Ó1ºÅ²ÖÈ¡µç³Ø)
-			{Battery_8, 10000, 0xFFFF, 0},       //16.µç»ú1ÉÏÉı
-			{Battery_9, 18000, 0xFFFF, 0},       //17.µç»ú2Ç°½ø
-			{Battery_4, 1000, 0xFFFF, 0},         //18.µç»ú3¼Ğ½ô
-			{Battery_22, 18000, 0xFFFF, 0},       //19.µç»ú2ºóÍË
-			{Battery_13, 10000, 0xFFFF, 0},       //20.µç»ú1ÏÂ½µ	
-			{Battery_1, 16000, 0xFFFF, 0},       //21.µç»ú1ÉÏÉı
-      {Battery_2, 8000, 0xFFFF, 0},        //22.·É»úÇ°½ø      
-			{Battery_26, 18000, 0xFFFF, 0},       //23.µç»ú2Ç°½ø
-			{Battery_10, 1000, 0xFFFF, 0},        //24.µç»ú3ËÉ¿ª
-			{Battery_16, 2000, 0xFFFF, 0},       //25.µç»ú2Ç°½ø
-			{Battery_20, 15000, 0xFFFF, 0},      //7.µç»ú2ºóÍË
-			{Battery_6, 5000, 0xFFFF, 0},        //31.·É»úºóÍË
-			{Battery_7, 16000, 0xFFFF, 0},        //32.µç»ú1ÏÂ½µ
+			//ä¸‹ç”µæ± æ­¥éª¤(æ”¾å…¥3å·ä»“)
+      {Center_1, 5000, 0xFFFF, 0},        //1.å·¦å³å±…ä¸­      
+			{Center_2, 13000, 0x15, 4},       //2.å‰åå±…ä¸­
+			{Battery_1, 16000, 0xFFFF, 0},      //3.ç”µæœº1ä¸Šå‡
+			{Battery_2, 5000, 0xFFFF, 0},       //4.é£æœºå‰è¿›
+			{Battery_3, 18000, 0xFFFF, 0},      //5.ç”µæœº2å‰è¿›
+			{Battery_4, 1000, 0xFFFF, 0},        //6.ç”µæœº3å¤¹ç´§
+			{Battery_5, 15000, 0xFFFF, 0},      //7.ç”µæœº2åé€€
+			{Battery_6, 5000, 0xFFFF, 0},       //8.é£æœºåé€€
+			{Battery_7, 18000, 0xFFFF, 0},      //9.ç”µæœº1ä¸‹é™			
+			{Battery_14, 1000, 0xFFFF, 0},       //10.ç”µæœº1ä¸Šå‡
+			{Battery_9, 19000, 0xFFFF, 0},      //11.ç”µæœº2å‰è¿›
+			{Battery_10, 1000, 0xFFFF, 0},       //12.ç”µæœº3æ¾å¼€
+			{Battery_11, 2000, 0xFFFF, 0},      //13.ç”µæœº2å‰è¿›
+			{Battery_12, 18000, 0xFFFF, 0},     //14.ç”µæœº2åé€€
+			{Battery_15, 1000, 0x14, 2},      //15.ç”µæœº1ä¸‹é™
+			//è£…ç”µæ± æ­¥éª¤(ä»1å·ä»“å–ç”µæ± )
+			{Battery_8, 10000, 0xFFFF, 0},       //16.ç”µæœº1ä¸Šå‡
+			{Battery_9, 18000, 0xFFFF, 0},       //17.ç”µæœº2å‰è¿›
+			{Battery_4, 1000, 0xFFFF, 0},         //18.ç”µæœº3å¤¹ç´§
+			{Battery_22, 18000, 0xFFFF, 0},       //19.ç”µæœº2åé€€
+			{Battery_13, 10000, 0xFFFF, 0},       //20.ç”µæœº1ä¸‹é™	
+			{Battery_1, 16000, 0xFFFF, 0},       //21.ç”µæœº1ä¸Šå‡
+      {Battery_2, 8000, 0xFFFF, 0},        //22.é£æœºå‰è¿›      
+			{Battery_26, 18000, 0xFFFF, 0},       //23.ç”µæœº2å‰è¿›
+			{Battery_10, 1000, 0xFFFF, 0},        //24.ç”µæœº3æ¾å¼€
+			{Battery_16, 2000, 0xFFFF, 0},       //25.ç”µæœº2å‰è¿›
+			{Battery_20, 15000, 0xFFFF, 0},      //7.ç”µæœº2åé€€
+			{Battery_6, 5000, 0xFFFF, 0},        //31.é£æœºåé€€
+			{Battery_7, 16000, 0xFFFF, 0},        //32.ç”µæœº1ä¸‹é™
 			
-			{Battery_21, 10000, 0x14, 4},      //33.·É»úÇ°½ø
-			{LeaveCenter, 15000, 0x15, 2},     //34.¾ÓÖĞ¸ËÊÍ·Å	
-      {CloseDr, 16250, 0x11, 4},     	  //1.¹Ø±Õ²ÕÃÅ      
-//			{StopDr, 1000, 0x11, 4},        		//2.Í£Ö¹
-			{OpenAC, 500, 0xFFFF, 0},             // ´ò¿ª¿Õµ÷
-			{UpdateEmptyBay, 500, 0xFFFF, 0},   // ×îºóÒ»²½¸üĞÂ¿Õ²ÖºÅ
+			{Battery_21, 10000, 0x14, 4},      //33.é£æœºå‰è¿›
+			{LeaveCenter, 15000, 0x15, 2},     //34.å±…ä¸­æ†é‡Šæ”¾	
+      {CloseDr, 16250, 0x11, 4},     	  //1.å…³é—­èˆ±é—¨      
+//			{StopDr, 1000, 0x11, 4},        		//2.åœæ­¢
+			{OpenAC, 500, 0xFFFF, 0},             // æ‰“å¼€ç©ºè°ƒ
+			{UpdateEmptyBay, 500, 0xFFFF, 0},   // æœ€åä¸€æ­¥æ›´æ–°ç©ºä»“å·
 		
 };
 #define LANDING_STEPS_3_COUNT (sizeof(landing_steps_3) / sizeof(landing_steps_3[0]))
 
-// ¾ÓÖĞ²½Öè
+// å±…ä¸­æ­¥éª¤
 static const StepDef closecenter_steps[] = 
 {
 		{Center_1, 5000, 0xFFFF, 0},    
@@ -779,185 +779,185 @@ static const StepDef closecenter_steps[] =
 };
 #define CLOSECENTER_STEP_COUNT (sizeof(closecenter_steps) / sizeof(closecenter_steps[0]))
                                               
-// ÊÍ·Å²½Öè
+// é‡Šæ”¾æ­¥éª¤
 static const StepDef leavecenter_steps[] = 
 {
-		{LeaveCenter1, 15000, 0x0015, 2},    // µÈ´ı15Ãë 
+		{LeaveCenter1, 15000, 0x0015, 2},    // ç­‰å¾…15ç§’ 
 		
 };
 #define LEAVECENTER_STEP_COUNT (sizeof(leavecenter_steps) / sizeof(leavecenter_steps[0]))
 
-// ×°µç³Ø²½Öè£¨È¡1ºÅ²Öµç³Ø£©
+// è£…ç”µæ± æ­¥éª¤ï¼ˆå–1å·ä»“ç”µæ± ï¼‰
 static const StepDef loadbattery_steps_1[] = 
 { 
-      {Center_1, 5000, 0xFFFF, 0},        //1.×óÓÒ¾ÓÖĞ      
-			{Center_2, 13000, 0x15, 4},       //2.Ç°ºó¾ÓÖĞ
-      {Battery_8, 10000, 0xFFFF, 0},       //16.µç»ú1ÉÏÉı
-			{Battery_9, 18000, 0xFFFF, 0},       //17.µç»ú2Ç°½ø
-			{Battery_4, 1000, 0xFFFF, 0},         //18.µç»ú3¼Ğ½ô
-			{Battery_22, 18000, 0xFFFF, 0},       //19.µç»ú2ºóÍË
-			{Battery_13, 10000, 0xFFFF, 0},       //20.µç»ú1ÏÂ½µ	
-			{Battery_1, 16000, 0xFFFF, 0},       //21.µç»ú1ÉÏÉı
-      {Battery_2, 8000, 0xFFFF, 0},        //22.·É»úÇ°½ø      
-			{Battery_3, 18000, 0xFFFF, 0},       //23.µç»ú2Ç°½ø
-			{Battery_10, 1000, 0xFFFF, 0},        //24.µç»ú3ËÉ¿ª
-			{Battery_16, 2000, 0xFFFF, 0},       //25.µç»ú2Ç°½ø
-			{Battery_17, 1000, 0xFFFF, 0},        //26.µç»ú2ºóÍË
-			{Battery_5, 15000, 0xFFFF, 0},      //7.µç»ú2ºóÍË
-			{Battery_6, 5000, 0xFFFF, 0},        //31.·É»úºóÍË
-			{Battery_7, 16000, 0xFFFF, 0},        //32.µç»ú1ÏÂ½µ
-			{Battery_21, 10000, 0x14, 4},      //33.·É»úÇ°½ø
-			{LeaveCenter, 10000, 0x15, 2},     //34.¾ÓÖĞ¸ËÊÍ·Å
+      {Center_1, 5000, 0xFFFF, 0},        //1.å·¦å³å±…ä¸­      
+			{Center_2, 13000, 0x15, 4},       //2.å‰åå±…ä¸­
+      {Battery_8, 10000, 0xFFFF, 0},       //16.ç”µæœº1ä¸Šå‡
+			{Battery_9, 18000, 0xFFFF, 0},       //17.ç”µæœº2å‰è¿›
+			{Battery_4, 1000, 0xFFFF, 0},         //18.ç”µæœº3å¤¹ç´§
+			{Battery_22, 18000, 0xFFFF, 0},       //19.ç”µæœº2åé€€
+			{Battery_13, 10000, 0xFFFF, 0},       //20.ç”µæœº1ä¸‹é™	
+			{Battery_1, 16000, 0xFFFF, 0},       //21.ç”µæœº1ä¸Šå‡
+      {Battery_2, 8000, 0xFFFF, 0},        //22.é£æœºå‰è¿›      
+			{Battery_3, 18000, 0xFFFF, 0},       //23.ç”µæœº2å‰è¿›
+			{Battery_10, 1000, 0xFFFF, 0},        //24.ç”µæœº3æ¾å¼€
+			{Battery_16, 2000, 0xFFFF, 0},       //25.ç”µæœº2å‰è¿›
+			{Battery_17, 1000, 0xFFFF, 0},        //26.ç”µæœº2åé€€
+			{Battery_5, 15000, 0xFFFF, 0},      //7.ç”µæœº2åé€€
+			{Battery_6, 5000, 0xFFFF, 0},        //31.é£æœºåé€€
+			{Battery_7, 16000, 0xFFFF, 0},        //32.ç”µæœº1ä¸‹é™
+			{Battery_21, 10000, 0x14, 4},      //33.é£æœºå‰è¿›
+			{LeaveCenter, 10000, 0x15, 2},     //34.å±…ä¸­æ†é‡Šæ”¾
 };
 #define LOADBATTERY_STEPS_1_COUNT (sizeof(loadbattery_steps_1) / sizeof(loadbattery_steps_1[0]))
 
 
 
-// ×°µç³Ø²½Öè£¨È¡2ºÅ²Öµç³Ø£©
+// è£…ç”µæ± æ­¥éª¤ï¼ˆå–2å·ä»“ç”µæ± ï¼‰
 static const StepDef loadbattery_steps_2[] = 
 { 
-      {Center_1, 5000, 0xFFFF, 0},        //1.×óÓÒ¾ÓÖĞ      
-			{Center_2, 13000, 0x15, 4},       //2.Ç°ºó¾ÓÖĞ
-      {Battery_23, 8000, 0xFFFF, 0},       //16.µç»ú1ÉÏÉı
-			{Battery_9, 18000, 0xFFFF, 0},       //17.µç»ú2Ç°½ø
-			{Battery_4, 1000, 0xFFFF, 0},         //18.µç»ú3¼Ğ½ô
-			{Battery_22, 18000, 0xFFFF, 0},       //19.µç»ú2ºóÍË
-			{Battery_24, 8000, 0xFFFF, 0},       //20.µç»ú1ÏÂ½µ	
-			{Battery_1, 16000, 0xFFFF, 0},       //21.µç»ú1ÉÏÉı
-      {Battery_2, 8000, 0xFFFF, 0},        //22.·É»úÇ°½ø      
-			{Battery_3, 18000, 0xFFFF, 0},       //23.µç»ú2Ç°½ø
-			{Battery_10, 1000, 0xFFFF, 0},        //24.µç»ú3ËÉ¿ª
-			{Battery_16, 2000, 0xFFFF, 0},       //25.µç»ú2Ç°½ø
-			{Battery_17, 1000, 0xFFFF, 0},        //26.µç»ú2ºóÍË
-			{Battery_5, 15000, 0xFFFF, 0},      //7.µç»ú2ºóÍË
-			{Battery_6, 5000, 0xFFFF, 0},        //31.·É»úºóÍË
-			{Battery_7, 16000, 0xFFFF, 0},        //32.µç»ú1ÏÂ½µ
-			{Battery_21, 10000, 0x14, 4},      //33.·É»úÇ°½ø
-			{LeaveCenter, 10000, 0x15, 2},     //34.¾ÓÖĞ¸ËÊÍ·Å
+      {Center_1, 5000, 0xFFFF, 0},        //1.å·¦å³å±…ä¸­      
+			{Center_2, 13000, 0x15, 4},       //2.å‰åå±…ä¸­
+      {Battery_23, 8000, 0xFFFF, 0},       //16.ç”µæœº1ä¸Šå‡
+			{Battery_9, 18000, 0xFFFF, 0},       //17.ç”µæœº2å‰è¿›
+			{Battery_4, 1000, 0xFFFF, 0},         //18.ç”µæœº3å¤¹ç´§
+			{Battery_22, 18000, 0xFFFF, 0},       //19.ç”µæœº2åé€€
+			{Battery_24, 8000, 0xFFFF, 0},       //20.ç”µæœº1ä¸‹é™	
+			{Battery_1, 16000, 0xFFFF, 0},       //21.ç”µæœº1ä¸Šå‡
+      {Battery_2, 8000, 0xFFFF, 0},        //22.é£æœºå‰è¿›      
+			{Battery_3, 18000, 0xFFFF, 0},       //23.ç”µæœº2å‰è¿›
+			{Battery_10, 1000, 0xFFFF, 0},        //24.ç”µæœº3æ¾å¼€
+			{Battery_16, 2000, 0xFFFF, 0},       //25.ç”µæœº2å‰è¿›
+			{Battery_17, 1000, 0xFFFF, 0},        //26.ç”µæœº2åé€€
+			{Battery_5, 15000, 0xFFFF, 0},      //7.ç”µæœº2åé€€
+			{Battery_6, 5000, 0xFFFF, 0},        //31.é£æœºåé€€
+			{Battery_7, 16000, 0xFFFF, 0},        //32.ç”µæœº1ä¸‹é™
+			{Battery_21, 10000, 0x14, 4},      //33.é£æœºå‰è¿›
+			{LeaveCenter, 10000, 0x15, 2},     //34.å±…ä¸­æ†é‡Šæ”¾
 };
 #define LOADBATTERY_STEPS_2_COUNT (sizeof(loadbattery_steps_2) / sizeof(loadbattery_steps_2[0]))
 
 
-// ×°µç³Ø²½Öè£¨È¡3ºÅ²Öµç³Ø£©
+// è£…ç”µæ± æ­¥éª¤ï¼ˆå–3å·ä»“ç”µæ± ï¼‰
 static const StepDef loadbattery_steps_3[] = 
 { 
-      {Center_1, 5000, 0xFFFF, 0},        //1.×óÓÒ¾ÓÖĞ      
-			{Center_2, 13000, 0x15, 4},       //2.Ç°ºó¾ÓÖĞ
-      {Battery_14, 2000, 0xFFFF, 0},       //16.µç»ú1ÉÏÉı
-			{Battery_9, 18000, 0xFFFF, 0},       //17.µç»ú2Ç°½ø
-			{Battery_4, 1000, 0xFFFF, 0},         //18.µç»ú3¼Ğ½ô
-			{Battery_22, 18000, 0xFFFF, 0},       //19.µç»ú2ºóÍË
-			{Battery_15, 2000, 0xFFFF, 0},       //20.µç»ú1ÏÂ½µ	
-			{Battery_1, 16000, 0xFFFF, 0},       //21.µç»ú1ÉÏÉı
-      {Battery_2, 8000, 0xFFFF, 0},        //22.·É»úÇ°½ø      
-			{Battery_3, 18000, 0xFFFF, 0},       //23.µç»ú2Ç°½ø
-			{Battery_10, 1000, 0xFFFF, 0},        //24.µç»ú3ËÉ¿ª
-			{Battery_16, 2000, 0xFFFF, 0},       //25.µç»ú2Ç°½ø
-			{Battery_17, 1000, 0xFFFF, 0},        //26.µç»ú2ºóÍË
-			{Battery_5, 15000, 0xFFFF, 0},      //7.µç»ú2ºóÍË
-			{Battery_6, 5000, 0xFFFF, 0},        //31.·É»úºóÍË
-			{Battery_7, 16000, 0xFFFF, 0},        //32.µç»ú1ÏÂ½µ
-			{Battery_21, 10000, 0x14, 4},      //33.·É»úÇ°½ø
-			{LeaveCenter, 10000, 0x15, 2},     //34.¾ÓÖĞ¸ËÊÍ·Å
+      {Center_1, 5000, 0xFFFF, 0},        //1.å·¦å³å±…ä¸­      
+			{Center_2, 13000, 0x15, 4},       //2.å‰åå±…ä¸­
+      {Battery_14, 2000, 0xFFFF, 0},       //16.ç”µæœº1ä¸Šå‡
+			{Battery_9, 18000, 0xFFFF, 0},       //17.ç”µæœº2å‰è¿›
+			{Battery_4, 1000, 0xFFFF, 0},         //18.ç”µæœº3å¤¹ç´§
+			{Battery_22, 18000, 0xFFFF, 0},       //19.ç”µæœº2åé€€
+			{Battery_15, 2000, 0xFFFF, 0},       //20.ç”µæœº1ä¸‹é™	
+			{Battery_1, 16000, 0xFFFF, 0},       //21.ç”µæœº1ä¸Šå‡
+      {Battery_2, 8000, 0xFFFF, 0},        //22.é£æœºå‰è¿›      
+			{Battery_3, 18000, 0xFFFF, 0},       //23.ç”µæœº2å‰è¿›
+			{Battery_10, 1000, 0xFFFF, 0},        //24.ç”µæœº3æ¾å¼€
+			{Battery_16, 2000, 0xFFFF, 0},       //25.ç”µæœº2å‰è¿›
+			{Battery_17, 1000, 0xFFFF, 0},        //26.ç”µæœº2åé€€
+			{Battery_5, 15000, 0xFFFF, 0},      //7.ç”µæœº2åé€€
+			{Battery_6, 5000, 0xFFFF, 0},        //31.é£æœºåé€€
+			{Battery_7, 16000, 0xFFFF, 0},        //32.ç”µæœº1ä¸‹é™
+			{Battery_21, 10000, 0x14, 4},      //33.é£æœºå‰è¿›
+			{LeaveCenter, 10000, 0x15, 2},     //34.å±…ä¸­æ†é‡Šæ”¾
 };
 #define LOADBATTERY_STEPS_3_COUNT (sizeof(loadbattery_steps_3) / sizeof(loadbattery_steps_3[0]))
 
 
-// ÏÂµç³Ø²½Öè(·ÅÈë1ºÅ²Ö)
+// ä¸‹ç”µæ± æ­¥éª¤(æ”¾å…¥1å·ä»“)
 static const StepDef downbattery_steps_1[] = 
 {
-      {Center_1, 5000, 0xFFFF, 0},        //1.×óÓÒ¾ÓÖĞ      
-			{Center_2, 13000, 0x15, 4},       //2.Ç°ºó¾ÓÖĞ
-			{Battery_1, 16000, 0xFFFF, 0},      //3.µç»ú1ÉÏÉı
-			{Battery_2, 5000, 0xFFFF, 0},       //4.·É»úÇ°½ø
-			{Battery_3, 18000, 0xFFFF, 0},      //5.µç»ú2Ç°½ø
-			{Battery_4, 1000, 0xFFFF, 0},        //6.µç»ú3¼Ğ½ô
-			{Battery_5, 15000, 0xFFFF, 0},      //7.µç»ú2ºóÍË
-			{Battery_6, 5000, 0xFFFF, 0},       //8.·É»úºóÍË
-			{Battery_7, 18000, 0xFFFF, 0},      //9.µç»ú1ÏÂ½µ			
-			{Battery_8, 10000, 0xFFFF, 0},       //10.µç»ú1ÉÏÉı
-			{Battery_9, 19000, 0xFFFF, 0},      //11.µç»ú2Ç°½ø
-			{Battery_10, 1000, 0xFFFF, 0},       //12.µç»ú3ËÉ¿ª
-			{Battery_11, 2000, 0xFFFF, 0},      //13.µç»ú2Ç°½ø
-			{Battery_12, 18000, 0xFFFF, 0},     //14.µç»ú2ºóÍË
-			{Battery_13, 10000, 0xFFFF, 0},      //15.µç»ú1ÏÂ½µ
-			{Battery_21, 10000, 0x14, 2},      //33.·É»úÇ°½ø
-			{LeaveCenter, 10000, 0x15, 2},     //34.¾ÓÖĞ¸ËÊÍ·Å			
+      {Center_1, 5000, 0xFFFF, 0},        //1.å·¦å³å±…ä¸­      
+			{Center_2, 13000, 0x15, 4},       //2.å‰åå±…ä¸­
+			{Battery_1, 16000, 0xFFFF, 0},      //3.ç”µæœº1ä¸Šå‡
+			{Battery_2, 5000, 0xFFFF, 0},       //4.é£æœºå‰è¿›
+			{Battery_3, 18000, 0xFFFF, 0},      //5.ç”µæœº2å‰è¿›
+			{Battery_4, 1000, 0xFFFF, 0},        //6.ç”µæœº3å¤¹ç´§
+			{Battery_5, 15000, 0xFFFF, 0},      //7.ç”µæœº2åé€€
+			{Battery_6, 5000, 0xFFFF, 0},       //8.é£æœºåé€€
+			{Battery_7, 18000, 0xFFFF, 0},      //9.ç”µæœº1ä¸‹é™			
+			{Battery_8, 10000, 0xFFFF, 0},       //10.ç”µæœº1ä¸Šå‡
+			{Battery_9, 19000, 0xFFFF, 0},      //11.ç”µæœº2å‰è¿›
+			{Battery_10, 1000, 0xFFFF, 0},       //12.ç”µæœº3æ¾å¼€
+			{Battery_11, 2000, 0xFFFF, 0},      //13.ç”µæœº2å‰è¿›
+			{Battery_12, 18000, 0xFFFF, 0},     //14.ç”µæœº2åé€€
+			{Battery_13, 10000, 0xFFFF, 0},      //15.ç”µæœº1ä¸‹é™
+			{Battery_21, 10000, 0x14, 2},      //33.é£æœºå‰è¿›
+			{LeaveCenter, 10000, 0x15, 2},     //34.å±…ä¸­æ†é‡Šæ”¾			
 };
 #define DOWNBATTERY_STEPS_1_COUNT (sizeof(downbattery_steps_1) / sizeof(downbattery_steps_1[0]))
 	
-// ÏÂµç³Ø²½Öè(·ÅÈë2ºÅ²Ö)
+// ä¸‹ç”µæ± æ­¥éª¤(æ”¾å…¥2å·ä»“)
 static const StepDef downbattery_steps_2[] = 
 {
-      {Center_1, 5000, 0xFFFF, 0},        //1.×óÓÒ¾ÓÖĞ      
-			{Center_2, 13000, 0x15, 4},       //2.Ç°ºó¾ÓÖĞ
-			{Battery_1, 16000, 0xFFFF, 0},      //3.µç»ú1ÉÏÉı
-			{Battery_2, 5000, 0xFFFF, 0},       //4.·É»úÇ°½ø
-			{Battery_3, 18000, 0xFFFF, 0},      //5.µç»ú2Ç°½ø
-			{Battery_4, 1000, 0xFFFF, 0},        //6.µç»ú3¼Ğ½ô
-			{Battery_5, 15000, 0xFFFF, 0},      //7.µç»ú2ºóÍË
-			{Battery_6, 5000, 0xFFFF, 0},       //8.·É»úºóÍË
-			{Battery_7, 18000, 0xFFFF, 0},      //9.µç»ú1ÏÂ½µ			
-			{Battery_23, 8000, 0xFFFF, 0},       //10.µç»ú1ÉÏÉı
-			{Battery_9, 19000, 0xFFFF, 0},      //11.µç»ú2Ç°½ø
-			{Battery_10, 1000, 0xFFFF, 0},       //12.µç»ú3ËÉ¿ª
-			{Battery_11, 2000, 0xFFFF, 0},      //13.µç»ú2Ç°½ø
-			{Battery_12, 18000, 0xFFFF, 0},     //14.µç»ú2ºóÍË
-			{Battery_24, 8000, 0xFFFF, 0},      //15.µç»ú1ÏÂ½µ
-			{Battery_21, 10000, 0x14, 2},      //33.·É»úÇ°½ø
-			{LeaveCenter, 10000, 0x15, 2},     //34.¾ÓÖĞ¸ËÊÍ·Å			
+      {Center_1, 5000, 0xFFFF, 0},        //1.å·¦å³å±…ä¸­      
+			{Center_2, 13000, 0x15, 4},       //2.å‰åå±…ä¸­
+			{Battery_1, 16000, 0xFFFF, 0},      //3.ç”µæœº1ä¸Šå‡
+			{Battery_2, 5000, 0xFFFF, 0},       //4.é£æœºå‰è¿›
+			{Battery_3, 18000, 0xFFFF, 0},      //5.ç”µæœº2å‰è¿›
+			{Battery_4, 1000, 0xFFFF, 0},        //6.ç”µæœº3å¤¹ç´§
+			{Battery_5, 15000, 0xFFFF, 0},      //7.ç”µæœº2åé€€
+			{Battery_6, 5000, 0xFFFF, 0},       //8.é£æœºåé€€
+			{Battery_7, 18000, 0xFFFF, 0},      //9.ç”µæœº1ä¸‹é™			
+			{Battery_23, 8000, 0xFFFF, 0},       //10.ç”µæœº1ä¸Šå‡
+			{Battery_9, 19000, 0xFFFF, 0},      //11.ç”µæœº2å‰è¿›
+			{Battery_10, 1000, 0xFFFF, 0},       //12.ç”µæœº3æ¾å¼€
+			{Battery_11, 2000, 0xFFFF, 0},      //13.ç”µæœº2å‰è¿›
+			{Battery_12, 18000, 0xFFFF, 0},     //14.ç”µæœº2åé€€
+			{Battery_24, 8000, 0xFFFF, 0},      //15.ç”µæœº1ä¸‹é™
+			{Battery_21, 10000, 0x14, 2},      //33.é£æœºå‰è¿›
+			{LeaveCenter, 10000, 0x15, 2},     //34.å±…ä¸­æ†é‡Šæ”¾			
 };
 #define DOWNBATTERY_STEPS_2_COUNT (sizeof(downbattery_steps_2) / sizeof(downbattery_steps_2[0]))
 
-// ÏÂµç³Ø²½Öè(·ÅÈë3ºÅ²Ö)
+// ä¸‹ç”µæ± æ­¥éª¤(æ”¾å…¥3å·ä»“)
 static const StepDef downbattery_steps_3[] = 
 {
-      {Center_1, 5000, 0xFFFF, 0},        //1.×óÓÒ¾ÓÖĞ      
-			{Center_2, 13000, 0x15, 4},       //2.Ç°ºó¾ÓÖĞ
-			{Battery_1, 16000, 0xFFFF, 0},      //3.µç»ú1ÉÏÉı
-			{Battery_2, 5000, 0xFFFF, 0},       //4.·É»úÇ°½ø
-			{Battery_3, 18000, 0xFFFF, 0},      //5.µç»ú2Ç°½ø
-			{Battery_4, 1000, 0xFFFF, 0},        //6.µç»ú3¼Ğ½ô
-			{Battery_5, 15000, 0xFFFF, 0},      //7.µç»ú2ºóÍË
-			{Battery_6, 5000, 0xFFFF, 0},       //8.·É»úºóÍË
-			{Battery_7, 18000, 0xFFFF, 0},      //9.µç»ú1ÏÂ½µ			
-			{Battery_14, 2000, 0xFFFF, 0},       //10.µç»ú1ÉÏÉı
-			{Battery_9, 19000, 0xFFFF, 0},      //11.µç»ú2Ç°½ø
-			{Battery_10, 1000, 0xFFFF, 0},       //12.µç»ú3ËÉ¿ª
-			{Battery_11, 2000, 0xFFFF, 0},      //13.µç»ú2Ç°½ø
-			{Battery_12, 18000, 0xFFFF, 0},     //14.µç»ú2ºóÍË
-			{Battery_15, 2000, 0xFFFF, 0},      //15.µç»ú1ÏÂ½µ
-			{Battery_21, 10000, 0x14, 2},      //33.·É»úÇ°½ø
-			{LeaveCenter, 10000, 0x15, 2},     //34.¾ÓÖĞ¸ËÊÍ·Å			
+      {Center_1, 5000, 0xFFFF, 0},        //1.å·¦å³å±…ä¸­      
+			{Center_2, 13000, 0x15, 4},       //2.å‰åå±…ä¸­
+			{Battery_1, 16000, 0xFFFF, 0},      //3.ç”µæœº1ä¸Šå‡
+			{Battery_2, 5000, 0xFFFF, 0},       //4.é£æœºå‰è¿›
+			{Battery_3, 18000, 0xFFFF, 0},      //5.ç”µæœº2å‰è¿›
+			{Battery_4, 1000, 0xFFFF, 0},        //6.ç”µæœº3å¤¹ç´§
+			{Battery_5, 15000, 0xFFFF, 0},      //7.ç”µæœº2åé€€
+			{Battery_6, 5000, 0xFFFF, 0},       //8.é£æœºåé€€
+			{Battery_7, 18000, 0xFFFF, 0},      //9.ç”µæœº1ä¸‹é™			
+			{Battery_14, 2000, 0xFFFF, 0},       //10.ç”µæœº1ä¸Šå‡
+			{Battery_9, 19000, 0xFFFF, 0},      //11.ç”µæœº2å‰è¿›
+			{Battery_10, 1000, 0xFFFF, 0},       //12.ç”µæœº3æ¾å¼€
+			{Battery_11, 2000, 0xFFFF, 0},      //13.ç”µæœº2å‰è¿›
+			{Battery_12, 18000, 0xFFFF, 0},     //14.ç”µæœº2åé€€
+			{Battery_15, 2000, 0xFFFF, 0},      //15.ç”µæœº1ä¸‹é™
+			{Battery_21, 10000, 0x14, 2},      //33.é£æœºå‰è¿›
+			{LeaveCenter, 10000, 0x15, 2},     //34.å±…ä¸­æ†é‡Šæ”¾			
 };
 #define DOWNBATTERY_STEPS_3_COUNT (sizeof(downbattery_steps_3) / sizeof(downbattery_steps_3[0]))
 	
-// È«¾Ö±äÁ¿¼ÇÂ¼µ±Ç°ÊÇ·ñÓĞ¾Éµç³Ø£¨ÓÉÖ÷Õ¾ÂÖÑ¯»ò×´Ì¬¼Ä´æÆ÷¸üĞÂ£©
-extern uint8_t g_has_old_battery;   // 1:ÓĞµç³Ø, 0:ÎŞµç³Ø
+// å…¨å±€å˜é‡è®°å½•å½“å‰æ˜¯å¦æœ‰æ—§ç”µæ± ï¼ˆç”±ä¸»ç«™è½®è¯¢æˆ–çŠ¶æ€å¯„å­˜å™¨æ›´æ–°ï¼‰
+extern uint8_t g_has_old_battery;   // 1:æœ‰ç”µæ± , 0:æ— ç”µæ± 
 
-// ²½Öè±í1£ºÓĞµç³ØÊ±£¬Ö´ĞĞÈ¡ÏÂµç³Ø²¢·ÅÈë¿Õµç³Ø²Ö
+// æ­¥éª¤è¡¨1ï¼šæœ‰ç”µæ± æ—¶ï¼Œæ‰§è¡Œå–ä¸‹ç”µæ± å¹¶æ”¾å…¥ç©ºç”µæ± ä»“
 static const StepDef cancel_with_battery_steps[] = 
 {
-    {Motor1Up1, 5000, 0xFFFF, 0},             	//3.µç»ú1ÉÏÉı1
-		{FlyForward, 5000, 0xFFFF, 0},						  //4.·É»úÇ°½ø
-    {Motor2Forward, 10000, 0xFFFF, 0},          //5.µç»ú2Ç°½ø		
-		{Motor3Clamp, 500, 0xFFFF, 0},					    //6.µç»ú3¼Ğ½ô
-    {FlyBack, 12000, 0xFFFF, 0},					      //7.·É»úºóÍË		
-		{Motor2Back, 10000, 0xFFFF, 0}, 					  //8.µç»ú2ºóÍË
-    {Motor1Down1, 13000, 0xFFFF, 0},						//9.µç»ú1ÏÂ½µ1		
-		{Motor2Forward, 10000, 0xFFFF, 0},					//10.µç»ú2Ç°½ø
-		{Motor3Lossen, 500, 0xFFFF, 0},							//11.µç»ú3ËÉ¿ª
-		{Motor2Back, 10000, 0xFFFF, 0},							//10.µç»ú2ºóÍË 
+    {Motor1Up1, 5000, 0xFFFF, 0},             	//3.ç”µæœº1ä¸Šå‡1
+		{FlyForward, 5000, 0xFFFF, 0},						  //4.é£æœºå‰è¿›
+    {Motor2Forward, 10000, 0xFFFF, 0},          //5.ç”µæœº2å‰è¿›		
+		{Motor3Clamp, 500, 0xFFFF, 0},					    //6.ç”µæœº3å¤¹ç´§
+    {FlyBack, 12000, 0xFFFF, 0},					      //7.é£æœºåé€€		
+		{Motor2Back, 10000, 0xFFFF, 0}, 					  //8.ç”µæœº2åé€€
+    {Motor1Down1, 13000, 0xFFFF, 0},						//9.ç”µæœº1ä¸‹é™1		
+		{Motor2Forward, 10000, 0xFFFF, 0},					//10.ç”µæœº2å‰è¿›
+		{Motor3Lossen, 500, 0xFFFF, 0},							//11.ç”µæœº3æ¾å¼€
+		{Motor2Back, 10000, 0xFFFF, 0},							//10.ç”µæœº2åé€€ 
 };
 #define CANCEL_WITH_BATTERY_COUNT (sizeof(cancel_with_battery_steps)/sizeof(cancel_with_battery_steps[0]))
 
-// ²½Öè±í2£ºÎŞµç³ØÊ±£¬Ö»Ğè¸´Î»µç»úµ½³õÊ¼×´Ì¬£¨ÎŞĞèÈ¡µç³Ø£©
+// æ­¥éª¤è¡¨2ï¼šæ— ç”µæ± æ—¶ï¼Œåªéœ€å¤ä½ç”µæœºåˆ°åˆå§‹çŠ¶æ€ï¼ˆæ— éœ€å–ç”µæ± ï¼‰
 static const StepDef cancel_without_battery_steps[] = 
 {
-    {Motor2Back, 5000, 0xFFFF, 0},              // µç»ú2ºóÍË£¨È·±£ÔÚ³õÊ¼Î»£©
-    {Motor1Down1, 1000, 0xFFFF, 0},             // µç»ú1ÏÂ½µ
-		{Motor3Lossen, 500, 0xFFFF, 0},							// µç»ú3ËÉ¿ª
-    {LeaveCenter, 15000, 0x0015, 2},            // ¾ÓÖĞ¸ËÊÍ·Å
+    {Motor2Back, 5000, 0xFFFF, 0},              // ç”µæœº2åé€€ï¼ˆç¡®ä¿åœ¨åˆå§‹ä½ï¼‰
+    {Motor1Down1, 1000, 0xFFFF, 0},             // ç”µæœº1ä¸‹é™
+		{Motor3Lossen, 500, 0xFFFF, 0},							// ç”µæœº3æ¾å¼€
+    {LeaveCenter, 15000, 0x0015, 2},            // å±…ä¸­æ†é‡Šæ”¾
 };
 #define CANCEL_WITHOUT_BATTERY_COUNT (sizeof(cancel_without_battery_steps)/sizeof(cancel_without_battery_steps[0]))
 	
@@ -976,51 +976,51 @@ uint8_t Sequence_IsBusy(void)
 void Sequence_Start(SeqId id)
 {
     if (seq_runner.busy) {
-        printf("ĞòÁĞÒÑÔÚÖ´ĞĞÖĞ£¬ºöÂÔĞÂÇëÇó\r\n");
+        printf("åºåˆ—å·²åœ¨æ‰§è¡Œä¸­ï¼Œå¿½ç•¥æ–°è¯·æ±‚\r\n");
         return;
     }
 		
-		    // Ç¿ÖÆ½«Ö÷Õ¾×´Ì¬ÖØÖÃÎªIDLE
+		    // å¼ºåˆ¶å°†ä¸»ç«™çŠ¶æ€é‡ç½®ä¸ºIDLE
     if (master_state != MASTER_IDLE) {
-        printf("ĞòÁĞÆô¶¯Ç°ÖØÖÃÖ÷Õ¾×´Ì¬£¬Ô­×´Ì¬: %d\r\n", master_state);
+        printf("åºåˆ—å¯åŠ¨å‰é‡ç½®ä¸»ç«™çŠ¶æ€ï¼ŒåŸçŠ¶æ€: %d\r\n", master_state);
         master_state = MASTER_IDLE;
         timeout_cnt = 0;
         memset(Master_RX_BUFF, 0, sizeof(Master_RX_BUFF));
     }
 		
-		// »ñÈ¡µ±Ç°¿Õ²ÖºÅ£¨1~3£©
+		// è·å–å½“å‰ç©ºä»“å·ï¼ˆ1~3ï¼‰
     uint8_t empty_bay = SwapState_GetEmptyBay();
     if (empty_bay < 1 || empty_bay > 3) {
-        printf("ÎŞĞ§µÄ¿Õ²ÖºÅ: %d£¬Ê¹ÓÃÄ¬ÈÏ1ºÅ²Ö\n", empty_bay);
+        printf("æ— æ•ˆçš„ç©ºä»“å·: %dï¼Œä½¿ç”¨é»˜è®¤1å·ä»“\n", empty_bay);
         empty_bay = 1;
     }
-    uint8_t index = empty_bay - 1; // Êı×éË÷Òı
+    uint8_t index = empty_bay - 1; // æ•°ç»„ç´¢å¼•
 		
     switch (id) {
 				case SEQ_ID_OPENDR1:
 						seq_runner.steps = opendr1_steps;
 						seq_runner.step_count = OPENDR1_STEP_COUNT;
-						printf("´ò¿ª²ÕÃÅĞòÁĞ\r\n");
+						printf("æ‰“å¼€èˆ±é—¨åºåˆ—\r\n");
 				break;
 				case SEQ_ID_OPENDR:
 						seq_runner.steps = opendr_steps;
 						seq_runner.step_count = OPENDR_STEP_COUNT;
-						printf("´ò¿ª²ÕÃÅĞòÁĞ\r\n");
+						printf("æ‰“å¼€èˆ±é—¨åºåˆ—\r\n");
 				break;
 				case SEQ_ID_CLOSEDR:
 						seq_runner.steps = closedr_steps;
 						seq_runner.step_count = CLOSEDR_STEP_COUNT;
-						printf("¹Ø±Õ²ÕÃÅĞòÁĞ\r\n");
+						printf("å…³é—­èˆ±é—¨åºåˆ—\r\n");
 				break;
 			  case SEQ_ID_CLOSECENTER:
 						seq_runner.steps = closecenter_steps;
 						seq_runner.step_count = CLOSECENTER_STEP_COUNT;
-						printf("¾ÓÖĞ¸Ë¾ÓÖĞĞòÁĞ\r\n");
+						printf("å±…ä¸­æ†å±…ä¸­åºåˆ—\r\n");
 				break;
 				case SEQ_ID_LEAVECENTER:
 						seq_runner.steps = leavecenter_steps;
 						seq_runner.step_count = LEAVECENTER_STEP_COUNT;
-						printf("¾ÓÖĞ¸ËÊÍ·ÅĞòÁĞ\r\n");
+						printf("å±…ä¸­æ†é‡Šæ”¾åºåˆ—\r\n");
 				break;
 				case SEQ_ID_LOADBATTERY:
 				{
@@ -1028,7 +1028,7 @@ void Sequence_Start(SeqId id)
             const uint8_t counts[] = {LOADBATTERY_STEPS_1_COUNT, LOADBATTERY_STEPS_2_COUNT, LOADBATTERY_STEPS_3_COUNT};
             seq_runner.steps = array[index];
             seq_runner.step_count = counts[index];
-            printf("Æô¶¯×°µç³ØĞòÁĞ£¬¿Õ²Ö=%d\n", empty_bay);
+            printf("å¯åŠ¨è£…ç”µæ± åºåˆ—ï¼Œç©ºä»“=%d\n", empty_bay);
             break;
 				}
 				case SEQ_ID_DOWNBATTERY:
@@ -1037,7 +1037,7 @@ void Sequence_Start(SeqId id)
             const uint8_t counts[] = {DOWNBATTERY_STEPS_1_COUNT, DOWNBATTERY_STEPS_2_COUNT, DOWNBATTERY_STEPS_3_COUNT};
             seq_runner.steps = array[index];
             seq_runner.step_count = counts[index];
-            printf("Æô¶¯ÏÂµç³ØĞòÁĞ£¬¿Õ²Ö=%d\n", empty_bay);
+            printf("å¯åŠ¨ä¸‹ç”µæ± åºåˆ—ï¼Œç©ºä»“=%d\n", empty_bay);
             break;
 				}
         case SEQ_ID_TAKEOFF:
@@ -1046,7 +1046,7 @@ void Sequence_Start(SeqId id)
             const uint8_t counts[] = {TAKEOFF_STEPS_1_COUNT, TAKEOFF_STEPS_2_COUNT, TAKEOFF_STEPS_3_COUNT};
             seq_runner.steps = array[index];
             seq_runner.step_count = counts[index];
-            printf("Æô¶¯Æğ·ÉĞòÁĞ£¬¿Õ²Ö=%d\n", empty_bay);
+            printf("å¯åŠ¨èµ·é£åºåˆ—ï¼Œç©ºä»“=%d\n", empty_bay);
             break;
 				}
         case SEQ_ID_LANDING:
@@ -1055,39 +1055,39 @@ void Sequence_Start(SeqId id)
             const uint8_t counts[] = {LANDING_STEPS_1_COUNT, LANDING_STEPS_2_COUNT, LANDING_STEPS_3_COUNT};
             seq_runner.steps = array[index];
             seq_runner.step_count = counts[index];
-            printf("Æô¶¯½µÂäĞòÁĞ£¬¿Õ²Ö=%d\n", empty_bay);
+            printf("å¯åŠ¨é™è½åºåˆ—ï¼Œç©ºä»“=%d\n", empty_bay);
             break;
 				}
 				case SEQ_ID_OPENFLY:
             seq_runner.steps = openfly_steps;
             seq_runner.step_count = OPENFLY_STEP_COUNT;
-            printf("·É»ú¿ª»úÍê³ÉĞòÁĞ\r\n");
+            printf("é£æœºå¼€æœºå®Œæˆåºåˆ—\r\n");
             break;
 				case SEQ_ID_CLOSEFLY:
             seq_runner.steps = closefly_steps;
             seq_runner.step_count = CLOSEFLY_STEP_COUNT;
-            printf("·É»ú¹Ø»úÍê³ÉĞòÁĞ\r\n");
+            printf("é£æœºå…³æœºå®Œæˆåºåˆ—\r\n");
             break;
 
 //        case SEQ_ID_CANCEL:
 //            seq_runner.steps = landing_steps;
 //            seq_runner.step_count = LANDING_STEP_COUNT;
-//            printf("È¡ÏûĞòÁĞ\r\n");
+//            printf("å–æ¶ˆåºåˆ—\r\n");
 //            break;
 //				case SEQ_ID_OPENUP:
 //						seq_runner.steps = OpenUp_steps;
 //						seq_runner.step_count = OPENUP_STEP_COUNT;
-//						printf("¿ªÃÅ¼°/Æ½Ì¨ÉÏÉıĞòÁĞ\r\n");
+//						printf("å¼€é—¨åŠ/å¹³å°ä¸Šå‡åºåˆ—\r\n");
 //				break;
 //				case SEQ_ID_CLOSEDOWN:
 //						seq_runner.steps = downclose_steps;
 //						seq_runner.step_count = CLOSEDOWN_STEP_COUNT;
-//						printf("¹ØÃÅ¼°/Æ½Ì¨ÏÂ½µĞòÁĞ\r\n");
+//						printf("å…³é—¨åŠ/å¹³å°ä¸‹é™åºåˆ—\r\n");
 //				break;
         default:
             return;
     }
-		// ========== ÅÄÉã×´Ì¬¿ìÕÕ ==========
+		// ========== æ‹æ‘„çŠ¶æ€å¿«ç…§ ==========
     StatusRegs_TakeSnapshot();
 		
     seq_runner.id = id;
@@ -1097,17 +1097,17 @@ void Sequence_Start(SeqId id)
     seq_runner.error = 0;
 		seq_runner.paused = 0; 
 		seq_runner.pending_update_addr = 0xFFFF;
-    seq_runner.retry_count = 0;   // ÖØÖÃÖØÊÔ¼ÆÊı
+    seq_runner.retry_count = 0;   // é‡ç½®é‡è¯•è®¡æ•°
 }
 
 
-// Ö´ĞĞµ±Ç°²½Öè£¨·¢ËÍÖ¸Áî£©
+// æ‰§è¡Œå½“å‰æ­¥éª¤ï¼ˆå‘é€æŒ‡ä»¤ï¼‰
 //static void ExecuteCurrentStep(void)
 //{
 //		const StepDef *step = &seq_runner.steps[seq_runner.current_index];
 //    
 //    if (MasterPolling_IsBusy()) {
-//			printf("ExecuteCurrentStep: ×ÜÏßÃ¦£¬Ìø¹ı²½Öè %d\n", seq_runner.current_index);
+//			printf("ExecuteCurrentStep: æ€»çº¿å¿™ï¼Œè·³è¿‡æ­¥éª¤ %d\n", seq_runner.current_index);
 //        return;
 //    }
 //    
@@ -1117,11 +1117,11 @@ void Sequence_Start(SeqId id)
 //    
 //    if (ret == 0) {
 //        if (step->wait_ms > 0) {
-//            // Æô¶¯Ó²¼ş¶¨Ê±Æ÷£¬³¬Ê±Ê±¼ä = wait_ms ºÁÃë
+//            // å¯åŠ¨ç¡¬ä»¶å®šæ—¶å™¨ï¼Œè¶…æ—¶æ—¶é—´ = wait_ms æ¯«ç§’
 //            bsp_StartHardTimer(1, step->wait_ms * 1000, StepTimerCallback);
 //					  //bsp_StartHardTimer(1, step->wait_ms , StepTimerCallback);
-//            seq_runner.wait_until = 1;   // ±ê¼ÇÎªµÈ´ı×´Ì¬£¨·ÇÁã¼´¿É£©
-//						// ±£´æ¹ÒÆğµÄ¸üĞÂĞÅÏ¢£¨Èç¹ûµØÖ·²»ÊÇ0xFFFF£©
+//            seq_runner.wait_until = 1;   // æ ‡è®°ä¸ºç­‰å¾…çŠ¶æ€ï¼ˆéé›¶å³å¯ï¼‰
+//						// ä¿å­˜æŒ‚èµ·çš„æ›´æ–°ä¿¡æ¯ï¼ˆå¦‚æœåœ°å€ä¸æ˜¯0xFFFFï¼‰
 //            if (step->update_addr != 0xFFFF) 
 //						{
 //                seq_runner.pending_update_addr = step->update_addr;
@@ -1131,11 +1131,11 @@ void Sequence_Start(SeqId id)
 //						{
 //                seq_runner.pending_update_addr = 0xFFFF;
 //            }
-//            printf("²½Öè %d ³É¹¦£¬Æô¶¯Ó²¼ş¶¨Ê±Æ÷ %d ms\r\n", seq_runner.current_index, step->wait_ms);
+//            printf("æ­¥éª¤ %d æˆåŠŸï¼Œå¯åŠ¨ç¡¬ä»¶å®šæ—¶å™¨ %d ms\r\n", seq_runner.current_index, step->wait_ms);
 //        } 
 //				else 
 //				{
-//            // ÎŞµÈ´ı£¬Á¢¼´½øÈëÏÂÒ»²½
+//            // æ— ç­‰å¾…ï¼Œç«‹å³è¿›å…¥ä¸‹ä¸€æ­¥
 //						if (step->update_addr != 0xFFFF) 
 //						{
 //                StatusRegs_Update(step->update_addr, step->update_value);
@@ -1143,19 +1143,19 @@ void Sequence_Start(SeqId id)
 //            seq_runner.current_index++;
 //            if (seq_runner.current_index >= seq_runner.step_count) {
 //                seq_runner.busy = 0;
-//                printf("ĞòÁĞÖ´ĞĞÍê³É\r\n");
-//								// ÊÍ·Å¿ìÕÕ£¬±ÜÃâ³¤ÆÚÕ¼ÓÃ
+//                printf("åºåˆ—æ‰§è¡Œå®Œæˆ\r\n");
+//								// é‡Šæ”¾å¿«ç…§ï¼Œé¿å…é•¿æœŸå ç”¨
 //								StatusRegs_ReleaseSnapshot();
 //            }
 //        }
 //    } 
 //		else if (ret == 1) 
 //		{
-//        printf("²½Öè %d ĞèÒª¼ÌĞøÖ´ĞĞ\r\n", seq_runner.current_index);
+//        printf("æ­¥éª¤ %d éœ€è¦ç»§ç»­æ‰§è¡Œ\r\n", seq_runner.current_index);
 //    } 
 //		else 
 //		{
-//        printf("²½Öè %d Ö´ĞĞÊ§°Ü£¬´íÎóÂë %d\r\n", seq_runner.current_index, ret);
+//        printf("æ­¥éª¤ %d æ‰§è¡Œå¤±è´¥ï¼Œé”™è¯¯ç  %d\r\n", seq_runner.current_index, ret);
 //        seq_runner.error = 1;
 //        seq_runner.busy = 0;
 //    }
@@ -1166,7 +1166,7 @@ static void ExecuteCurrentStep(void)
     const StepDef *step = &seq_runner.steps[seq_runner.current_index];
 
     if (MasterPolling_IsBusy()) {
-        printf("ExecuteCurrentStep: ×ÜÏßÃ¦£¬Ìø¹ı²½Öè %d\n", seq_runner.current_index);
+        printf("ExecuteCurrentStep: æ€»çº¿å¿™ï¼Œè·³è¿‡æ­¥éª¤ %d\n", seq_runner.current_index);
         return;
     }
 
@@ -1175,7 +1175,7 @@ static void ExecuteCurrentStep(void)
     MasterBusy_Release();
 
     if (ret == 0) {
-        // Õı³£³É¹¦
+        // æ­£å¸¸æˆåŠŸ
         if (step->wait_ms > 0) {
             bsp_StartHardTimer(1, step->wait_ms * 1000, StepTimerCallback);
             seq_runner.wait_until = 1;
@@ -1185,7 +1185,7 @@ static void ExecuteCurrentStep(void)
             } else {
                 seq_runner.pending_update_addr = 0xFFFF;
             }
-            printf("²½Öè %d ³É¹¦£¬Æô¶¯Ó²¼ş¶¨Ê±Æ÷ %d ms\r\n", seq_runner.current_index, step->wait_ms);
+            printf("æ­¥éª¤ %d æˆåŠŸï¼Œå¯åŠ¨ç¡¬ä»¶å®šæ—¶å™¨ %d ms\r\n", seq_runner.current_index, step->wait_ms);
         } else {
             if (step->update_addr != 0xFFFF) {
                 StatusRegs_Update(step->update_addr, step->update_value);
@@ -1193,30 +1193,30 @@ static void ExecuteCurrentStep(void)
             seq_runner.current_index++;
             if (seq_runner.current_index >= seq_runner.step_count) {
                 seq_runner.busy = 0;
-                printf("ĞòÁĞÖ´ĞĞÍê³É\r\n");
+                printf("åºåˆ—æ‰§è¡Œå®Œæˆ\r\n");
                 StatusRegs_ReleaseSnapshot();
             }
         }
     } else if (ret == 1) {
-        printf("²½Öè %d ĞèÒª¼ÌĞøÖ´ĞĞ\r\n", seq_runner.current_index);
+        printf("æ­¥éª¤ %d éœ€è¦ç»§ç»­æ‰§è¡Œ\r\n", seq_runner.current_index);
     } else if (ret == 3) {
-				// ¶Â×ª´¥·¢ÖØÊÔ
+				// å µè½¬è§¦å‘é‡è¯•
         seq_runner.retry_count++;
-        printf("²½Öè %d ´¥·¢ÖØÊÔ£¬µ±Ç°ÖØÊÔ´ÎÊı %d/3\r\n", seq_runner.current_index, seq_runner.retry_count);
+        printf("æ­¥éª¤ %d è§¦å‘é‡è¯•ï¼Œå½“å‰é‡è¯•æ¬¡æ•° %d/3\r\n", seq_runner.current_index, seq_runner.retry_count);
         if (seq_runner.retry_count < 3) {
-            // ÖØÆôÕû¸öĞòÁĞ
+            // é‡å¯æ•´ä¸ªåºåˆ—
             uint8_t seq_id = seq_runner.id;
             seq_runner.busy = 0;
             Sequence_Start(seq_id);
         } else {
-            // ³¬¹ıÖØÊÔ´ÎÊı£¬¸üĞÂ¹ÊÕÏÂëÎª0xFF£¬ÖÕÖ¹ĞòÁĞ
+            // è¶…è¿‡é‡è¯•æ¬¡æ•°ï¼Œæ›´æ–°æ•…éšœç ä¸º0xFFï¼Œç»ˆæ­¢åºåˆ—
             StatusRegs_Update(REG_FAULT_CODE, 0x00FF);
-            printf("ÖØÊÔ´ÎÊı³¬¹ı3´Î£¬¸üĞÂ¹ÊÕÏÂë0xFF£¬ĞòÁĞÖÕÖ¹\r\n");
+            printf("é‡è¯•æ¬¡æ•°è¶…è¿‡3æ¬¡ï¼Œæ›´æ–°æ•…éšœç 0xFFï¼Œåºåˆ—ç»ˆæ­¢\r\n");
             seq_runner.error = 1;
             seq_runner.busy = 0;
         }
     } else {
-        printf("²½Öè %d Ö´ĞĞÊ§°Ü£¬´íÎóÂë %d\r\n", seq_runner.current_index, ret);
+        printf("æ­¥éª¤ %d æ‰§è¡Œå¤±è´¥ï¼Œé”™è¯¯ç  %d\r\n", seq_runner.current_index, ret);
         seq_runner.error = 1;
         seq_runner.busy = 0;
     }
@@ -1231,50 +1231,50 @@ void Sequence_Process(void)
 
     if (seq_runner.wait_until > 0) {
 //			printf("wait_until=%d, g_step_timer_expired=%d\n", seq_runner.wait_until, g_step_timer_expired);
-        // ÔİÍ£Ê±£¬²»´¦ÀíÈÎºÎ³¬Ê±£¬±£Áô×´Ì¬
+        // æš‚åœæ—¶ï¼Œä¸å¤„ç†ä»»ä½•è¶…æ—¶ï¼Œä¿ç•™çŠ¶æ€
         if (seq_runner.paused) {
             return;
         }
 
-        // Õı³£µÈ´ı³¬Ê±´¦Àí
+        // æ­£å¸¸ç­‰å¾…è¶…æ—¶å¤„ç†
         if (g_step_timer_expired) {
             g_step_timer_expired = 0;
             seq_runner.wait_until = 0;
 
-            // Ö´ĞĞ¹ÒÆğµÄ¼Ä´æÆ÷¸üĞÂ
+            // æ‰§è¡ŒæŒ‚èµ·çš„å¯„å­˜å™¨æ›´æ–°
             if (seq_runner.pending_update_addr != 0xFFFF) {
                 StatusRegs_Update(seq_runner.pending_update_addr, seq_runner.pending_update_value);
                 seq_runner.pending_update_addr = 0xFFFF;
             }
 
-            // ½øÈëÏÂÒ»²½
+            // è¿›å…¥ä¸‹ä¸€æ­¥
             seq_runner.current_index++;
             if (seq_runner.current_index >= seq_runner.step_count) {
-                printf("ĞòÁĞÖ´ĞĞÍê±Ï\r\n");
+                printf("åºåˆ—æ‰§è¡Œå®Œæ¯•\r\n");
                 seq_runner.busy = 0;
                 seq_runner.paused = 0;
                 StatusRegs_ReleaseSnapshot();
             } else {
-                printf("µÈ´ı½áÊø£¬½øÈë²½Öè %d\r\n", seq_runner.current_index);
+                printf("ç­‰å¾…ç»“æŸï¼Œè¿›å…¥æ­¥éª¤ %d\r\n", seq_runner.current_index);
             }
         }
         return;
     }
 
-    // ÈôÔİÍ££¬Ôò²»ÔÊĞíÖ´ĞĞĞÂ²½Öè
+    // è‹¥æš‚åœï¼Œåˆ™ä¸å…è®¸æ‰§è¡Œæ–°æ­¥éª¤
     if (seq_runner.paused) return;
 		
 
     if (seq_runner.current_index < seq_runner.step_count) {
-				printf("Sequence_Process: Ö´ĞĞ²½Öè %d\n", seq_runner.current_index);
+				printf("Sequence_Process: æ‰§è¡Œæ­¥éª¤ %d\n", seq_runner.current_index);
         ExecuteCurrentStep();
     }
 }
 
-// ÅĞ¶ÏÎŞÈË»úÄÚÊÇ·ñÓĞ¾Éµç³Ø£¨¸ù¾İµç³Ø³äµç×´Ì¬£©
+// åˆ¤æ–­æ— äººæœºå†…æ˜¯å¦æœ‰æ—§ç”µæ± ï¼ˆæ ¹æ®ç”µæ± å……ç”µçŠ¶æ€ï¼‰
 static uint8_t HasOldBatteryInUAV(void)
 {
-    // ¶ÁÈ¡Èı¿éµç³ØµÄ³äµç×´Ì¬£¨0=³äµçÖĞ£¬1=Î´³äµç£©
+    // è¯»å–ä¸‰å—ç”µæ± çš„å……ç”µçŠ¶æ€ï¼ˆ0=å……ç”µä¸­ï¼Œ1=æœªå……ç”µï¼‰
     uint16_t bat1_charge = StatusRegs_Get(REG_BAT1_CHARGE_STATE);
     uint16_t bat2_charge = StatusRegs_Get(REG_BAT2_CHARGE_STATE);
     uint16_t bat3_charge = StatusRegs_Get(REG_BAT3_CHARGE_STATE);
@@ -1284,29 +1284,29 @@ static uint8_t HasOldBatteryInUAV(void)
     if (bat2_charge == 1) not_charging_count++;
     if (bat3_charge == 1) not_charging_count++;
 
-    // Ö»ÓĞµ±Ç¡ºÃÒ»¿éµç³Ø²»ÔÚ³äµçÊ±£¬²ÅÈÏÎªÎŞÈË»úÄÚÓĞ¾Éµç³Ø
+    // åªæœ‰å½“æ°å¥½ä¸€å—ç”µæ± ä¸åœ¨å……ç”µæ—¶ï¼Œæ‰è®¤ä¸ºæ— äººæœºå†…æœ‰æ—§ç”µæ± 
     return (not_charging_count == 1) ? 1 : 0;
 }
 
-// È¡ÏûĞòÁĞÆô¶¯º¯Êı
+// å–æ¶ˆåºåˆ—å¯åŠ¨å‡½æ•°
 void Sequence_Cancel(void)
 {
     if (seq_runner.busy) {
-        printf("ĞòÁĞÒÑÔÚÖ´ĞĞÖĞ£¬ºöÂÔÈ¡ÏûÇëÇó\r\n");
+        printf("åºåˆ—å·²åœ¨æ‰§è¡Œä¸­ï¼Œå¿½ç•¥å–æ¶ˆè¯·æ±‚\r\n");
         return;
     }
     
-    // ¸ù¾İµç³Ø³äµç×´Ì¬ÅĞ¶ÏÊÇ·ñÓĞ¾Éµç³Ø
+    // æ ¹æ®ç”µæ± å……ç”µçŠ¶æ€åˆ¤æ–­æ˜¯å¦æœ‰æ—§ç”µæ± 
     if (HasOldBatteryInUAV()) {
-        // ÓĞµç³Ø£ºÖ´ĞĞ»»µçĞòÁĞ£¨È¡ÏÂ¾Éµç³Ø£¬·ÅÈë¿Õµç³Ø²Ö£©
+        // æœ‰ç”µæ± ï¼šæ‰§è¡Œæ¢ç”µåºåˆ—ï¼ˆå–ä¸‹æ—§ç”µæ± ï¼Œæ”¾å…¥ç©ºç”µæ± ä»“ï¼‰
         seq_runner.steps = cancel_with_battery_steps;
         seq_runner.step_count = CANCEL_WITH_BATTERY_COUNT;
-        printf("Æô¶¯È¡ÏûĞòÁĞ£¨ÓĞµç³Ø£©\r\n");
+        printf("å¯åŠ¨å–æ¶ˆåºåˆ—ï¼ˆæœ‰ç”µæ± ï¼‰\r\n");
     } else {
-        // ÎŞµç³Ø£ºÖ±½Ó¸´Î»µ½»»µçÍê³É×´Ì¬
+        // æ— ç”µæ± ï¼šç›´æ¥å¤ä½åˆ°æ¢ç”µå®ŒæˆçŠ¶æ€
         seq_runner.steps = cancel_without_battery_steps;
         seq_runner.step_count = CANCEL_WITHOUT_BATTERY_COUNT;
-        printf("Æô¶¯È¡ÏûĞòÁĞ£¨ÎŞµç³Ø£©\r\n");
+        printf("å¯åŠ¨å–æ¶ˆåºåˆ—ï¼ˆæ— ç”µæ± ï¼‰\r\n");
     }
     
     seq_runner.id = SEQ_ID_CANCEL;
@@ -1317,13 +1317,13 @@ void Sequence_Cancel(void)
     seq_runner.paused = 0;
     seq_runner.pending_update_addr = 0xFFFF;
     
-    // ÅÄÉã×´Ì¬¿ìÕÕ£¨¿ÉÑ¡£©
+    // æ‹æ‘„çŠ¶æ€å¿«ç…§ï¼ˆå¯é€‰ï¼‰
     StatusRegs_TakeSnapshot();
 }
 
 
 
-//////////////////////////////////////¾ÓÖĞÉı½µÖ÷Ìåº¯Êı//////////////////////////////////////////////////
+//////////////////////////////////////å±…ä¸­å‡é™ä¸»ä½“å‡½æ•°//////////////////////////////////////////////////
 uint8_t Center_1(void)
 {
 		MotorControlParams motors[4] = 
@@ -1333,7 +1333,7 @@ uint8_t Center_1(void)
 			{MOTOR9_SLAVE_ADDR, MOTOR5_CTRL_REG1, MOTOR9_length_l, MOTOR9_length_h},
 			{MOTOR11_SLAVE_ADDR, MOTOR5_CTRL_REG1, MOTOR11_length_l, MOTOR11_length_h}
     };
-    // Í¬²½·¢ËÍËùÓĞµç»úÖ¸Áî£¨²»µÈ´ıÏìÓ¦£©
+    // åŒæ­¥å‘é€æ‰€æœ‰ç”µæœºæŒ‡ä»¤ï¼ˆä¸ç­‰å¾…å“åº”ï¼‰
     Sync_Motors_Control(motors, 4);
 		
 		master_state = MASTER_IDLE;
@@ -1355,20 +1355,20 @@ uint8_t Center_1(void)
 //		int32_t target_pos[] = {MOTOR9_CENTER_POS, MOTOR10_CENTER_POS, MOTOR11_CENTER_POS, MOTOR12_CENTER_POS};
 //    uint8_t ret = WaitWithPositionCheck(addrs, 4, 5000, 1000, 3, target_pos);
 //    if (ret == 1) {
-//        // ¶Â×ª
+//        // å µè½¬
 //        StatusRegs_Update(REG_FAULT_CODE, 0x00E1);
-//        printf("Center_1 ¼ì²âµ½µç»ú¶Â×ª£¬Ö´ĞĞÊÍ·Å²¢×¼±¸ÖØÊÔ\n");
+//        printf("Center_1 æ£€æµ‹åˆ°ç”µæœºå µè½¬ï¼Œæ‰§è¡Œé‡Šæ”¾å¹¶å‡†å¤‡é‡è¯•\n");
 //        delay_ms(2000);
 //        LeaveCenter1();
 //        delay_ms(15000);
-//        return 3;   // ÖØÊÔ
+//        return 3;   // é‡è¯•
 //    } else if (ret == 2) {
-//        // µ½Î»Ê§°Ü
+//        // åˆ°ä½å¤±è´¥
 //        StatusRegs_Update(REG_FAULT_CODE, 0x00E2);
-//        printf("Center_1 µç»úÎ´µ½Î»£¬ÉÏ±¨¹ÊÕÏ\n");
+//        printf("Center_1 ç”µæœºæœªåˆ°ä½ï¼Œä¸ŠæŠ¥æ•…éšœ\n");
 //        master_state = MASTER_IDLE;
 //        timeout_cnt = 0;
-//        return 1;   // ÖÕÖ¹ĞòÁĞ
+//        return 1;   // ç»ˆæ­¢åºåˆ—
 //    }
 
 //    master_state = MASTER_IDLE;
@@ -1405,21 +1405,21 @@ uint8_t Center_2(void)
 //    int32_t target_pos[] = {MOTOR5_CENTER_POS, MOTOR6_CENTER_POS, MOTOR7_CENTER_POS, MOTOR8_CENTER_POS};
 //    uint8_t ret = WaitWithPositionCheck(addrs, 4, 13000, 1000, 3, target_pos);
 //    if (ret == 1) {
-//        // ¶Â×ª
+//        // å µè½¬
 //        StatusRegs_Update(REG_FAULT_CODE, 0x00E1);
-//        printf("Center_2 ¼ì²âµ½µç»ú¶Â×ª£¬Ö´ĞĞÊÍ·Å²¢×¼±¸ÖØÊÔ\n");
+//        printf("Center_2 æ£€æµ‹åˆ°ç”µæœºå µè½¬ï¼Œæ‰§è¡Œé‡Šæ”¾å¹¶å‡†å¤‡é‡è¯•\n");
 //        delay_ms(2000);
 //        LeaveCenter1();
 //        delay_ms(15000);
-//        return 3;   // ÖØÊÔ
+//        return 3;   // é‡è¯•
 //    } else if (ret == 2) {
-//        // µ½Î»Ê§°Ü
+//        // åˆ°ä½å¤±è´¥
 //        StatusRegs_Update(REG_FAULT_CODE, 0x00E2);
-//        printf("Center_2 µç»úÎ´µ½Î»£¬ÉÏ±¨¹ÊÕÏ\n");
+//        printf("Center_2 ç”µæœºæœªåˆ°ä½ï¼Œä¸ŠæŠ¥æ•…éšœ\n");
 //				delay_ms(2000);
 //        LeaveCenter1();
 //        delay_ms(15000);
-//        return 3;   // ÖÕÖ¹ĞòÁĞ
+//        return 3;   // ç»ˆæ­¢åºåˆ—
 //    }
 
 //    master_state = MASTER_IDLE;
@@ -1428,12 +1428,12 @@ uint8_t Center_2(void)
 //}
 
 /**
- * @brief ¿ìËÙÊÍ·Å¾ÓÖĞ¸Ë£¨²»½øĞĞÎ»ÖÃ¼à²â£¬½ö·¢ËÍÖ¸Áî£©
- * @return 0 ³É¹¦
+ * @brief å¿«é€Ÿé‡Šæ”¾å±…ä¸­æ†ï¼ˆä¸è¿›è¡Œä½ç½®ç›‘æµ‹ï¼Œä»…å‘é€æŒ‡ä»¤ï¼‰
+ * @return 0 æˆåŠŸ
  */
 uint8_t LeaveCenter(void)
 {
-		//ĞèÒªĞŞ¸Ä¾ßÌå²ÎÊı  
+		//éœ€è¦ä¿®æ”¹å…·ä½“å‚æ•°  
 		MotorControlParams motors[8] = 
 		{
 			{MOTOR5_SLAVE_ADDR, MOTOR5_CTRL_REG1, MOTOR13_length_l, MOTOR13_length_h},
@@ -1448,9 +1448,9 @@ uint8_t LeaveCenter(void)
     uint8_t results[8];
     uint8_t ret = Control_Motors_Complete(motors, 8, results);
     if (ret == 0) {
-        printf("×İÏò¹éÖĞ¿ØÖÆ³É¹¦\r\n");
+        printf("çºµå‘å½’ä¸­æ§åˆ¶æˆåŠŸ\r\n");
     } else {
-        printf("×İÏò¹éÖĞ¿ØÖÆÓĞ %d ¸öÊ§°Ü\r\n", ret);
+        printf("çºµå‘å½’ä¸­æ§åˆ¶æœ‰ %d ä¸ªå¤±è´¥\r\n", ret);
     }
 
 		master_state = MASTER_IDLE;
@@ -1478,8 +1478,8 @@ uint8_t LeaveCenter(void)
 //                            MOTOR10_RELEASE_POS, MOTOR12_RELEASE_POS, MOTOR9_RELEASE_POS, MOTOR11_RELEASE_POS};
 //    uint8_t ret = WaitWithPositionCheck(addrs, 8, 10000, 1000, 3, target_pos);
 //    if (ret == 2) {
-//        StatusRegs_Update(REG_FAULT_CODE, 0x00E3); // ÊÍ·Å²»µ½Î»¹ÊÕÏÂë
-//        printf("ÊÍ·ÅÎ´µ½Î»£¬ÉÏ±¨¹ÊÕÏ\n");
+//        StatusRegs_Update(REG_FAULT_CODE, 0x00E3); // é‡Šæ”¾ä¸åˆ°ä½æ•…éšœç 
+//        printf("é‡Šæ”¾æœªåˆ°ä½ï¼Œä¸ŠæŠ¥æ•…éšœ\n");
 //        delay_ms(2000);
 //        LeaveCenter1();
 //        delay_ms(15000);
@@ -1492,10 +1492,10 @@ uint8_t LeaveCenter(void)
 //    return 0;
 //}
 
-//ÊÍ·Å1
+//é‡Šæ”¾1
 uint8_t LeaveCenter1(void)
 {
-		//ĞèÒªĞŞ¸Ä¾ßÌå²ÎÊı  
+		//éœ€è¦ä¿®æ”¹å…·ä½“å‚æ•°  
 		MotorControlParams motors[8] = 
 		{
 			{MOTOR5_SLAVE_ADDR, MOTOR5_CTRL_REG1, MOTOR13_length_l, MOTOR13_length_h},
@@ -1510,9 +1510,9 @@ uint8_t LeaveCenter1(void)
     uint8_t results[8];
     uint8_t ret = Control_Motors_Complete(motors, 8, results);
     if (ret == 0) {
-        printf("×İÏò¹éÖĞ¿ØÖÆ³É¹¦\r\n");
+        printf("çºµå‘å½’ä¸­æ§åˆ¶æˆåŠŸ\r\n");
     } else {
-        printf("×İÏò¹éÖĞ¿ØÖÆÓĞ %d ¸öÊ§°Ü\r\n", ret);
+        printf("çºµå‘å½’ä¸­æ§åˆ¶æœ‰ %d ä¸ªå¤±è´¥\r\n", ret);
     }
 		master_state = MASTER_IDLE;
     timeout_cnt = 0;
@@ -1521,7 +1521,7 @@ uint8_t LeaveCenter1(void)
 
 uint8_t LeaveCenter2(void)
 {
-		//ĞèÒªĞŞ¸Ä¾ßÌå²ÎÊı  
+		//éœ€è¦ä¿®æ”¹å…·ä½“å‚æ•°  
 		MotorControlParams motors[8] = 
 		{
 			{MOTOR5_SLAVE_ADDR, MOTOR5_CTRL_REG1, MOTOR13_length_l, MOTOR13_length_h},
@@ -1536,9 +1536,9 @@ uint8_t LeaveCenter2(void)
     uint8_t results[8];
     uint8_t ret = Control_Motors_Complete(motors, 8, results);
     if (ret == 0) {
-        printf("×İÏò¹éÖĞ¿ØÖÆ³É¹¦\r\n");
+        printf("çºµå‘å½’ä¸­æ§åˆ¶æˆåŠŸ\r\n");
     } else {
-        printf("×İÏò¹éÖĞ¿ØÖÆÓĞ %d ¸öÊ§°Ü\r\n", ret);
+        printf("çºµå‘å½’ä¸­æ§åˆ¶æœ‰ %d ä¸ªå¤±è´¥\r\n", ret);
     }
 		master_state = MASTER_IDLE;
     timeout_cnt = 0;
@@ -1564,7 +1564,7 @@ uint8_t LeaveCenter2(void)
 //    uint8_t ret = WaitWithPositionCheck(addrs, 8, 15000, 1000, 3);
 //    if (ret != 0) {
 //        StatusRegs_Update(REG_FAULT_CODE, 0x00E1);
-//        printf("LeaveCenter1 ¼ì²âµ½µç»ú¶Â×ª£¬Ö´ĞĞÊÍ·Å²¢×¼±¸ÖØÊÔ\n");
+//        printf("LeaveCenter1 æ£€æµ‹åˆ°ç”µæœºå µè½¬ï¼Œæ‰§è¡Œé‡Šæ”¾å¹¶å‡†å¤‡é‡è¯•\n");
 //        delay_ms(2000);
 //        LeaveCenter();
 //        delay_ms(15000);
@@ -1578,9 +1578,9 @@ uint8_t LeaveCenter2(void)
 
 uint8_t Battery_1(void)
 {
-	  // µç»ú1ÉÏÉı
-  	uint8_t ctrl_ret4;  // Ö¸Áî·¢ËÍ·µ»ØÖµ 
-		uint16_t motor_cmd4 = MOTOR4_speed; // ËÙ¶È500£¨0x01f4£©
+	  // ç”µæœº1ä¸Šå‡
+  	uint8_t ctrl_ret4;  // æŒ‡ä»¤å‘é€è¿”å›å€¼ 
+		uint16_t motor_cmd4 = MOTOR4_speed; // é€Ÿåº¦500ï¼ˆ0x01f4ï¼‰
 	  MotorControlParams motors[1] = 
 		{
 			{MOTOR1_SLAVE_ADDR, MOTOR1_CTRL_REG1, Pulse_num7, Pulse_num8},
@@ -1588,9 +1588,9 @@ uint8_t Battery_1(void)
     uint8_t results[1];
 		uint8_t ret = Control_Motors_Complete(motors, 1, results);
 		if (ret == 0) {
-				printf("ËùÓĞµç»ú¿ØÖÆ³É¹¦\r\n");
+				printf("æ‰€æœ‰ç”µæœºæ§åˆ¶æˆåŠŸ\r\n");
 		} else {
-				printf("ÓĞ %d ¸öµç»ú¿ØÖÆÊ§°Ü\r\n", ret);
+				printf("æœ‰ %d ä¸ªç”µæœºæ§åˆ¶å¤±è´¥\r\n", ret);
 		}
 		master_state = MASTER_IDLE;
     timeout_cnt = 0;
@@ -1599,7 +1599,7 @@ uint8_t Battery_1(void)
 
 uint8_t Battery_2(void)
 {
-	  // ·É»úÇ°½ø
+	  // é£æœºå‰è¿›
 		MotorControlParams motors[4] = 
 		{
 			{MOTOR5_SLAVE_ADDR, MOTOR5_CTRL_REG1, MOTOR6_length_l, MOTOR6_length_h},
@@ -1608,9 +1608,9 @@ uint8_t Battery_2(void)
 			{MOTOR8_SLAVE_ADDR, MOTOR5_CTRL_REG1, MOTOR5_length_l, MOTOR5_length_h}
     };
     uint8_t results[4];
-    // Í¬²½·¢ËÍËùÓĞµç»úÖ¸Áî£¨²»µÈ´ıÏìÓ¦£©
+    // åŒæ­¥å‘é€æ‰€æœ‰ç”µæœºæŒ‡ä»¤ï¼ˆä¸ç­‰å¾…å“åº”ï¼‰
     Sync_Motors_Control(motors, 4);
-//		StatusRegs_Update(0x15, 4); //½«¾ÓÖĞ×´Ì¬Ğ´Èë¼Ä´æÆ÷
+//		StatusRegs_Update(0x15, 4); //å°†å±…ä¸­çŠ¶æ€å†™å…¥å¯„å­˜å™¨
 		master_state = MASTER_IDLE;
     timeout_cnt = 0;
 		return 0;
@@ -1619,9 +1619,9 @@ uint8_t Battery_2(void)
 uint8_t Battery_3(void)
 {
 	
-		// µç»ú2Ç°½ø
-  	uint8_t ctrl_ret4;  // Ö¸Áî·¢ËÍ·µ»ØÖµ 
-		uint16_t motor_cmd4 = MOTOR4_speed; // ËÙ¶È500£¨0x01f4£©
+		// ç”µæœº2å‰è¿›
+  	uint8_t ctrl_ret4;  // æŒ‡ä»¤å‘é€è¿”å›å€¼ 
+		uint16_t motor_cmd4 = MOTOR4_speed; // é€Ÿåº¦500ï¼ˆ0x01f4ï¼‰
 	  MotorControlParams motors[1] = 
 		{
 			{MOTOR2_SLAVE_ADDR, MOTOR2_CTRL_REG1, Pulse_num1, Pulse_num2},
@@ -1629,9 +1629,9 @@ uint8_t Battery_3(void)
     uint8_t results[1];
 		uint8_t ret = Control_Motors_Complete(motors, 1, results);
 		if (ret == 0) {
-				printf("ËùÓĞµç»ú¿ØÖÆ³É¹¦\r\n");
+				printf("æ‰€æœ‰ç”µæœºæ§åˆ¶æˆåŠŸ\r\n");
 		} else {
-				printf("ÓĞ %d ¸öµç»ú¿ØÖÆÊ§°Ü\r\n", ret);
+				printf("æœ‰ %d ä¸ªç”µæœºæ§åˆ¶å¤±è´¥\r\n", ret);
 		}
 		master_state = MASTER_IDLE;
     timeout_cnt = 0;
@@ -1640,57 +1640,57 @@ uint8_t Battery_3(void)
 
 //uint8_t Battery_4(void)
 //{
-//  	//µç»ú3¼Ğ½ôµç³Ø
-//		uint8_t motor_num3 = 2;   // ¼Ä´æÆ÷µØÖ·£¨¼Ğ½ô£©
-//		uint16_t motor_cmd3 = Clamp; // µç»úÖ¸Áî£º
+//  	//ç”µæœº3å¤¹ç´§ç”µæ± 
+//		uint8_t motor_num3 = 2;   // å¯„å­˜å™¨åœ°å€ï¼ˆå¤¹ç´§ï¼‰
+//		uint16_t motor_cmd3 = Clamp; // ç”µæœºæŒ‡ä»¤ï¼š
 //		uint8_t ctrl_ret3 = Motor_Control(MOTOR3_SLAVE_ADDR, motor_num3, motor_cmd3);
 //		if(ctrl_ret3 == 0)
 //    {
-//        printf("´Ó»ú3¼Ğ½ôÖ¸Áî·¢ËÍ³É¹¦£¡\r\n");
+//        printf("ä»æœº3å¤¹ç´§æŒ‡ä»¤å‘é€æˆåŠŸï¼\r\n");
 //    }
 //    else
 //    {
-//        printf("´Ó»ú3¼Ğ½ôÖ¸Áî·¢ËÍÊ§°Ü£¬´íÎóÂë£º%d\r\n", ctrl_ret3);
+//        printf("ä»æœº3å¤¹ç´§æŒ‡ä»¤å‘é€å¤±è´¥ï¼Œé”™è¯¯ç ï¼š%d\r\n", ctrl_ret3);
 //    }
 //		master_state = MASTER_IDLE;
-//		timeout_cnt = 0; // Í¬Ê±ÖØÖÃ³¬Ê±¼ÆÊıÆ÷
+//		timeout_cnt = 0; // åŒæ—¶é‡ç½®è¶…æ—¶è®¡æ•°å™¨
 //    __disable_irq();
 //    Master_RX_CNT = 0;
 //    __enable_irq();
-//    // ·µ»Ø0±íÊ¾³É¹¦£¬·Ç0±íÊ¾Ê§°Ü
+//    // è¿”å›0è¡¨ç¤ºæˆåŠŸï¼Œé0è¡¨ç¤ºå¤±è´¥
 //    return (ctrl_ret3 == 0) ? 0 : 1;
 //}
 
 //uint8_t Battery_4(void)
 //{
-//    // Ö±½Ó·¢ËÍ06Ö¸Áî£¬²»µÈ´ıÏìÓ¦
-//printf("Battery_4 Ç°£ºmaster_state=%d, RX_CNT=%d\n", master_state, Master_RX_CNT);
+//    // ç›´æ¥å‘é€06æŒ‡ä»¤ï¼Œä¸ç­‰å¾…å“åº”
+//printf("Battery_4 å‰ï¼šmaster_state=%d, RX_CNT=%d\n", master_state, Master_RX_CNT);
 //	delay_ms(5); 
 //    uint8_t ret = Modbus_06_WriteSingleReg(MOTOR3_SLAVE_ADDR, MOTOR3_CTRL_REG2, Clamp);
 //	delay_ms(10); 
-//    // ÓÉÓÚµç»úÒÑ¶¯×÷£¬Ç¿ÖÆÈÏÎª³É¹¦
+//    // ç”±äºç”µæœºå·²åŠ¨ä½œï¼Œå¼ºåˆ¶è®¤ä¸ºæˆåŠŸ
 //    master_state = MASTER_IDLE;
 //    timeout_cnt = 0;
 //    __disable_irq();
 //    Master_RX_CNT = 0;
 //    __enable_irq();
-//    printf("µç»ú3¼Ğ½ôÖ¸ÁîÒÑ·¢ËÍ£¨ºöÂÔÏìÓ¦£©\r\n");
+//    printf("ç”µæœº3å¤¹ç´§æŒ‡ä»¤å·²å‘é€ï¼ˆå¿½ç•¥å“åº”ï¼‰\r\n");
 //    return 0;
 //}
 
 uint8_t Battery_4(void)
 {
-    printf("Battery_4 ¿ªÊ¼Ö´ĞĞ\n");
-    // 1. Ç¿ÖÆ»Ö¸´Ö÷Õ¾×´Ì¬£¬Çå¿Õ½ÓÊÕ»º³åÇø
+    printf("Battery_4 å¼€å§‹æ‰§è¡Œ\n");
+    // 1. å¼ºåˆ¶æ¢å¤ä¸»ç«™çŠ¶æ€ï¼Œæ¸…ç©ºæ¥æ”¶ç¼“å†²åŒº
     __disable_irq();
     Master_RX_CNT = 0;
     memset(Master_RX_BUFF, 0, sizeof(Master_RX_BUFF));
     __enable_irq();
     master_state = MASTER_IDLE;
     timeout_cnt = 0;
-    delay_ms(5); // È·±£×ÜÏßÎÈ¶¨
+    delay_ms(5); // ç¡®ä¿æ€»çº¿ç¨³å®š
 
-    // 2. ¹¹Ôì06Ö¡²¢Ö±½Ó·¢ËÍ£¨²»µ÷ÓÃModbus_06_WriteSingleReg£©
+    // 2. æ„é€ 06å¸§å¹¶ç›´æ¥å‘é€ï¼ˆä¸è°ƒç”¨Modbus_06_WriteSingleRegï¼‰
     uint8_t tx_buff[8];
     tx_buff[0] = MOTOR3_SLAVE_ADDR;
     tx_buff[1] = 0x06;
@@ -1702,22 +1702,22 @@ uint8_t Battery_4(void)
     tx_buff[6] = crc & 0xFF;
     tx_buff[7] = (crc >> 8) & 0xFF;
 
-    RS485_MasterSendData(tx_buff, 8); // ·¢ËÍ
-    // 3. Á¢¼´»Ö¸´×´Ì¬£¬²»µÈ´ıÏìÓ¦
+    RS485_MasterSendData(tx_buff, 8); // å‘é€
+    // 3. ç«‹å³æ¢å¤çŠ¶æ€ï¼Œä¸ç­‰å¾…å“åº”
     master_state = MASTER_IDLE;
     timeout_cnt = 0;
     __disable_irq();
     Master_RX_CNT = 0;
     __enable_irq();
-    printf("µç»ú3¼Ğ½ôÖ¸ÁîÒÑ·¢ËÍ£¨ºöÂÔÏìÓ¦£©\r\n");
+    printf("ç”µæœº3å¤¹ç´§æŒ‡ä»¤å·²å‘é€ï¼ˆå¿½ç•¥å“åº”ï¼‰\r\n");
     return 0;
 }
 
 uint8_t Battery_5(void)
 {
-	  //µç»ú2ºóÍË
-  	uint8_t ctrl_ret4;  // Ö¸Áî·¢ËÍ·µ»ØÖµ 
-		uint16_t motor_cmd4 = MOTOR4_speed; // ËÙ¶È500£¨0x01f4£©
+	  //ç”µæœº2åé€€
+  	uint8_t ctrl_ret4;  // æŒ‡ä»¤å‘é€è¿”å›å€¼ 
+		uint16_t motor_cmd4 = MOTOR4_speed; // é€Ÿåº¦500ï¼ˆ0x01f4ï¼‰
 	  MotorControlParams motors[1] = 
 		{
 			{MOTOR2_SLAVE_ADDR, MOTOR2_CTRL_REG1, Pulse_num19, Pulse_num20},
@@ -1725,9 +1725,9 @@ uint8_t Battery_5(void)
     uint8_t results[1];
 		uint8_t ret = Control_Motors_Complete(motors, 1, results);
 		if (ret == 0) {
-				printf("ËùÓĞµç»ú¿ØÖÆ³É¹¦\r\n");
+				printf("æ‰€æœ‰ç”µæœºæ§åˆ¶æˆåŠŸ\r\n");
 		} else {
-				printf("ÓĞ %d ¸öµç»ú¿ØÖÆÊ§°Ü\r\n", ret);
+				printf("æœ‰ %d ä¸ªç”µæœºæ§åˆ¶å¤±è´¥\r\n", ret);
 		}
 		master_state = MASTER_IDLE;
     timeout_cnt = 0;
@@ -1737,7 +1737,7 @@ uint8_t Battery_5(void)
 
 uint8_t Battery_6(void)
 {
-	  //·É»úºóÍË
+	  //é£æœºåé€€
 		MotorControlParams motors[4] = 
 		{
 			{MOTOR5_SLAVE_ADDR, MOTOR5_CTRL_REG1, MOTOR5_length_l, MOTOR5_length_h},
@@ -1748,9 +1748,9 @@ uint8_t Battery_6(void)
     uint8_t results[4];
     uint8_t ret = Control_Motors_Complete(motors, 4, results);
     if (ret == 0) {
-        printf("×İÏò¹éÖĞ¿ØÖÆ³É¹¦\r\n");
+        printf("çºµå‘å½’ä¸­æ§åˆ¶æˆåŠŸ\r\n");
     } else {
-        printf("×İÏò¹éÖĞ¿ØÖÆÓĞ %d ¸öÊ§°Ü\r\n", ret);
+        printf("çºµå‘å½’ä¸­æ§åˆ¶æœ‰ %d ä¸ªå¤±è´¥\r\n", ret);
     }
 //		StatusRegs_Update(0x15, 2);
 		master_state = MASTER_IDLE;
@@ -1760,9 +1760,9 @@ uint8_t Battery_6(void)
 
 uint8_t Battery_7(void)
 {
-  	//µç»ú1ÏÂ½µ
-		uint8_t ctrl_ret4;  // Ö¸Áî·¢ËÍ·µ»ØÖµ 
-		uint16_t motor_cmd4 = MOTOR4_speed; // ËÙ¶È500£¨0x01f4£©
+  	//ç”µæœº1ä¸‹é™
+		uint8_t ctrl_ret4;  // æŒ‡ä»¤å‘é€è¿”å›å€¼ 
+		uint16_t motor_cmd4 = MOTOR4_speed; // é€Ÿåº¦500ï¼ˆ0x01f4ï¼‰
 	  MotorControlParams motors[1] = 
 		{
 			{MOTOR1_SLAVE_ADDR, MOTOR1_CTRL_REG1, Pulse_num9, Pulse_num10},
@@ -1770,9 +1770,9 @@ uint8_t Battery_7(void)
     uint8_t results[1];
 		uint8_t ret = Control_Motors_Complete(motors, 1, results);
 		if (ret == 0) {
-				printf("ËùÓĞµç»ú¿ØÖÆ³É¹¦\r\n");
+				printf("æ‰€æœ‰ç”µæœºæ§åˆ¶æˆåŠŸ\r\n");
 		} else {
-				printf("ÓĞ %d ¸öµç»ú¿ØÖÆÊ§°Ü\r\n", ret);
+				printf("æœ‰ %d ä¸ªç”µæœºæ§åˆ¶å¤±è´¥\r\n", ret);
 		}
 		master_state = MASTER_IDLE;
     timeout_cnt = 0;
@@ -1781,9 +1781,9 @@ uint8_t Battery_7(void)
 
 uint8_t Battery_8(void)
 {
-  	//µç»ú1ÉÏÉı
-		uint8_t ctrl_ret4;  // Ö¸Áî·¢ËÍ·µ»ØÖµ 
-		uint16_t motor_cmd4 = MOTOR4_speed; // ËÙ¶È500£¨0x01f4£©
+  	//ç”µæœº1ä¸Šå‡
+		uint8_t ctrl_ret4;  // æŒ‡ä»¤å‘é€è¿”å›å€¼ 
+		uint16_t motor_cmd4 = MOTOR4_speed; // é€Ÿåº¦500ï¼ˆ0x01f4ï¼‰
 	  MotorControlParams motors[1] = 
 		{
 			{MOTOR1_SLAVE_ADDR, MOTOR1_CTRL_REG1, Pulse_num11, Pulse_num12},
@@ -1791,9 +1791,9 @@ uint8_t Battery_8(void)
     uint8_t results[1];
 		uint8_t ret = Control_Motors_Complete(motors, 1, results);
 		if (ret == 0) {
-				printf("ËùÓĞµç»ú¿ØÖÆ³É¹¦\r\n");
+				printf("æ‰€æœ‰ç”µæœºæ§åˆ¶æˆåŠŸ\r\n");
 		} else {
-				printf("ÓĞ %d ¸öµç»ú¿ØÖÆÊ§°Ü\r\n", ret);
+				printf("æœ‰ %d ä¸ªç”µæœºæ§åˆ¶å¤±è´¥\r\n", ret);
 		}
 		master_state = MASTER_IDLE;
     timeout_cnt = 0;
@@ -1802,9 +1802,9 @@ uint8_t Battery_8(void)
 
 uint8_t Battery_9(void)
 {
-	  //µç»ú2Ç°½ø
-  	uint8_t ctrl_ret4;  // Ö¸Áî·¢ËÍ·µ»ØÖµ 
-		uint16_t motor_cmd4 = MOTOR4_speed; // ËÙ¶È500£¨0x01f4£©
+	  //ç”µæœº2å‰è¿›
+  	uint8_t ctrl_ret4;  // æŒ‡ä»¤å‘é€è¿”å›å€¼ 
+		uint16_t motor_cmd4 = MOTOR4_speed; // é€Ÿåº¦500ï¼ˆ0x01f4ï¼‰
 	  MotorControlParams motors[1] = 
 		{
 			{MOTOR2_SLAVE_ADDR, MOTOR2_CTRL_REG1, Pulse_num27, Pulse_num28},
@@ -1812,9 +1812,9 @@ uint8_t Battery_9(void)
     uint8_t results[1];
 		uint8_t ret = Control_Motors_Complete(motors, 1, results);
 		if (ret == 0) {
-				printf("ËùÓĞµç»ú¿ØÖÆ³É¹¦\r\n");
+				printf("æ‰€æœ‰ç”µæœºæ§åˆ¶æˆåŠŸ\r\n");
 		} else {
-				printf("ÓĞ %d ¸öµç»ú¿ØÖÆÊ§°Ü\r\n", ret);
+				printf("æœ‰ %d ä¸ªç”µæœºæ§åˆ¶å¤±è´¥\r\n", ret);
 		}
 		master_state = MASTER_IDLE;
     timeout_cnt = 0;
@@ -1823,51 +1823,51 @@ uint8_t Battery_9(void)
 
 //uint8_t Battery_10(void)
 //{
-//  	//µç»ú3ËÉ¿ªµç³Ø
-//		uint8_t motor_num3 = 1;   // ¼Ä´æÆ÷µØÖ·£¨ËÉ¿ª£©
-//		uint16_t motor_cmd3 = Lossen; // µç»úÖ¸Áî£º
+//  	//ç”µæœº3æ¾å¼€ç”µæ± 
+//		uint8_t motor_num3 = 1;   // å¯„å­˜å™¨åœ°å€ï¼ˆæ¾å¼€ï¼‰
+//		uint16_t motor_cmd3 = Lossen; // ç”µæœºæŒ‡ä»¤ï¼š
 //		uint8_t ctrl_ret3 = Motor_Control(MOTOR3_SLAVE_ADDR, motor_num3, motor_cmd3);
 //		if(ctrl_ret3 == 0)
 //    {
-//        printf("´Ó»ú3ËÉ¿ªÖ¸Áî·¢ËÍ³É¹¦£¡\r\n");
+//        printf("ä»æœº3æ¾å¼€æŒ‡ä»¤å‘é€æˆåŠŸï¼\r\n");
 //    }
 //    else
 //    {
-//        printf("´Ó»ú3ËÉ¿ªÖ¸Áî·¢ËÍÊ§°Ü£¬´íÎóÂë£º%d\r\n", ctrl_ret3);
+//        printf("ä»æœº3æ¾å¼€æŒ‡ä»¤å‘é€å¤±è´¥ï¼Œé”™è¯¯ç ï¼š%d\r\n", ctrl_ret3);
 //    }
 //		master_state = MASTER_IDLE;
-//		timeout_cnt = 0; // Í¬Ê±ÖØÖÃ³¬Ê±¼ÆÊıÆ÷
+//		timeout_cnt = 0; // åŒæ—¶é‡ç½®è¶…æ—¶è®¡æ•°å™¨
 //		return 0;
 //}
 
 //uint8_t Battery_10(void)
 //{
-//    // Ö±½Ó·¢ËÍ06Ö¸Áî£¬²»µÈ´ıÏìÓ¦
-//	printf("Battery_10 ¿ªÊ¼Ö´ĞĞ\n");
+//    // ç›´æ¥å‘é€06æŒ‡ä»¤ï¼Œä¸ç­‰å¾…å“åº”
+//	printf("Battery_10 å¼€å§‹æ‰§è¡Œ\n");
 //    uint8_t ret = Modbus_06_WriteSingleReg(MOTOR3_SLAVE_ADDR, MOTOR3_CTRL_REG1, Lossen);
-//    // ÓÉÓÚµç»úÒÑ¶¯×÷£¬Ç¿ÖÆÈÏÎª³É¹¦
+//    // ç”±äºç”µæœºå·²åŠ¨ä½œï¼Œå¼ºåˆ¶è®¤ä¸ºæˆåŠŸ
 //    master_state = MASTER_IDLE;
 //    timeout_cnt = 0;
 //    __disable_irq();
 //    Master_RX_CNT = 0;
 //    __enable_irq();
-//    printf("µç»ú3ËÉ¿ªÖ¸ÁîÒÑ·¢ËÍ£¨ºöÂÔÏìÓ¦£©\r\n");
+//    printf("ç”µæœº3æ¾å¼€æŒ‡ä»¤å·²å‘é€ï¼ˆå¿½ç•¥å“åº”ï¼‰\r\n");
 //    return 0;
 //}
 
 uint8_t Battery_10(void)
 {
-    printf("Battery_10 ¿ªÊ¼Ö´ĞĞ\n");
-    // 1. Ç¿ÖÆ»Ö¸´Ö÷Õ¾×´Ì¬£¬Çå¿Õ½ÓÊÕ»º³åÇø
+    printf("Battery_10 å¼€å§‹æ‰§è¡Œ\n");
+    // 1. å¼ºåˆ¶æ¢å¤ä¸»ç«™çŠ¶æ€ï¼Œæ¸…ç©ºæ¥æ”¶ç¼“å†²åŒº
     __disable_irq();
     Master_RX_CNT = 0;
     memset(Master_RX_BUFF, 0, sizeof(Master_RX_BUFF));
     __enable_irq();
     master_state = MASTER_IDLE;
     timeout_cnt = 0;
-    delay_ms(5); // È·±£×ÜÏßÎÈ¶¨
+    delay_ms(5); // ç¡®ä¿æ€»çº¿ç¨³å®š
 
-    // 2. ¹¹Ôì06Ö¡²¢Ö±½Ó·¢ËÍ£¨²»µ÷ÓÃModbus_06_WriteSingleReg£©
+    // 2. æ„é€ 06å¸§å¹¶ç›´æ¥å‘é€ï¼ˆä¸è°ƒç”¨Modbus_06_WriteSingleRegï¼‰
     uint8_t tx_buff[8];
     tx_buff[0] = MOTOR3_SLAVE_ADDR;
     tx_buff[1] = 0x06;
@@ -1879,22 +1879,22 @@ uint8_t Battery_10(void)
     tx_buff[6] = crc & 0xFF;
     tx_buff[7] = (crc >> 8) & 0xFF;
 
-    RS485_MasterSendData(tx_buff, 8); // ·¢ËÍ
-    // 3. Á¢¼´»Ö¸´×´Ì¬£¬²»µÈ´ıÏìÓ¦
+    RS485_MasterSendData(tx_buff, 8); // å‘é€
+    // 3. ç«‹å³æ¢å¤çŠ¶æ€ï¼Œä¸ç­‰å¾…å“åº”
     master_state = MASTER_IDLE;
     timeout_cnt = 0;
     __disable_irq();
     Master_RX_CNT = 0;
     __enable_irq();
-    printf("µç»ú3ËÉ¿ªÖ¸ÁîÒÑ·¢ËÍ£¨ºöÂÔÏìÓ¦£©\r\n");
+    printf("ç”µæœº3æ¾å¼€æŒ‡ä»¤å·²å‘é€ï¼ˆå¿½ç•¥å“åº”ï¼‰\r\n");
     return 0;
 }
 
 uint8_t Battery_11(void)
 {
-	  //µç»ú2Ç°½ø
-  	uint8_t ctrl_ret4;  // Ö¸Áî·¢ËÍ·µ»ØÖµ 
-		uint16_t motor_cmd4 = MOTOR4_speed; // ËÙ¶È500£¨0x01f4£©
+	  //ç”µæœº2å‰è¿›
+  	uint8_t ctrl_ret4;  // æŒ‡ä»¤å‘é€è¿”å›å€¼ 
+		uint16_t motor_cmd4 = MOTOR4_speed; // é€Ÿåº¦500ï¼ˆ0x01f4ï¼‰
 	  MotorControlParams motors[1] = 
 		{
 			{MOTOR2_SLAVE_ADDR, MOTOR2_CTRL_REG1, Pulse_num5, Pulse_num6},
@@ -1902,9 +1902,9 @@ uint8_t Battery_11(void)
     uint8_t results[1];
 		uint8_t ret = Control_Motors_Complete(motors, 1, results);
 		if (ret == 0) {
-				printf("ËùÓĞµç»ú¿ØÖÆ³É¹¦\r\n");
+				printf("æ‰€æœ‰ç”µæœºæ§åˆ¶æˆåŠŸ\r\n");
 		} else {
-				printf("ÓĞ %d ¸öµç»ú¿ØÖÆÊ§°Ü\r\n", ret);
+				printf("æœ‰ %d ä¸ªç”µæœºæ§åˆ¶å¤±è´¥\r\n", ret);
 		}
 		master_state = MASTER_IDLE;
     timeout_cnt = 0;
@@ -1914,9 +1914,9 @@ uint8_t Battery_11(void)
 
 uint8_t Battery_12(void)
 {
-	  //µç»ú2ºóÍË
-  	uint8_t ctrl_ret4;  // Ö¸Áî·¢ËÍ·µ»ØÖµ 
-		uint16_t motor_cmd4 = MOTOR4_speed; // ËÙ¶È500£¨0x01f4£©
+	  //ç”µæœº2åé€€
+  	uint8_t ctrl_ret4;  // æŒ‡ä»¤å‘é€è¿”å›å€¼ 
+		uint16_t motor_cmd4 = MOTOR4_speed; // é€Ÿåº¦500ï¼ˆ0x01f4ï¼‰
 	  MotorControlParams motors[1] = 
 		{
 			{MOTOR2_SLAVE_ADDR, MOTOR2_CTRL_REG1, Pulse_num3, Pulse_num4},
@@ -1924,9 +1924,9 @@ uint8_t Battery_12(void)
     uint8_t results[1];
 		uint8_t ret = Control_Motors_Complete(motors, 1, results);
 		if (ret == 0) {
-				printf("ËùÓĞµç»ú¿ØÖÆ³É¹¦\r\n");
+				printf("æ‰€æœ‰ç”µæœºæ§åˆ¶æˆåŠŸ\r\n");
 		} else {
-				printf("ÓĞ %d ¸öµç»ú¿ØÖÆÊ§°Ü\r\n", ret);
+				printf("æœ‰ %d ä¸ªç”µæœºæ§åˆ¶å¤±è´¥\r\n", ret);
 		}
 		master_state = MASTER_IDLE;
     timeout_cnt = 0;
@@ -1935,9 +1935,9 @@ uint8_t Battery_12(void)
 
 uint8_t Battery_13(void)
 {
-	  //µç»ú1ÏÂ½µ
-  	uint8_t ctrl_ret4;  // Ö¸Áî·¢ËÍ·µ»ØÖµ 
-		uint16_t motor_cmd4 = MOTOR4_speed; // ËÙ¶È500£¨0x01f4£©
+	  //ç”µæœº1ä¸‹é™
+  	uint8_t ctrl_ret4;  // æŒ‡ä»¤å‘é€è¿”å›å€¼ 
+		uint16_t motor_cmd4 = MOTOR4_speed; // é€Ÿåº¦500ï¼ˆ0x01f4ï¼‰
 	  MotorControlParams motors[1] = 
 		{
 			{MOTOR1_SLAVE_ADDR, MOTOR1_CTRL_REG1, Pulse_num13, Pulse_num14},
@@ -1945,9 +1945,9 @@ uint8_t Battery_13(void)
     uint8_t results[1];
 		uint8_t ret = Control_Motors_Complete(motors, 1, results);
 		if (ret == 0) {
-				printf("ËùÓĞµç»ú¿ØÖÆ³É¹¦\r\n");
+				printf("æ‰€æœ‰ç”µæœºæ§åˆ¶æˆåŠŸ\r\n");
 		} else {
-				printf("ÓĞ %d ¸öµç»ú¿ØÖÆÊ§°Ü\r\n", ret);
+				printf("æœ‰ %d ä¸ªç”µæœºæ§åˆ¶å¤±è´¥\r\n", ret);
 		}
 		master_state = MASTER_IDLE;
     timeout_cnt = 0;
@@ -1956,9 +1956,9 @@ uint8_t Battery_13(void)
 
 uint8_t Battery_14(void)
 {
-	  //µç»ú1ÉÏÉı
-  	uint8_t ctrl_ret4;  // Ö¸Áî·¢ËÍ·µ»ØÖµ 
-		uint16_t motor_cmd4 = MOTOR4_speed; // ËÙ¶È500£¨0x01f4£©
+	  //ç”µæœº1ä¸Šå‡
+  	uint8_t ctrl_ret4;  // æŒ‡ä»¤å‘é€è¿”å›å€¼ 
+		uint16_t motor_cmd4 = MOTOR4_speed; // é€Ÿåº¦500ï¼ˆ0x01f4ï¼‰
 	  MotorControlParams motors[1] = 
 		{
 			{MOTOR1_SLAVE_ADDR, MOTOR1_CTRL_REG1, Pulse_num15, Pulse_num16},
@@ -1966,9 +1966,9 @@ uint8_t Battery_14(void)
     uint8_t results[1];
 		uint8_t ret = Control_Motors_Complete(motors, 1, results);
 		if (ret == 0) {
-				printf("ËùÓĞµç»ú¿ØÖÆ³É¹¦\r\n");
+				printf("æ‰€æœ‰ç”µæœºæ§åˆ¶æˆåŠŸ\r\n");
 		} else {
-				printf("ÓĞ %d ¸öµç»ú¿ØÖÆÊ§°Ü\r\n", ret);
+				printf("æœ‰ %d ä¸ªç”µæœºæ§åˆ¶å¤±è´¥\r\n", ret);
 		}
 		master_state = MASTER_IDLE;
     timeout_cnt = 0;
@@ -1977,9 +1977,9 @@ uint8_t Battery_14(void)
 
 uint8_t Battery_15(void)
 {
-	  //µç»ú1ÏÂ½µ
-  	uint8_t ctrl_ret4;  // Ö¸Áî·¢ËÍ·µ»ØÖµ 
-		uint16_t motor_cmd4 = MOTOR4_speed; // ËÙ¶È500£¨0x01f4£©
+	  //ç”µæœº1ä¸‹é™
+  	uint8_t ctrl_ret4;  // æŒ‡ä»¤å‘é€è¿”å›å€¼ 
+		uint16_t motor_cmd4 = MOTOR4_speed; // é€Ÿåº¦500ï¼ˆ0x01f4ï¼‰
 	  MotorControlParams motors[1] = 
 		{
 			{MOTOR1_SLAVE_ADDR, MOTOR1_CTRL_REG1, Pulse_num17, Pulse_num18},
@@ -1987,9 +1987,9 @@ uint8_t Battery_15(void)
     uint8_t results[1];
 		uint8_t ret = Control_Motors_Complete(motors, 1, results);
 		if (ret == 0) {
-				printf("ËùÓĞµç»ú¿ØÖÆ³É¹¦\r\n");
+				printf("æ‰€æœ‰ç”µæœºæ§åˆ¶æˆåŠŸ\r\n");
 		} else {
-				printf("ÓĞ %d ¸öµç»ú¿ØÖÆÊ§°Ü\r\n", ret);
+				printf("æœ‰ %d ä¸ªç”µæœºæ§åˆ¶å¤±è´¥\r\n", ret);
 		}
 		master_state = MASTER_IDLE;
     timeout_cnt = 0;
@@ -1998,9 +1998,9 @@ uint8_t Battery_15(void)
 
 uint8_t Battery_16(void)
 {
-	  //µç»ú2Ç°½ø
-  	uint8_t ctrl_ret4;  // Ö¸Áî·¢ËÍ·µ»ØÖµ 
-		uint16_t motor_cmd4 = MOTOR4_speed; // ËÙ¶È500£¨0x01f4£©
+	  //ç”µæœº2å‰è¿›
+  	uint8_t ctrl_ret4;  // æŒ‡ä»¤å‘é€è¿”å›å€¼ 
+		uint16_t motor_cmd4 = MOTOR4_speed; // é€Ÿåº¦500ï¼ˆ0x01f4ï¼‰
 	  MotorControlParams motors[1] = 
 		{
 			{MOTOR2_SLAVE_ADDR, MOTOR2_CTRL_REG1, Pulse_num21, Pulse_num22},
@@ -2008,9 +2008,9 @@ uint8_t Battery_16(void)
     uint8_t results[1];
 		uint8_t ret = Control_Motors_Complete(motors, 1, results);
 		if (ret == 0) {
-				printf("ËùÓĞµç»ú¿ØÖÆ³É¹¦\r\n");
+				printf("æ‰€æœ‰ç”µæœºæ§åˆ¶æˆåŠŸ\r\n");
 		} else {
-				printf("ÓĞ %d ¸öµç»ú¿ØÖÆÊ§°Ü\r\n", ret);
+				printf("æœ‰ %d ä¸ªç”µæœºæ§åˆ¶å¤±è´¥\r\n", ret);
 		}
 		master_state = MASTER_IDLE;
     timeout_cnt = 0;
@@ -2019,9 +2019,9 @@ uint8_t Battery_16(void)
 
 uint8_t Battery_17(void)
 {
-	  //µç»ú2ºóÍË
-  	uint8_t ctrl_ret4;  // Ö¸Áî·¢ËÍ·µ»ØÖµ 
-		uint16_t motor_cmd4 = MOTOR4_speed; // ËÙ¶È500£¨0x01f4£©
+	  //ç”µæœº2åé€€
+  	uint8_t ctrl_ret4;  // æŒ‡ä»¤å‘é€è¿”å›å€¼ 
+		uint16_t motor_cmd4 = MOTOR4_speed; // é€Ÿåº¦500ï¼ˆ0x01f4ï¼‰
 	  MotorControlParams motors[1] = 
 		{
 			{MOTOR2_SLAVE_ADDR, MOTOR2_CTRL_REG1, Pulse_num23, Pulse_num24},
@@ -2029,9 +2029,9 @@ uint8_t Battery_17(void)
     uint8_t results[1];
 		uint8_t ret = Control_Motors_Complete(motors, 1, results);
 		if (ret == 0) {
-				printf("ËùÓĞµç»ú¿ØÖÆ³É¹¦\r\n");
+				printf("æ‰€æœ‰ç”µæœºæ§åˆ¶æˆåŠŸ\r\n");
 		} else {
-				printf("ÓĞ %d ¸öµç»ú¿ØÖÆÊ§°Ü\r\n", ret);
+				printf("æœ‰ %d ä¸ªç”µæœºæ§åˆ¶å¤±è´¥\r\n", ret);
 		}
 		master_state = MASTER_IDLE;
     timeout_cnt = 0;
@@ -2040,9 +2040,9 @@ uint8_t Battery_17(void)
 
 uint8_t Battery_18(void)
 {
-	  //µç»ú2Ç°½ø
-  	uint8_t ctrl_ret4;  // Ö¸Áî·¢ËÍ·µ»ØÖµ 
-		uint16_t motor_cmd4 = MOTOR4_speed; // ËÙ¶È500£¨0x01f4£©
+	  //ç”µæœº2å‰è¿›
+  	uint8_t ctrl_ret4;  // æŒ‡ä»¤å‘é€è¿”å›å€¼ 
+		uint16_t motor_cmd4 = MOTOR4_speed; // é€Ÿåº¦500ï¼ˆ0x01f4ï¼‰
 	  MotorControlParams motors[1] = 
 		{
 			{MOTOR2_SLAVE_ADDR, MOTOR2_CTRL_REG1, Pulse_num31, Pulse_num32},
@@ -2050,9 +2050,9 @@ uint8_t Battery_18(void)
     uint8_t results[1];
 		uint8_t ret = Control_Motors_Complete(motors, 1, results);
 		if (ret == 0) {
-				printf("ËùÓĞµç»ú¿ØÖÆ³É¹¦\r\n");
+				printf("æ‰€æœ‰ç”µæœºæ§åˆ¶æˆåŠŸ\r\n");
 		} else {
-				printf("ÓĞ %d ¸öµç»ú¿ØÖÆÊ§°Ü\r\n", ret);
+				printf("æœ‰ %d ä¸ªç”µæœºæ§åˆ¶å¤±è´¥\r\n", ret);
 		}
 		master_state = MASTER_IDLE;
     timeout_cnt = 0;
@@ -2061,9 +2061,9 @@ uint8_t Battery_18(void)
 
 uint8_t Battery_19(void)
 {
-	  //µç»ú2ºóÍË
-  	uint8_t ctrl_ret4;  // Ö¸Áî·¢ËÍ·µ»ØÖµ 
-		uint16_t motor_cmd4 = MOTOR4_speed; // ËÙ¶È500£¨0x01f4£©
+	  //ç”µæœº2åé€€
+  	uint8_t ctrl_ret4;  // æŒ‡ä»¤å‘é€è¿”å›å€¼ 
+		uint16_t motor_cmd4 = MOTOR4_speed; // é€Ÿåº¦500ï¼ˆ0x01f4ï¼‰
 	  MotorControlParams motors[1] = 
 		{
 			{MOTOR2_SLAVE_ADDR, MOTOR2_CTRL_REG1, Pulse_num33, Pulse_num34},
@@ -2071,9 +2071,9 @@ uint8_t Battery_19(void)
     uint8_t results[1];
 		uint8_t ret = Control_Motors_Complete(motors, 1, results);
 		if (ret == 0) {
-				printf("ËùÓĞµç»ú¿ØÖÆ³É¹¦\r\n");
+				printf("æ‰€æœ‰ç”µæœºæ§åˆ¶æˆåŠŸ\r\n");
 		} else {
-				printf("ÓĞ %d ¸öµç»ú¿ØÖÆÊ§°Ü\r\n", ret);
+				printf("æœ‰ %d ä¸ªç”µæœºæ§åˆ¶å¤±è´¥\r\n", ret);
 		}
 		master_state = MASTER_IDLE;
     timeout_cnt = 0;
@@ -2083,9 +2083,9 @@ uint8_t Battery_19(void)
 
 uint8_t Battery_20(void)
 {
-	  //µç»ú2ºóÍË
-  	uint8_t ctrl_ret4;  // Ö¸Áî·¢ËÍ·µ»ØÖµ 
-		uint16_t motor_cmd4 = MOTOR4_speed; // ËÙ¶È500£¨0x01f4£©
+	  //ç”µæœº2åé€€
+  	uint8_t ctrl_ret4;  // æŒ‡ä»¤å‘é€è¿”å›å€¼ 
+		uint16_t motor_cmd4 = MOTOR4_speed; // é€Ÿåº¦500ï¼ˆ0x01f4ï¼‰
 	  MotorControlParams motors[1] = 
 		{
 			{MOTOR2_SLAVE_ADDR, MOTOR2_CTRL_REG1, Pulse_num25, Pulse_num26},
@@ -2093,9 +2093,9 @@ uint8_t Battery_20(void)
     uint8_t results[1];
 		uint8_t ret = Control_Motors_Complete(motors, 1, results);
 		if (ret == 0) {
-				printf("ËùÓĞµç»ú¿ØÖÆ³É¹¦\r\n");
+				printf("æ‰€æœ‰ç”µæœºæ§åˆ¶æˆåŠŸ\r\n");
 		} else {
-				printf("ÓĞ %d ¸öµç»ú¿ØÖÆÊ§°Ü\r\n", ret);
+				printf("æœ‰ %d ä¸ªç”µæœºæ§åˆ¶å¤±è´¥\r\n", ret);
 		}
 		master_state = MASTER_IDLE;
     timeout_cnt = 0;
@@ -2104,7 +2104,7 @@ uint8_t Battery_20(void)
 
 uint8_t Battery_21(void)
 {
-	  //·É»úÇ°½ø
+	  //é£æœºå‰è¿›
 		MotorControlParams motors[4] = 
 		{
 			{MOTOR5_SLAVE_ADDR, MOTOR5_CTRL_REG1, MOTOR16_length_l, MOTOR16_length_h},
@@ -2113,9 +2113,9 @@ uint8_t Battery_21(void)
 			{MOTOR8_SLAVE_ADDR, MOTOR5_CTRL_REG1, MOTOR15_length_l, MOTOR15_length_h}
     };
     uint8_t results[4];
-    // Í¬²½·¢ËÍËùÓĞµç»úÖ¸Áî£¨²»µÈ´ıÏìÓ¦£©
+    // åŒæ­¥å‘é€æ‰€æœ‰ç”µæœºæŒ‡ä»¤ï¼ˆä¸ç­‰å¾…å“åº”ï¼‰
     Sync_Motors_Control(motors, 4);
-//		StatusRegs_Update(0x15, 4); //½«¾ÓÖĞ×´Ì¬Ğ´Èë¼Ä´æÆ÷
+//		StatusRegs_Update(0x15, 4); //å°†å±…ä¸­çŠ¶æ€å†™å…¥å¯„å­˜å™¨
 		master_state = MASTER_IDLE;
     timeout_cnt = 0;
 		return 0;
@@ -2123,9 +2123,9 @@ uint8_t Battery_21(void)
 
 uint8_t Battery_22(void)
 {
-	  //µç»ú2ºóÍË
-  	uint8_t ctrl_ret4;  // Ö¸Áî·¢ËÍ·µ»ØÖµ 
-		uint16_t motor_cmd4 = MOTOR4_speed; // ËÙ¶È500£¨0x01f4£©
+	  //ç”µæœº2åé€€
+  	uint8_t ctrl_ret4;  // æŒ‡ä»¤å‘é€è¿”å›å€¼ 
+		uint16_t motor_cmd4 = MOTOR4_speed; // é€Ÿåº¦500ï¼ˆ0x01f4ï¼‰
 	  MotorControlParams motors[1] = 
 		{
 			{MOTOR2_SLAVE_ADDR, MOTOR2_CTRL_REG1, Pulse_num29, Pulse_num30},
@@ -2133,9 +2133,9 @@ uint8_t Battery_22(void)
     uint8_t results[1];
 		uint8_t ret = Control_Motors_Complete(motors, 1, results);
 		if (ret == 0) {
-				printf("ËùÓĞµç»ú¿ØÖÆ³É¹¦\r\n");
+				printf("æ‰€æœ‰ç”µæœºæ§åˆ¶æˆåŠŸ\r\n");
 		} else {
-				printf("ÓĞ %d ¸öµç»ú¿ØÖÆÊ§°Ü\r\n", ret);
+				printf("æœ‰ %d ä¸ªç”µæœºæ§åˆ¶å¤±è´¥\r\n", ret);
 		}
 		master_state = MASTER_IDLE;
     timeout_cnt = 0;
@@ -2144,9 +2144,9 @@ uint8_t Battery_22(void)
 
 uint8_t Battery_23(void)
 {
-	  //2ºÅ²Öµç»ú1ÉÏÉı
-  	uint8_t ctrl_ret4;  // Ö¸Áî·¢ËÍ·µ»ØÖµ 
-		uint16_t motor_cmd4 = MOTOR4_speed; // ËÙ¶È500£¨0x01f4£©
+	  //2å·ä»“ç”µæœº1ä¸Šå‡
+  	uint8_t ctrl_ret4;  // æŒ‡ä»¤å‘é€è¿”å›å€¼ 
+		uint16_t motor_cmd4 = MOTOR4_speed; // é€Ÿåº¦500ï¼ˆ0x01f4ï¼‰
 	  MotorControlParams motors[1] = 
 		{
 			{MOTOR1_SLAVE_ADDR, MOTOR1_CTRL_REG1, Pulse_num35, Pulse_num36},
@@ -2154,9 +2154,9 @@ uint8_t Battery_23(void)
     uint8_t results[1];
 		uint8_t ret = Control_Motors_Complete(motors, 1, results);
 		if (ret == 0) {
-				printf("ËùÓĞµç»ú¿ØÖÆ³É¹¦\r\n");
+				printf("æ‰€æœ‰ç”µæœºæ§åˆ¶æˆåŠŸ\r\n");
 		} else {
-				printf("ÓĞ %d ¸öµç»ú¿ØÖÆÊ§°Ü\r\n", ret);
+				printf("æœ‰ %d ä¸ªç”µæœºæ§åˆ¶å¤±è´¥\r\n", ret);
 		}
 		master_state = MASTER_IDLE;
     timeout_cnt = 0;
@@ -2165,9 +2165,9 @@ uint8_t Battery_23(void)
 
 uint8_t Battery_24(void)
 {
-	  //2ºÅ²Öµç»ú1ÏÂ½µ
-  	uint8_t ctrl_ret4;  // Ö¸Áî·¢ËÍ·µ»ØÖµ 
-		uint16_t motor_cmd4 = MOTOR4_speed; // ËÙ¶È500£¨0x01f4£©
+	  //2å·ä»“ç”µæœº1ä¸‹é™
+  	uint8_t ctrl_ret4;  // æŒ‡ä»¤å‘é€è¿”å›å€¼ 
+		uint16_t motor_cmd4 = MOTOR4_speed; // é€Ÿåº¦500ï¼ˆ0x01f4ï¼‰
 	  MotorControlParams motors[1] = 
 		{
 			{MOTOR1_SLAVE_ADDR, MOTOR1_CTRL_REG1, Pulse_num37, Pulse_num38},
@@ -2175,9 +2175,9 @@ uint8_t Battery_24(void)
     uint8_t results[1];
 		uint8_t ret = Control_Motors_Complete(motors, 1, results);
 		if (ret == 0) {
-				printf("ËùÓĞµç»ú¿ØÖÆ³É¹¦\r\n");
+				printf("æ‰€æœ‰ç”µæœºæ§åˆ¶æˆåŠŸ\r\n");
 		} else {
-				printf("ÓĞ %d ¸öµç»ú¿ØÖÆÊ§°Ü\r\n", ret);
+				printf("æœ‰ %d ä¸ªç”µæœºæ§åˆ¶å¤±è´¥\r\n", ret);
 		}
 		master_state = MASTER_IDLE;
     timeout_cnt = 0;
@@ -2186,9 +2186,9 @@ uint8_t Battery_24(void)
 
 uint8_t Battery_25(void)
 {
-	  //µç»ú2ºóÍË
-  	uint8_t ctrl_ret4;  // Ö¸Áî·¢ËÍ·µ»ØÖµ 
-		uint16_t motor_cmd4 = MOTOR4_speed; // ËÙ¶È500£¨0x01f4£©
+	  //ç”µæœº2åé€€
+  	uint8_t ctrl_ret4;  // æŒ‡ä»¤å‘é€è¿”å›å€¼ 
+		uint16_t motor_cmd4 = MOTOR4_speed; // é€Ÿåº¦500ï¼ˆ0x01f4ï¼‰
 	  MotorControlParams motors[1] = 
 		{
 			{MOTOR2_SLAVE_ADDR, MOTOR2_CTRL_REG1, Pulse_num39, Pulse_num40},
@@ -2196,9 +2196,9 @@ uint8_t Battery_25(void)
     uint8_t results[1];
 		uint8_t ret = Control_Motors_Complete(motors, 1, results);
 		if (ret == 0) {
-				printf("ËùÓĞµç»ú¿ØÖÆ³É¹¦\r\n");
+				printf("æ‰€æœ‰ç”µæœºæ§åˆ¶æˆåŠŸ\r\n");
 		} else {
-				printf("ÓĞ %d ¸öµç»ú¿ØÖÆÊ§°Ü\r\n", ret);
+				printf("æœ‰ %d ä¸ªç”µæœºæ§åˆ¶å¤±è´¥\r\n", ret);
 		}
 		master_state = MASTER_IDLE;
     timeout_cnt = 0;
@@ -2208,9 +2208,9 @@ uint8_t Battery_25(void)
 uint8_t Battery_26(void)
 {
 	
-		// µç»ú2Ç°½ø
-  	uint8_t ctrl_ret4;  // Ö¸Áî·¢ËÍ·µ»ØÖµ 
-		uint16_t motor_cmd4 = MOTOR4_speed; // ËÙ¶È500£¨0x01f4£©
+		// ç”µæœº2å‰è¿›
+  	uint8_t ctrl_ret4;  // æŒ‡ä»¤å‘é€è¿”å›å€¼ 
+		uint16_t motor_cmd4 = MOTOR4_speed; // é€Ÿåº¦500ï¼ˆ0x01f4ï¼‰
 	  MotorControlParams motors[1] = 
 		{
 			{MOTOR2_SLAVE_ADDR, MOTOR2_CTRL_REG1, Pulse_num41, Pulse_num42},
@@ -2218,9 +2218,9 @@ uint8_t Battery_26(void)
     uint8_t results[1];
 		uint8_t ret = Control_Motors_Complete(motors, 1, results);
 		if (ret == 0) {
-				printf("ËùÓĞµç»ú¿ØÖÆ³É¹¦\r\n");
+				printf("æ‰€æœ‰ç”µæœºæ§åˆ¶æˆåŠŸ\r\n");
 		} else {
-				printf("ÓĞ %d ¸öµç»ú¿ØÖÆÊ§°Ü\r\n", ret);
+				printf("æœ‰ %d ä¸ªç”µæœºæ§åˆ¶å¤±è´¥\r\n", ret);
 		}
 		master_state = MASTER_IDLE;
     timeout_cnt = 0;
@@ -2230,9 +2230,9 @@ uint8_t Battery_26(void)
 
 uint8_t Battery_27(void)
 {
-	  // µç»ú1ÉÏÉı
-  	uint8_t ctrl_ret4;  // Ö¸Áî·¢ËÍ·µ»ØÖµ 
-		uint16_t motor_cmd4 = MOTOR4_speed; // ËÙ¶È500£¨0x01f4£©
+	  // ç”µæœº1ä¸Šå‡
+  	uint8_t ctrl_ret4;  // æŒ‡ä»¤å‘é€è¿”å›å€¼ 
+		uint16_t motor_cmd4 = MOTOR4_speed; // é€Ÿåº¦500ï¼ˆ0x01f4ï¼‰
 	  MotorControlParams motors[1] = 
 		{
 			{MOTOR1_SLAVE_ADDR, MOTOR1_CTRL_REG1, Pulse_num43, Pulse_num44},
@@ -2240,9 +2240,9 @@ uint8_t Battery_27(void)
     uint8_t results[1];
 		uint8_t ret = Control_Motors_Complete(motors, 1, results);
 		if (ret == 0) {
-				printf("ËùÓĞµç»ú¿ØÖÆ³É¹¦\r\n");
+				printf("æ‰€æœ‰ç”µæœºæ§åˆ¶æˆåŠŸ\r\n");
 		} else {
-				printf("ÓĞ %d ¸öµç»ú¿ØÖÆÊ§°Ü\r\n", ret);
+				printf("æœ‰ %d ä¸ªç”µæœºæ§åˆ¶å¤±è´¥\r\n", ret);
 		}
 		master_state = MASTER_IDLE;
     timeout_cnt = 0;
@@ -2251,9 +2251,9 @@ uint8_t Battery_27(void)
 
 uint8_t Battery_28(void)
 {
-		// µç»ú2Ç°½ø
-  	uint8_t ctrl_ret4;  // Ö¸Áî·¢ËÍ·µ»ØÖµ 
-		uint16_t motor_cmd4 = MOTOR4_speed; // ËÙ¶È500£¨0x01f4£©
+		// ç”µæœº2å‰è¿›
+  	uint8_t ctrl_ret4;  // æŒ‡ä»¤å‘é€è¿”å›å€¼ 
+		uint16_t motor_cmd4 = MOTOR4_speed; // é€Ÿåº¦500ï¼ˆ0x01f4ï¼‰
 	  MotorControlParams motors[1] = 
 		{
 			{MOTOR2_SLAVE_ADDR, MOTOR2_CTRL_REG1, Pulse_num45, Pulse_num46},
@@ -2261,9 +2261,9 @@ uint8_t Battery_28(void)
     uint8_t results[1];
 		uint8_t ret = Control_Motors_Complete(motors, 1, results);
 		if (ret == 0) {
-				printf("ËùÓĞµç»ú¿ØÖÆ³É¹¦\r\n");
+				printf("æ‰€æœ‰ç”µæœºæ§åˆ¶æˆåŠŸ\r\n");
 		} else {
-				printf("ÓĞ %d ¸öµç»ú¿ØÖÆÊ§°Ü\r\n", ret);
+				printf("æœ‰ %d ä¸ªç”µæœºæ§åˆ¶å¤±è´¥\r\n", ret);
 		}
 		master_state = MASTER_IDLE;
     timeout_cnt = 0;
@@ -2272,9 +2272,9 @@ uint8_t Battery_28(void)
 	
 uint8_t Battery_29(void)
 {
-	  // µç»ú1ÉÏÉı
-  	uint8_t ctrl_ret4;  // Ö¸Áî·¢ËÍ·µ»ØÖµ 
-		uint16_t motor_cmd4 = MOTOR4_speed; // ËÙ¶È500£¨0x01f4£©
+	  // ç”µæœº1ä¸Šå‡
+  	uint8_t ctrl_ret4;  // æŒ‡ä»¤å‘é€è¿”å›å€¼ 
+		uint16_t motor_cmd4 = MOTOR4_speed; // é€Ÿåº¦500ï¼ˆ0x01f4ï¼‰
 	  MotorControlParams motors[1] = 
 		{
 			{MOTOR1_SLAVE_ADDR, MOTOR1_CTRL_REG1, Pulse_num47, Pulse_num48},
@@ -2282,9 +2282,9 @@ uint8_t Battery_29(void)
     uint8_t results[1];
 		uint8_t ret = Control_Motors_Complete(motors, 1, results);
 		if (ret == 0) {
-				printf("ËùÓĞµç»ú¿ØÖÆ³É¹¦\r\n");
+				printf("æ‰€æœ‰ç”µæœºæ§åˆ¶æˆåŠŸ\r\n");
 		} else {
-				printf("ÓĞ %d ¸öµç»ú¿ØÖÆÊ§°Ü\r\n", ret);
+				printf("æœ‰ %d ä¸ªç”µæœºæ§åˆ¶å¤±è´¥\r\n", ret);
 		}
 		master_state = MASTER_IDLE;
     timeout_cnt = 0;
@@ -2293,43 +2293,43 @@ uint8_t Battery_29(void)
 
 uint8_t CloseDr(void)
 {
-  	//4.²ÕÌå¹Ø±Õ
-		uint8_t motor_num4 = 1;   // ¼Ä´æÆ÷µØÖ·£¨¼Ğ½ô£©
-		uint16_t motor_cmd4 = CLOSEC; // µç»úÖ¸Áî£º
+  	//4.èˆ±ä½“å…³é—­
+		uint8_t motor_num4 = 1;   // å¯„å­˜å™¨åœ°å€ï¼ˆå¤¹ç´§ï¼‰
+		uint16_t motor_cmd4 = CLOSEC; // ç”µæœºæŒ‡ä»¤ï¼š
 		uint8_t ctrl_ret3 = Motor_Control(MOTOR4_SLAVE_ADDR, motor_num4, motor_cmd4);
 		if(ctrl_ret3 == 0)
     {
-        printf("²ÕÌå¹Ø±ÕÖ¸Áî·¢ËÍ³É¹¦£¡\r\n");
+        printf("èˆ±ä½“å…³é—­æŒ‡ä»¤å‘é€æˆåŠŸï¼\r\n");
     }
     else
     {
-        printf("²ÕÌå¹Ø±ÕÖ¸Áî·¢ËÍÊ§°Ü£¬´íÎóÂë£º%d\r\n", ctrl_ret3);
+        printf("èˆ±ä½“å…³é—­æŒ‡ä»¤å‘é€å¤±è´¥ï¼Œé”™è¯¯ç ï¼š%d\r\n", ctrl_ret3);
     }
 		master_state = MASTER_IDLE;
-		timeout_cnt = 0; // Í¬Ê±ÖØÖÃ³¬Ê±¼ÆÊıÆ÷
+		timeout_cnt = 0; // åŒæ—¶é‡ç½®è¶…æ—¶è®¡æ•°å™¨
 		return 0;
 }
 //uint8_t CloseDr(void)
 //{
-//    // ¶ÁÈ¡²ÕÃÅµ±Ç°×´Ì¬£¨0x11¼Ä´æÆ÷£©
+//    // è¯»å–èˆ±é—¨å½“å‰çŠ¶æ€ï¼ˆ0x11å¯„å­˜å™¨ï¼‰
 //    uint16_t door_state = StatusRegs_Get(REG_DOOR_STATE);
 //    
-//    // Èç¹û²ÕÃÅÒÑ¾­´ò¿ªµ½Î»£¨ÖµÎª4£©£¬Ôò²»ÔÙÖ´ĞĞ´ò¿ªÖ¸Áî
+//    // å¦‚æœèˆ±é—¨å·²ç»æ‰“å¼€åˆ°ä½ï¼ˆå€¼ä¸º4ï¼‰ï¼Œåˆ™ä¸å†æ‰§è¡Œæ‰“å¼€æŒ‡ä»¤
 ////    if (door_state == 4) {
-////        printf("²ÕÃÅÒÑ¹Ø±Õµ½Î»£¬ÎŞĞèÖØ¸´Ö´ĞĞ´ò¿ªÖ¸Áî\n");
+////        printf("èˆ±é—¨å·²å…³é—­åˆ°ä½ï¼Œæ— éœ€é‡å¤æ‰§è¡Œæ‰“å¼€æŒ‡ä»¤\n");
 ////        master_state = MASTER_IDLE;
 ////        timeout_cnt = 0;
 ////        return 0;
 ////    }
 
-//    // Ö´ĞĞ²ÕÃÅ¹Ø±ÕÖ¸Áî
+//    // æ‰§è¡Œèˆ±é—¨å…³é—­æŒ‡ä»¤
 //    uint8_t motor_num4 = 1;
 //    uint16_t motor_cmd4 = CLOSEC;
 //    uint8_t ctrl_ret3 = Motor_Control(MOTOR4_SLAVE_ADDR, motor_num4, motor_cmd4);
 //    if (ctrl_ret3 == 0) {
-//        printf("²ÕÃÅ¹Ø±ÕÖ¸Áî·¢ËÍ³É¹¦£¡\r\n");
+//        printf("èˆ±é—¨å…³é—­æŒ‡ä»¤å‘é€æˆåŠŸï¼\r\n");
 //    } else {
-//        printf("²ÕÃÅ¹Ø±ÕÖ¸Áî·¢ËÍÊ§°Ü£¬´íÎóÂë£º%d\r\n", ctrl_ret3);
+//        printf("èˆ±é—¨å…³é—­æŒ‡ä»¤å‘é€å¤±è´¥ï¼Œé”™è¯¯ç ï¼š%d\r\n", ctrl_ret3);
 //    }
 //    
 //    master_state = MASTER_IDLE;
@@ -2342,13 +2342,13 @@ uint8_t CheckAndCloseDoor(void)
     uint16_t uav_status = StatusRegs_Get(REG_RESERVED4);
 		printf("CheckAndCloseDoor: uav_status=%d\n", uav_status);
     if (uav_status == 3) {
-        printf("¼ì²âµ½ÎŞÈË»ú²»ÔÚ»ú³²£¨0x60=3£©£¬Ö´ĞĞ¹Ø±Õ²ÕÃÅ\n");
+        printf("æ£€æµ‹åˆ°æ— äººæœºä¸åœ¨æœºå·¢ï¼ˆ0x60=3ï¼‰ï¼Œæ‰§è¡Œå…³é—­èˆ±é—¨\n");
         uint8_t ret = CloseDr();
         if (ret != 0) {
-            printf("¹Ø±Õ²ÕÃÅÖ´ĞĞÊ§°Ü£¬´íÎóÂë£º%d\n", ret);
+            printf("å…³é—­èˆ±é—¨æ‰§è¡Œå¤±è´¥ï¼Œé”™è¯¯ç ï¼š%d\n", ret);
         }
     } else {
-        printf("0x60=%d£¬ÎŞĞè¹Ø±Õ²ÕÃÅ\n", uav_status);
+        printf("0x60=%dï¼Œæ— éœ€å…³é—­èˆ±é—¨\n", uav_status);
     }
     master_state = MASTER_IDLE;
     timeout_cnt = 0;
@@ -2357,64 +2357,64 @@ uint8_t CheckAndCloseDoor(void)
 
 uint8_t StopDr(void)
 {
-  	//4.²ÕÌåÍ£Ö¹
-		uint8_t motor_num4 = 1;   // ¼Ä´æÆ÷µØÖ·£¨¼Ğ½ô£©
-		uint16_t motor_cmd4 = STOPC; // µç»úÖ¸Áî£º
+  	//4.èˆ±ä½“åœæ­¢
+		uint8_t motor_num4 = 1;   // å¯„å­˜å™¨åœ°å€ï¼ˆå¤¹ç´§ï¼‰
+		uint16_t motor_cmd4 = STOPC; // ç”µæœºæŒ‡ä»¤ï¼š
 		uint8_t ctrl_ret3 = Motor_Control(MOTOR4_SLAVE_ADDR, motor_num4, motor_cmd4);
 		if(ctrl_ret3 == 0)
     {
-        printf("²ÕÌåÍ£Ö¹Ö¸Áî·¢ËÍ³É¹¦£¡\r\n");
+        printf("èˆ±ä½“åœæ­¢æŒ‡ä»¤å‘é€æˆåŠŸï¼\r\n");
     }
     else
     {
-        printf("²ÕÌåÍ£Ö¹Ö¸Áî·¢ËÍÊ§°Ü£¬´íÎóÂë£º%d\r\n", ctrl_ret3);
+        printf("èˆ±ä½“åœæ­¢æŒ‡ä»¤å‘é€å¤±è´¥ï¼Œé”™è¯¯ç ï¼š%d\r\n", ctrl_ret3);
     }
 		master_state = MASTER_IDLE;
-		timeout_cnt = 0; // Í¬Ê±ÖØÖÃ³¬Ê±¼ÆÊıÆ÷
+		timeout_cnt = 0; // åŒæ—¶é‡ç½®è¶…æ—¶è®¡æ•°å™¨
 		return 0;
 }
 
 
 uint8_t OpenDr(void)
 {
-  	//4.²ÕÌå´ò¿ª
-		uint8_t motor_num4 = 1;   // ¼Ä´æÆ÷µØÖ·
-		uint16_t motor_cmd4 = OPENC; // µç»úÖ¸Áî£º
+  	//4.èˆ±ä½“æ‰“å¼€
+		uint8_t motor_num4 = 1;   // å¯„å­˜å™¨åœ°å€
+		uint16_t motor_cmd4 = OPENC; // ç”µæœºæŒ‡ä»¤ï¼š
 		uint8_t ctrl_ret3 = Motor_Control(MOTOR4_SLAVE_ADDR, motor_num4, motor_cmd4);
 		if(ctrl_ret3 == 0)
     {
-        printf("²ÕÌå´ò¿ªÖ¸Áî·¢ËÍ³É¹¦£¡\r\n");
+        printf("èˆ±ä½“æ‰“å¼€æŒ‡ä»¤å‘é€æˆåŠŸï¼\r\n");
     }
     else
     {
-        printf("²ÕÌå´ò¿ªÖ¸Áî·¢ËÍÊ§°Ü£¬´íÎóÂë£º%d\r\n", ctrl_ret3);
+        printf("èˆ±ä½“æ‰“å¼€æŒ‡ä»¤å‘é€å¤±è´¥ï¼Œé”™è¯¯ç ï¼š%d\r\n", ctrl_ret3);
     }
 		master_state = MASTER_IDLE;
-		timeout_cnt = 0; // Í¬Ê±ÖØÖÃ³¬Ê±¼ÆÊıÆ÷
+		timeout_cnt = 0; // åŒæ—¶é‡ç½®è¶…æ—¶è®¡æ•°å™¨
 		return 0;
 }
 
 //uint8_t OpenDr(void)
 //{
-//    // ¶ÁÈ¡²ÕÃÅµ±Ç°×´Ì¬£¨0x11¼Ä´æÆ÷£©
+//    // è¯»å–èˆ±é—¨å½“å‰çŠ¶æ€ï¼ˆ0x11å¯„å­˜å™¨ï¼‰
 //    uint16_t door_state = StatusRegs_Get(REG_DOOR_STATE);
 //    
-//    // Èç¹û²ÕÃÅÒÑ¾­´ò¿ªµ½Î»£¨ÖµÎª2£©£¬Ôò²»ÔÙÖ´ĞĞ´ò¿ªÖ¸Áî
+//    // å¦‚æœèˆ±é—¨å·²ç»æ‰“å¼€åˆ°ä½ï¼ˆå€¼ä¸º2ï¼‰ï¼Œåˆ™ä¸å†æ‰§è¡Œæ‰“å¼€æŒ‡ä»¤
 ////    if (door_state == 2) {
-////        printf("²ÕÃÅÒÑ´ò¿ªµ½Î»£¬ÎŞĞèÖØ¸´Ö´ĞĞ´ò¿ªÖ¸Áî\n");
+////        printf("èˆ±é—¨å·²æ‰“å¼€åˆ°ä½ï¼Œæ— éœ€é‡å¤æ‰§è¡Œæ‰“å¼€æŒ‡ä»¤\n");
 ////        master_state = MASTER_IDLE;
 ////        timeout_cnt = 0;
 ////        return 0;
 ////    }
 
-//    // Ö´ĞĞ²ÕÃÅ´ò¿ªÖ¸Áî
+//    // æ‰§è¡Œèˆ±é—¨æ‰“å¼€æŒ‡ä»¤
 //    uint8_t motor_num4 = 1;
 //    uint16_t motor_cmd4 = OPENC;
 //    uint8_t ctrl_ret3 = Motor_Control(MOTOR4_SLAVE_ADDR, motor_num4, motor_cmd4);
 //    if (ctrl_ret3 == 0) {
-//        printf("²ÕÃÅ´ò¿ªÖ¸Áî·¢ËÍ³É¹¦£¡\r\n");
+//        printf("èˆ±é—¨æ‰“å¼€æŒ‡ä»¤å‘é€æˆåŠŸï¼\r\n");
 //    } else {
-//        printf("²ÕÃÅ´ò¿ªÖ¸Áî·¢ËÍÊ§°Ü£¬´íÎóÂë£º%d\r\n", ctrl_ret3);
+//        printf("èˆ±é—¨æ‰“å¼€æŒ‡ä»¤å‘é€å¤±è´¥ï¼Œé”™è¯¯ç ï¼š%d\r\n", ctrl_ret3);
 //    }
 //    
 //    master_state = MASTER_IDLE;
@@ -2425,39 +2425,39 @@ uint8_t OpenDr(void)
 
 uint8_t OpenAC(void)
 {
-  	//´ò¿ª¿Õµ÷
-		uint8_t motor_num13 = 1;   // ¼Ä´æÆ÷µØÖ·
-		uint16_t motor_cmd13 = OPENAC; // µç»úÖ¸Áî£º
+  	//æ‰“å¼€ç©ºè°ƒ
+		uint8_t motor_num13 = 1;   // å¯„å­˜å™¨åœ°å€
+		uint16_t motor_cmd13 = OPENAC; // ç”µæœºæŒ‡ä»¤ï¼š
 		uint8_t ctrl_ret3 = Motor_Control(MOTOR13_SLAVE_ADDR, motor_num13, motor_cmd13);
 		if(ctrl_ret3 == 0)
     {
-        printf("¿Õµ÷´ò¿ªÖ¸Áî·¢ËÍ³É¹¦£¡\r\n");
+        printf("ç©ºè°ƒæ‰“å¼€æŒ‡ä»¤å‘é€æˆåŠŸï¼\r\n");
     }
     else
     {
-        printf("¿Õµ÷´ò¿ªÖ¸Áî·¢ËÍÊ§°Ü£¬´íÎóÂë£º%d\r\n", ctrl_ret3);
+        printf("ç©ºè°ƒæ‰“å¼€æŒ‡ä»¤å‘é€å¤±è´¥ï¼Œé”™è¯¯ç ï¼š%d\r\n", ctrl_ret3);
     }
 		master_state = MASTER_IDLE;
-		timeout_cnt = 0; // Í¬Ê±ÖØÖÃ³¬Ê±¼ÆÊıÆ÷
+		timeout_cnt = 0; // åŒæ—¶é‡ç½®è¶…æ—¶è®¡æ•°å™¨
 		return 0;
 }
 
 uint8_t CloseAC(void)
 {
-  	//¹Ø±Õ¿Õµ÷
-		uint8_t motor_num13 = 1;   // ¼Ä´æÆ÷µØÖ·
-		uint16_t motor_cmd13 = CLOSEAC; // µç»úÖ¸Áî£º
+  	//å…³é—­ç©ºè°ƒ
+		uint8_t motor_num13 = 1;   // å¯„å­˜å™¨åœ°å€
+		uint16_t motor_cmd13 = CLOSEAC; // ç”µæœºæŒ‡ä»¤ï¼š
 		uint8_t ctrl_ret3 = Motor_Control(MOTOR13_SLAVE_ADDR, motor_num13, motor_cmd13);
 		if(ctrl_ret3 == 0)
     {
-        printf("¿Õµ÷¹Ø±ÕÖ¸Áî·¢ËÍ³É¹¦£¡\r\n");
+        printf("ç©ºè°ƒå…³é—­æŒ‡ä»¤å‘é€æˆåŠŸï¼\r\n");
     }
     else
     {
-        printf("¿Õµ÷¹Ø±ÕÖ¸Áî·¢ËÍÊ§°Ü£¬´íÎóÂë£º%d\r\n", ctrl_ret3);
+        printf("ç©ºè°ƒå…³é—­æŒ‡ä»¤å‘é€å¤±è´¥ï¼Œé”™è¯¯ç ï¼š%d\r\n", ctrl_ret3);
     }
 		master_state = MASTER_IDLE;
-		timeout_cnt = 0; // Í¬Ê±ÖØÖÃ³¬Ê±¼ÆÊıÆ÷
+		timeout_cnt = 0; // åŒæ—¶é‡ç½®è¶…æ—¶è®¡æ•°å™¨
 		return 0;
 }
 
@@ -2469,7 +2469,7 @@ uint8_t Sequence_GetCurrentId(void)
 
 uint8_t Sequence_GetCurrentStep(void)
 {
-    if (!seq_runner.busy) return 0xFF;   // ĞòÁĞÎ´ÔËĞĞ·µ»Ø0xFF
+    if (!seq_runner.busy) return 0xFF;   // åºåˆ—æœªè¿è¡Œè¿”å›0xFF
     return seq_runner.current_index;
 }
 
@@ -2482,7 +2482,7 @@ const uint8_t* GetMotorListForCurrentStep(void)
             return step_motor_map[i].motor_addrs;
         }
     }
-    return NULL; // ·µ»Ø¿ÕÖ¸Õë±íÊ¾Î´ÕÒµ½
+    return NULL; // è¿”å›ç©ºæŒ‡é’ˆè¡¨ç¤ºæœªæ‰¾åˆ°
 }
 
 void Sequence_ForceStop(void) {
@@ -2490,5 +2490,5 @@ void Sequence_ForceStop(void) {
         seq_runner.wait_until = 0; 
         seq_runner.error = 1;      
         seq_runner.paused = 0;     
-        g_step_timer_expired = 0;  // Çå³ı¿ÉÄÜ²ĞÓàµÄ¶¨Ê±Æ÷±êÖ¾
+        g_step_timer_expired = 0;  // æ¸…é™¤å¯èƒ½æ®‹ä½™çš„å®šæ—¶å™¨æ ‡å¿—
 }

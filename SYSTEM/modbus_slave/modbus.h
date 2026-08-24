@@ -8,240 +8,240 @@
 #include <stdint.h> 
 
 
-#define ALARM_POLL_INTERVAL_MS  1000   // 1ÃëÂÖÑ¯Ò»´Î
-// -------------------------- Ó²¼şÏà¹Øºê¶¨Òå --------------------------
-#define USARTx               USART1        // Ñ¡ÓÃUSART1×÷ÎªRS485Í¨ĞÅ¿Ú
-#define USART_BAUDRATE       9600         // Modbus-RTU²¨ÌØÂÊ
+#define ALARM_POLL_INTERVAL_MS  1000   // 1ç§’è½®è¯¢ä¸€æ¬¡
+// -------------------------- ç¡¬ä»¶ç›¸å…³å®å®šä¹‰ --------------------------
+#define USARTx               USART1        // é€‰ç”¨USART1ä½œä¸ºRS485é€šä¿¡å£
+#define USART_BAUDRATE       9600         // Modbus-RTUæ³¢ç‰¹ç‡
 #define RS485_RE_GPIO        GPIOC         // EN485=GPIOC
 #define RS485_RE_PIN         GPIO_Pin_0    // EN485_PIN=GPIOA_Pin_8
-#define RS485_DE_GPIO        GPIOC         // ¸´ÓÃREÒı½Å£¨Ó²¼şÉÏRE/DEÍ¨³£Á¬ÔÚÒ»Æğ£©
+#define RS485_DE_GPIO        GPIOC         // å¤ç”¨REå¼•è„šï¼ˆç¡¬ä»¶ä¸ŠRE/DEé€šå¸¸è¿åœ¨ä¸€èµ·ï¼‰
 #define RS485_DE_PIN         GPIO_Pin_0
 
-// USARTÒı½Å£¨Æ¥Åä¶¨Òå£ºUSART_TX=GPIOB_Pin_10, USART_RX=GPIOB_Pin_11£©
+// USARTå¼•è„šï¼ˆåŒ¹é…å®šä¹‰ï¼šUSART_TX=GPIOB_Pin_10, USART_RX=GPIOB_Pin_11ï¼‰
 #define USART_TX_GPIO        GPIOA
 //#define USART_TX_PIN         GPIO_Pin_9
 #define USART_RX_GPIO        GPIOA
 //#define USART_RX_PIN         GPIO_Pin_10
 
-// ¼ÌµçÆ÷¿ØÖÆÒı½Å¶¨Òå
+// ç»§ç”µå™¨æ§åˆ¶å¼•è„šå®šä¹‰
 #define RELAY_FORWARD_PIN    GPIO_Pin_2
 #define RELAY_BACKWARD_PIN   GPIO_Pin_3
 #define RELAY_GPIO_PORT      GPIOE
-// ÎªÁË·½±ã¹ÜÀí£¬¶¨ÒåÈ«²¿Òı½ÅÑÚÂë
+// ä¸ºäº†æ–¹ä¾¿ç®¡ç†ï¼Œå®šä¹‰å…¨éƒ¨å¼•è„šæ©ç 
 #define RELAY_ALL_PINS       (RELAY_FORWARD_PIN | RELAY_BACKWARD_PIN)
 
-// -------------------------- ModbusÖ÷Õ¾ÅäÖÃ --------------------------
-#define MOTOR_COUNT      3       // ¿ØÖÆ3¸öµç»ú
-#define Reg_Number     Reg_num   //¼Ä´æÆ÷ÊıÁ¿
-// 1. µç»ú±êÊ¶£¨Çø·Ö²»Í¬µç»ú£©
-#define MOTOR_ID_1       2       // µç»ú1µÄÎ¨Ò»±êÊ¶
-#define MOTOR_ID_2       3       // µç»ú2µÄÎ¨Ò»±êÊ¶
-#define MOTOR_ID_3       1       // µç»ú3µÄÎ¨Ò»±êÊ¶
-#define MOTOR_ID_4       4       // µç»ú4µÄÎ¨Ò»±êÊ¶
-#define MOTOR_ID_13      13      // µç»ú13µÄÎ¨Ò»±êÊ¶
-#define MOTOR_TOTAL      5       // µç»ú×ÜÊı£¨½öÓÃÓÚºÏ·¨ĞÔĞ£Ñé£©
-// Ã¿¸öµç»ú¶ÀÁ¢µÄModbus´ÓÕ¾µØÖ·
-#define MOTOR1_SLAVE_ADDR  0x03   // µç»ú1´ÓÕ¾µØÖ·
-#define MOTOR2_SLAVE_ADDR  0x02   // µç»ú2´ÓÕ¾µØÖ·
-#define MOTOR3_SLAVE_ADDR  0x01   // µç»ú3´ÓÕ¾µØÖ·
-#define MOTOR4_SLAVE_ADDR  0x04   // ²ÕÃÅ´ÓÕ¾µØÖ·
-#define MOTOR5_SLAVE_ADDR  0x05   // µç»ú5´ÓÕ¾µØÖ·
-#define MOTOR6_SLAVE_ADDR  0x06   // µç»ú6´ÓÕ¾µØÖ·
-#define MOTOR7_SLAVE_ADDR  0x07   // µç»ú7´ÓÕ¾µØÖ·
-#define MOTOR8_SLAVE_ADDR  0x08   // µç»ú8´ÓÕ¾µØÖ·
-#define MOTOR9_SLAVE_ADDR  0x09   // µç»ú9´ÓÕ¾µØÖ·
-#define MOTOR10_SLAVE_ADDR 0x0a   // µç»ú10´ÓÕ¾µØÖ·
-#define MOTOR11_SLAVE_ADDR 0x0b   // µç»ú11´ÓÕ¾µØÖ·
-#define MOTOR12_SLAVE_ADDR 0x0c   // µç»ú12´ÓÕ¾µØÖ·
-#define MOTOR13_SLAVE_ADDR 0x0d   // ¿Õµ÷´ÓÕ¾µØÖ·
-#define MOTOR16_SLAVE_ADDR 0x0e   // ÓêÁ¿µØÖ·
-#define MOTOR17_SLAVE_ADDR 0x0f   // ·çËÙµØÖ·
-#define MOTOR14_SLAVE_ADDR 0x14   // µç»ú14´ÓÕ¾µØÖ·(¿ØÖÆÒ£¿ØÆ÷µÄ¶æ»ú)
-#define MOTOR15_SLAVE_ADDR 0x13   // µç»ú15´ÓÕ¾µØÖ·(µç³Ø³äµç¿Õ¿ª)
-#define TIMEOUT_MS           500           // Í¨ĞÅ³¬Ê±Ê±¼ä(ms)
-// 06¹¦ÄÜÂëÖ¡³¤¶È£¨¹Ì¶¨8×Ö½Ú£©
+// -------------------------- Modbusä¸»ç«™é…ç½® --------------------------
+#define MOTOR_COUNT      3       // æ§åˆ¶3ä¸ªç”µæœº
+#define Reg_Number     Reg_num   //å¯„å­˜å™¨æ•°é‡
+// 1. ç”µæœºæ ‡è¯†ï¼ˆåŒºåˆ†ä¸åŒç”µæœºï¼‰
+#define MOTOR_ID_1       2       // ç”µæœº1çš„å”¯ä¸€æ ‡è¯†
+#define MOTOR_ID_2       3       // ç”µæœº2çš„å”¯ä¸€æ ‡è¯†
+#define MOTOR_ID_3       1       // ç”µæœº3çš„å”¯ä¸€æ ‡è¯†
+#define MOTOR_ID_4       4       // ç”µæœº4çš„å”¯ä¸€æ ‡è¯†
+#define MOTOR_ID_13      13      // ç”µæœº13çš„å”¯ä¸€æ ‡è¯†
+#define MOTOR_TOTAL      5       // ç”µæœºæ€»æ•°ï¼ˆä»…ç”¨äºåˆæ³•æ€§æ ¡éªŒï¼‰
+// æ¯ä¸ªç”µæœºç‹¬ç«‹çš„Modbusä»ç«™åœ°å€
+#define MOTOR1_SLAVE_ADDR  0x03   // ç”µæœº1ä»ç«™åœ°å€
+#define MOTOR2_SLAVE_ADDR  0x02   // ç”µæœº2ä»ç«™åœ°å€
+#define MOTOR3_SLAVE_ADDR  0x01   // ç”µæœº3ä»ç«™åœ°å€
+#define MOTOR4_SLAVE_ADDR  0x04   // èˆ±é—¨ä»ç«™åœ°å€
+#define MOTOR5_SLAVE_ADDR  0x05   // ç”µæœº5ä»ç«™åœ°å€
+#define MOTOR6_SLAVE_ADDR  0x06   // ç”µæœº6ä»ç«™åœ°å€
+#define MOTOR7_SLAVE_ADDR  0x07   // ç”µæœº7ä»ç«™åœ°å€
+#define MOTOR8_SLAVE_ADDR  0x08   // ç”µæœº8ä»ç«™åœ°å€
+#define MOTOR9_SLAVE_ADDR  0x09   // ç”µæœº9ä»ç«™åœ°å€
+#define MOTOR10_SLAVE_ADDR 0x0a   // ç”µæœº10ä»ç«™åœ°å€
+#define MOTOR11_SLAVE_ADDR 0x0b   // ç”µæœº11ä»ç«™åœ°å€
+#define MOTOR12_SLAVE_ADDR 0x0c   // ç”µæœº12ä»ç«™åœ°å€
+#define MOTOR13_SLAVE_ADDR 0x0d   // ç©ºè°ƒä»ç«™åœ°å€
+#define MOTOR16_SLAVE_ADDR 0x0e   // é›¨é‡åœ°å€
+#define MOTOR17_SLAVE_ADDR 0x0f   // é£é€Ÿåœ°å€
+#define MOTOR14_SLAVE_ADDR 0x14   // ç”µæœº14ä»ç«™åœ°å€(æ§åˆ¶é¥æ§å™¨çš„èˆµæœº)
+#define MOTOR15_SLAVE_ADDR 0x13   // ç”µæœº15ä»ç«™åœ°å€(ç”µæ± å……ç”µç©ºå¼€)
+#define TIMEOUT_MS           500           // é€šä¿¡è¶…æ—¶æ—¶é—´(ms)
+// 06åŠŸèƒ½ç å¸§é•¿åº¦ï¼ˆå›ºå®š8å­—èŠ‚ï¼‰
 #define MODBUS_06_FRAME_LEN 8
-// ======================== ²½½øµç»ú¿ØÖÆ¼Ä´æÆ÷Ó³Éä ========================
-// 06/10¹¦ÄÜÂë - Ğ´¼Ä´æÆ÷£¨¿ØÖÆÖ¸Áî£©16½øÖÆ
-//µç»ú1
-#define MOTOR1_CTRL_REG1      0x00ce  // µç»ú1¿ØÖÆ¼Ä´æÆ÷
+// ======================== æ­¥è¿›ç”µæœºæ§åˆ¶å¯„å­˜å™¨æ˜ å°„ ========================
+// 06/10åŠŸèƒ½ç  - å†™å¯„å­˜å™¨ï¼ˆæ§åˆ¶æŒ‡ä»¤ï¼‰16è¿›åˆ¶
+//ç”µæœº1
+#define MOTOR1_CTRL_REG1      0x00ce  // ç”µæœº1æ§åˆ¶å¯„å­˜å™¨
 
-//µç»ú2
-#define MOTOR2_CTRL_REG1      0x00ce  // µç»ú2¿ØÖÆ¼Ä´æÆ÷
-#define MOTOR2_CTRL_REG5      0x00fd  // µç»ú5¿ØÖÆ¼Ä´æÆ÷£¨Î»ÖÃÄ£Ê½¿ØÖÆ£©
+//ç”µæœº2
+#define MOTOR2_CTRL_REG1      0x00ce  // ç”µæœº2æ§åˆ¶å¯„å­˜å™¨
+#define MOTOR2_CTRL_REG5      0x00fd  // ç”µæœº5æ§åˆ¶å¯„å­˜å™¨ï¼ˆä½ç½®æ¨¡å¼æ§åˆ¶ï¼‰
 
-//µç»ú3
-#define MOTOR3_CTRL_REG1      0x0036  // µç»ú1¿ØÖÆ¼Ä´æÆ÷µØÖ·£¨ËÉ¿ª£©
-#define MOTOR3_CTRL_REG2      0x0037  // µç»ú2¿ØÖÆ¼Ä´æÆ÷µØÖ·£¨¼Ğ½ô£©
-#define MOTOR3_CTRL_REG3      0x0047  // µç»ú3¿ØÖÆ¼Ä´æÆ÷µØÖ·£¨±£´æ£©
+//ç”µæœº3
+#define MOTOR3_CTRL_REG1      0x0036  // ç”µæœº1æ§åˆ¶å¯„å­˜å™¨åœ°å€ï¼ˆæ¾å¼€ï¼‰
+#define MOTOR3_CTRL_REG2      0x0037  // ç”µæœº2æ§åˆ¶å¯„å­˜å™¨åœ°å€ï¼ˆå¤¹ç´§ï¼‰
+#define MOTOR3_CTRL_REG3      0x0047  // ç”µæœº3æ§åˆ¶å¯„å­˜å™¨åœ°å€ï¼ˆä¿å­˜ï¼‰
 
-//²ÕÃÅ
-#define MOTOR4_CTRL_REG1       0x0046  // µç»ú4¿ØÖÆ¼Ä´æÆ÷µØÖ·
-#define OPENC                  0x0002  // ¿ª²Õ
-#define CLOSEC                 0x0001  // ¹Ø²Õ
-#define STOPC                  0x0005  // Í£Ö¹
+//èˆ±é—¨
+#define MOTOR4_CTRL_REG1       0x0046  // ç”µæœº4æ§åˆ¶å¯„å­˜å™¨åœ°å€
+#define OPENC                  0x0002  // å¼€èˆ±
+#define CLOSEC                 0x0001  // å…³èˆ±
+#define STOPC                  0x0005  // åœæ­¢
 
-//µç»ú5-12
-#define MOTOR5_CTRL_REG1      0x00ce  // µç»ú5-12¿ØÖÆ¼Ä´æÆ÷µØÖ·£¨ĞĞ³ÌÉèÖÃ£©
+//ç”µæœº5-12
+#define MOTOR5_CTRL_REG1      0x00ce  // ç”µæœº5-12æ§åˆ¶å¯„å­˜å™¨åœ°å€ï¼ˆè¡Œç¨‹è®¾ç½®ï¼‰
 
-//¿Õµ÷
-#define MOTOR13_CTRL_REG1       0x002f  // ¿Õµ÷¿ØÖÆ¼Ä´æÆ÷µØÖ·
-#define OPENAC                  0x0001  // ´ò¿ª¿Õµ÷
-#define CLOSEAC                 0x0000  // ¹Ø±Õ¿Õµ÷
+//ç©ºè°ƒ
+#define MOTOR13_CTRL_REG1       0x002f  // ç©ºè°ƒæ§åˆ¶å¯„å­˜å™¨åœ°å€
+#define OPENAC                  0x0001  // æ‰“å¼€ç©ºè°ƒ
+#define CLOSEAC                 0x0000  // å…³é—­ç©ºè°ƒ
 
-// 03¹¦ÄÜÂë - ¶Á¼Ä´æÆ÷£¨×´Ì¬¶ÁÈ¡£©
-//µç»ú1
-#define MOTOR1_STATUS_REG1    0x0046 // µç»ú1×´Ì¬¼Ä´æÆ÷
-#define MOTOR1_STATUS_REG2    0x0047 // µç»ú2×´Ì¬¼Ä´æÆ÷
-#define MOTOR1_STATUS_REG3    0x0048 // µç»ú3×´Ì¬¼Ä´æÆ÷
-#define MOTOR1_STATUS_REG4    0x0045 // µç»ú4×´Ì¬¼Ä´æÆ÷
-#define MOTOR1_STATUS_REG5    0x004b // µç»ú5×´Ì¬¼Ä´æÆ÷
-#define MOTOR1_STATUS_REG6    0x003c // µç»ú6×´Ì¬¼Ä´æÆ÷
-
-
-// µç»ú×´Ì¬Öµ¶¨Òå£¨´ÓÕ¾·µ»Ø£©
-#define MOTOR1_STATUS_IDLE    0x0000        // ¿ÕÏĞ
-#define MOTOR1_STATUS_RUNNING 0x0001        // ÔËĞĞÖĞ
-#define MOTOR1_STATUS_ERROR   0x0002        // ¹ÊÕÏ
-#define MOTOR1_STATUS_ZERO    0x0003        // ÒÑ»ØÁã
-
-//µç»ú1
-// Î»ÖÃ¿ØÖÆÄ£Ê½
-// Î»ÖÃ¿ØÖÆÄ£Ê½
-#define Pulse_num7            0xF6F0        //ĞĞ³ÌµÍÎ»£¬Ô¶Àëµç»ú-332000  ef20
-#define Pulse_num8            0xfffa        //ĞĞ³Ì¸ßÎ»
-#define Pulse_num9            0x10e0        //³ÌµÍÎ»£¬¿¿½üµç»ú332000
-#define Pulse_num10           0x0006        //ĞĞ³Ì¸ßÎ»   5
-#define Pulse_num11           0xecc0        //³ÌµÍÎ»£¬Ô¶Àëµç»ú-136000
-#define Pulse_num12           0xfffd        //ĞĞ³Ì¸ßÎ»
-#define Pulse_num13           0x1340        //³ÌµÍÎ»£¬¿¿½üµç»ú136000
-#define Pulse_num14           0x0002        //ĞĞ³Ì¸ßÎ»
-#define Pulse_num15           0xf830        //³ÌµÍÎ»£¬Ô¶Àëµç»ú-2000
-#define Pulse_num16           0xffff        //ĞĞ³Ì¸ßÎ»
-#define Pulse_num17           0x07d0        //³ÌµÍÎ»£¬¿¿½üµç»ú2000
-#define Pulse_num18           0x0000        //ĞĞ³Ì¸ßÎ»
-#define Pulse_num35           0xf278        //³ÌµÍÎ»£¬Ô¶Àëµç»ú-69000
-#define Pulse_num36           0xfffe        //ĞĞ³Ì¸ßÎ»
-#define Pulse_num37           0x0d88        //³ÌµÍÎ»£¬¿¿½üµç»ú69000
-#define Pulse_num38           0x0001        //ĞĞ³Ì¸ßÎ»
-#define Pulse_num43             0xFAD8        //µç»ú2¶ËµÍÎ»Âö³åÊı-329000
-#define Pulse_num44             0xfffa        //µç»ú2¶Ë¸ßÎ»Âö³åÊı
+// 03åŠŸèƒ½ç  - è¯»å¯„å­˜å™¨ï¼ˆçŠ¶æ€è¯»å–ï¼‰
+//ç”µæœº1
+#define MOTOR1_STATUS_REG1    0x0046 // ç”µæœº1çŠ¶æ€å¯„å­˜å™¨
+#define MOTOR1_STATUS_REG2    0x0047 // ç”µæœº2çŠ¶æ€å¯„å­˜å™¨
+#define MOTOR1_STATUS_REG3    0x0048 // ç”µæœº3çŠ¶æ€å¯„å­˜å™¨
+#define MOTOR1_STATUS_REG4    0x0045 // ç”µæœº4çŠ¶æ€å¯„å­˜å™¨
+#define MOTOR1_STATUS_REG5    0x004b // ç”µæœº5çŠ¶æ€å¯„å­˜å™¨
+#define MOTOR1_STATUS_REG6    0x003c // ç”µæœº6çŠ¶æ€å¯„å­˜å™¨
 
 
+// ç”µæœºçŠ¶æ€å€¼å®šä¹‰ï¼ˆä»ç«™è¿”å›ï¼‰
+#define MOTOR1_STATUS_IDLE    0x0000        // ç©ºé—²
+#define MOTOR1_STATUS_RUNNING 0x0001        // è¿è¡Œä¸­
+#define MOTOR1_STATUS_ERROR   0x0002        // æ•…éšœ
+#define MOTOR1_STATUS_ZERO    0x0003        // å·²å›é›¶
+
+//ç”µæœº1
+// ä½ç½®æ§åˆ¶æ¨¡å¼
+// ä½ç½®æ§åˆ¶æ¨¡å¼
+#define Pulse_num7            0xF6F0        //è¡Œç¨‹ä½ä½ï¼Œè¿œç¦»ç”µæœº-332000  ef20
+#define Pulse_num8            0xfffa        //è¡Œç¨‹é«˜ä½
+#define Pulse_num9            0x10e0        //ç¨‹ä½ä½ï¼Œé è¿‘ç”µæœº332000
+#define Pulse_num10           0x0006        //è¡Œç¨‹é«˜ä½   5
+#define Pulse_num11           0xecc0        //ç¨‹ä½ä½ï¼Œè¿œç¦»ç”µæœº-136000
+#define Pulse_num12           0xfffd        //è¡Œç¨‹é«˜ä½
+#define Pulse_num13           0x1340        //ç¨‹ä½ä½ï¼Œé è¿‘ç”µæœº136000
+#define Pulse_num14           0x0002        //è¡Œç¨‹é«˜ä½
+#define Pulse_num15           0xf830        //ç¨‹ä½ä½ï¼Œè¿œç¦»ç”µæœº-2000
+#define Pulse_num16           0xffff        //è¡Œç¨‹é«˜ä½
+#define Pulse_num17           0x07d0        //ç¨‹ä½ä½ï¼Œé è¿‘ç”µæœº2000
+#define Pulse_num18           0x0000        //è¡Œç¨‹é«˜ä½
+#define Pulse_num35           0xf278        //ç¨‹ä½ä½ï¼Œè¿œç¦»ç”µæœº-69000
+#define Pulse_num36           0xfffe        //è¡Œç¨‹é«˜ä½
+#define Pulse_num37           0x0d88        //ç¨‹ä½ä½ï¼Œé è¿‘ç”µæœº69000
+#define Pulse_num38           0x0001        //è¡Œç¨‹é«˜ä½
+#define Pulse_num43             0xFAD8        //ç”µæœº2ç«¯ä½ä½è„‰å†²æ•°-329000
+#define Pulse_num44             0xfffa        //ç”µæœº2ç«¯é«˜ä½è„‰å†²æ•°
 
 
 
 
-//µç»ú2
-//ËÙ¶ÈÄ£Ê½¿ØÖÆ
-#define  Direction             0x0000        //·½Ïò£¨¸ßÎ»£º00ÏòÇ°£¬01Ïòºó£»µÍÎ»£º00±íÊ¾¼ÓËÙ¶ÈµµÎ»Îª0)
+
+
+//ç”µæœº2
+//é€Ÿåº¦æ¨¡å¼æ§åˆ¶
+#define  Direction             0x0000        //æ–¹å‘ï¼ˆé«˜ä½ï¼š00å‘å‰ï¼Œ01å‘åï¼›ä½ä½ï¼š00è¡¨ç¤ºåŠ é€Ÿåº¦æ¡£ä½ä¸º0)
 #define  Direction_back        0x0100
-#define  Speed                 0x01f4        //ËÙ¶È£¨Á½×Ö½Ú£©
-#define  Multi_Flag            0x0000        //¶à»úÍ¬²½±êÖ¾£¨¸ßÎ»µ¥×Ö½Ú0/1,µÍ×Ö½ÚÎª00£©
-//Á¢¼´Í£Ö¹
+#define  Speed                 0x01f4        //é€Ÿåº¦ï¼ˆä¸¤å­—èŠ‚ï¼‰
+#define  Multi_Flag            0x0000        //å¤šæœºåŒæ­¥æ ‡å¿—ï¼ˆé«˜ä½å•å­—èŠ‚0/1,ä½å­—èŠ‚ä¸º00ï¼‰
+//ç«‹å³åœæ­¢
 #define  Motor_Stop2           0x9800        //
-//´¥·¢»ØÁã
-#define  Motor2_Back_ZERO      0x0300        //¶àÈ¦ÏŞÎ»»ØÁã
-//Ê¹ÄÜĞÅºÅ¿ØÖÆ
-#define  EN_State              0xab01        //Ê¹ÄÜ×´Ì¬£¨00²»Ê¹ÄÜ/01Ê¹ÄÜ£©
-#define  Multi_Flag            0x0000        //¶à»úÍ¬²½±êÖ¾£¨¸ßÎ»µ¥×Ö½Ú0/1,µÍ×Ö½ÚÎª00£©
-//Î»ÖÃÄ£Ê½
-#define Position1              0x0000        //Ïà¶ÔÄ£Ê½
-#define Position2              0x0001        //¾ø¶ÔÄ£Ê½
-#define Pulse_num1             0x3188        //µç»ú2¶ËµÍÎ»Âö³åÊı-315000    8778
-#define Pulse_num2             0xfffb        //µç»ú2¶Ë¸ßÎ»Âö³åÊı
-#define Pulse_num3             0xa168        //µç»ú2¶ËµÍÎ»Âö³åÊı369000
-#define Pulse_num4             0x0006        //µç»ú2¶Ë¸ßÎ»Âö³åÊı	  5
-#define Pulse_num5             0xDCD8       //µç»ú2¶ËµÍÎ»Âö³åÊı-9000     eb89 
-#define Pulse_num6             0xffff        //µç»ú2¶Ë¸ßÎ»Âö³åÊı
-#define Pulse_num19             0x7888        //µç»ú2¶ËµÍÎ»Âö³åÊı293000
-#define Pulse_num20             0x0005        //µç»ú2¶Ë¸ßÎ»Âö³åÊı   5
-#define Pulse_num21             0xA240        //µç»ú2¶ËµÍÎ»Âö³åÊı-15000    c568
-#define Pulse_num22             0xffff        //µç»ú2¶Ë¸ßÎ»Âö³åÊı
-#define Pulse_num23             0x3a98        //µç»ú2¶ËµÍÎ»Âö³åÊı15000
-#define Pulse_num24             0x0000        //µç»ú2¶Ë¸ßÎ»Âö³åÊı
-#define Pulse_num25             0xb320        //µç»ú2¶ËµÍÎ»Âö³åÊı308000
-#define Pulse_num26             0x0005        //µç»ú2¶Ë¸ßÎ»Âö³åÊı   4
-#define Pulse_num27             0x7DD8        //µç»ú2¶ËµÍÎ»Âö³åÊı-363000   7608
-#define Pulse_num28             0xfffa        //µç»ú2¶Ë¸ßÎ»Âö³åÊı
-#define Pulse_num29             0x89f8        //µç»ú2¶ËµÍÎ»Âö³åÊı363000
-#define Pulse_num30             0x0006        //µç»ú2¶Ë¸ßÎ»Âö³åÊı   5
-#define Pulse_num31             0xd8f0        //µç»ú2¶ËµÍÎ»Âö³åÊı-10000
-#define Pulse_num32             0xffff        //µç»ú2¶Ë¸ßÎ»Âö³åÊı
-#define Pulse_num33             0x2710        //µç»ú2¶ËµÍÎ»Âö³åÊı10000
-#define Pulse_num34             0x0000        //µç»ú2¶Ë¸ßÎ»Âö³åÊı
-#define Pulse_num39             0xd260        //µç»ú2¶ËµÍÎ»Âö³åÊı316000
-#define Pulse_num40             0x0005        //µç»ú2¶Ë¸ßÎ»Âö³åÊı   4
-#define Pulse_num41             0x9330        //µç»ú2¶ËµÍÎ»Âö³åÊı-290000
-#define Pulse_num42             0xfffb        //µç»ú2¶Ë¸ßÎ»Âö³åÊı
-#define Pulse_num45             0x8778        //µç»ú2¶ËµÍÎ»Âö³åÊı-295000  7FA8
-#define Pulse_num46             0xfffb        //µç»ú2¶Ë¸ßÎ»Âö³åÊı
-#define Pulse_num47             0x8778        //µç»ú2¶ËµÍÎ»Âö³åÊı-290000
-#define Pulse_num48             0xfffb        //µç»ú2¶Ë¸ßÎ»Âö³åÊı
+//è§¦å‘å›é›¶
+#define  Motor2_Back_ZERO      0x0300        //å¤šåœˆé™ä½å›é›¶
+//ä½¿èƒ½ä¿¡å·æ§åˆ¶
+#define  EN_State              0xab01        //ä½¿èƒ½çŠ¶æ€ï¼ˆ00ä¸ä½¿èƒ½/01ä½¿èƒ½ï¼‰
+#define  Multi_Flag            0x0000        //å¤šæœºåŒæ­¥æ ‡å¿—ï¼ˆé«˜ä½å•å­—èŠ‚0/1,ä½å­—èŠ‚ä¸º00ï¼‰
+//ä½ç½®æ¨¡å¼
+#define Position1              0x0000        //ç›¸å¯¹æ¨¡å¼
+#define Position2              0x0001        //ç»å¯¹æ¨¡å¼
+#define Pulse_num1             0x3188        //ç”µæœº2ç«¯ä½ä½è„‰å†²æ•°-315000    8778
+#define Pulse_num2             0xfffb        //ç”µæœº2ç«¯é«˜ä½è„‰å†²æ•°
+#define Pulse_num3             0xa168        //ç”µæœº2ç«¯ä½ä½è„‰å†²æ•°369000
+#define Pulse_num4             0x0006        //ç”µæœº2ç«¯é«˜ä½è„‰å†²æ•°	  5
+#define Pulse_num5             0xDCD8       //ç”µæœº2ç«¯ä½ä½è„‰å†²æ•°-9000     eb89 
+#define Pulse_num6             0xffff        //ç”µæœº2ç«¯é«˜ä½è„‰å†²æ•°
+#define Pulse_num19             0x7888        //ç”µæœº2ç«¯ä½ä½è„‰å†²æ•°293000
+#define Pulse_num20             0x0005        //ç”µæœº2ç«¯é«˜ä½è„‰å†²æ•°   5
+#define Pulse_num21             0xA240        //ç”µæœº2ç«¯ä½ä½è„‰å†²æ•°-15000    c568
+#define Pulse_num22             0xffff        //ç”µæœº2ç«¯é«˜ä½è„‰å†²æ•°
+#define Pulse_num23             0x3a98        //ç”µæœº2ç«¯ä½ä½è„‰å†²æ•°15000
+#define Pulse_num24             0x0000        //ç”µæœº2ç«¯é«˜ä½è„‰å†²æ•°
+#define Pulse_num25             0xb320        //ç”µæœº2ç«¯ä½ä½è„‰å†²æ•°308000
+#define Pulse_num26             0x0005        //ç”µæœº2ç«¯é«˜ä½è„‰å†²æ•°   4
+#define Pulse_num27             0x7DD8        //ç”µæœº2ç«¯ä½ä½è„‰å†²æ•°-363000   7608
+#define Pulse_num28             0xfffa        //ç”µæœº2ç«¯é«˜ä½è„‰å†²æ•°
+#define Pulse_num29             0x89f8        //ç”µæœº2ç«¯ä½ä½è„‰å†²æ•°363000
+#define Pulse_num30             0x0006        //ç”µæœº2ç«¯é«˜ä½è„‰å†²æ•°   5
+#define Pulse_num31             0xd8f0        //ç”µæœº2ç«¯ä½ä½è„‰å†²æ•°-10000
+#define Pulse_num32             0xffff        //ç”µæœº2ç«¯é«˜ä½è„‰å†²æ•°
+#define Pulse_num33             0x2710        //ç”µæœº2ç«¯ä½ä½è„‰å†²æ•°10000
+#define Pulse_num34             0x0000        //ç”µæœº2ç«¯é«˜ä½è„‰å†²æ•°
+#define Pulse_num39             0xd260        //ç”µæœº2ç«¯ä½ä½è„‰å†²æ•°316000
+#define Pulse_num40             0x0005        //ç”µæœº2ç«¯é«˜ä½è„‰å†²æ•°   4
+#define Pulse_num41             0x9330        //ç”µæœº2ç«¯ä½ä½è„‰å†²æ•°-290000
+#define Pulse_num42             0xfffb        //ç”µæœº2ç«¯é«˜ä½è„‰å†²æ•°
+#define Pulse_num45             0x8778        //ç”µæœº2ç«¯ä½ä½è„‰å†²æ•°-295000  7FA8
+#define Pulse_num46             0xfffb        //ç”µæœº2ç«¯é«˜ä½è„‰å†²æ•°
+#define Pulse_num47             0x8778        //ç”µæœº2ç«¯ä½ä½è„‰å†²æ•°-290000
+#define Pulse_num48             0xfffb        //ç”µæœº2ç«¯é«˜ä½è„‰å†²æ•°
 
 
-//µç»ú3
-#define Lossen                 0x0001         //ËÉ¿ª
-#define Clamp                  0x0001         //¼Ğ½ô
-#define Save                   0x0001         //±£´æÅäÖÃ
+//ç”µæœº3
+#define Lossen                 0x0001         //æ¾å¼€
+#define Clamp                  0x0001         //å¤¹ç´§
+#define Save                   0x0001         //ä¿å­˜é…ç½®
 
-//¹éÖĞµç»ú4~8¹«ÓÃ¼Ä´æÆ÷µØÖ·
-#define speed                  0x009a         //ÔËĞĞËÙ¶ÈÉèÖÃ
-#define length                 0x00c8         //¹Ì¶¨ĞĞ³ÌÔË¶¯
-#define MOTOR4_RUN             0x0001         //Õı×ªÁ¬ĞøÔË¶¯
-#define MOTOR4_deRUN           0x0257         //·´×ªÔË¶¯
-#define MOTOR4_stop            0x0256         //Í£Ö¹ÔË¶¯
-#define MOTOR4_speed           0x01f4         //ÔË¶¯ËÙ¶È
-//#define MOTOR5_length_l        0xbf20         //ĞĞ³ÌµÍÎ»£¬¿¿½üµç»ú180000  
-//#define MOTOR5_length_h        0x0002         //ĞĞ³Ì¸ßÎ»£¬¿¿½üµç»ú
-#define MOTOR5_length_l        0xaf80         //ĞĞ³ÌµÍÎ»£¬¿¿½üµç»ú176000  
-#define MOTOR5_length_h        0x0002         //ĞĞ³Ì¸ßÎ»£¬¿¿½üµç»ú
-//#define MOTOR6_length_l        0x40e0         //ĞĞ³ÌµÍÎ»£¬Ô¶Àëµç»ú-180000
-//#define MOTOR6_length_h        0xfffd         //ĞĞ³Ì¸ßÎ»£¬Ô¶Àëµç»ú
-#define MOTOR6_length_l        0x4F00         //ĞĞ³ÌµÍÎ»£¬Ô¶Àëµç»ú-176000
-#define MOTOR6_length_h        0xfffd         //ĞĞ³Ì¸ßÎ»£¬Ô¶Àëµç»ú
-#define MOTOR7_length_l        0x5d78         //ĞĞ³ÌµÍÎ»£¬¿¿½üµç»ú155000
-#define MOTOR7_length_h        0x0002         //ĞĞ³Ì¸ßÎ»£¬¿¿½üµç»ú
-#define MOTOR8_length_l        0xa8d0        //ĞĞ³ÌµÍÎ»£¬Ô¶Àëµç»ú-350000  
-#define MOTOR8_length_h        0xfffa         //ĞĞ³Ì¸ßÎ»£¬Ô¶Àëµç»ú
-#define MOTOR9_length_l        0x5f90         //ĞĞ³ÌµÍÎ»£¬¿¿½üµç»ú90000
-#define MOTOR9_length_h        0x0001         //ĞĞ³Ì¸ßÎ»£¬¿¿½üµç»ú
-#define MOTOR10_length_l        0xa070        //ĞĞ³ÌµÍÎ»£¬Ô¶Àëµç»ú-90000
-#define MOTOR10_length_h        0xfffe         //ĞĞ³Ì¸ßÎ»£¬Ô¶Àëµç»ú
-#define MOTOR11_length_l        0x82b8         //ĞĞ³ÌµÍÎ»£¬¿¿½üµç»ú99000
-#define MOTOR11_length_h        0x0001         //ĞĞ³Ì¸ßÎ»£¬¿¿½üµç»ú
-#define MOTOR12_length_l        0x7d48        //ĞĞ³ÌµÍÎ»£¬Ô¶Àëµç»ú-99000
-#define MOTOR12_length_h        0xfffe         //ĞĞ³Ì¸ßÎ»£¬Ô¶Àëµç»ú
-#define MOTOR13_length_l        0x3450         //ĞĞ³ÌµÍÎ»£¬¿¿½üµç»ú210000
-#define MOTOR13_length_h        0x0003         //ĞĞ³Ì¸ßÎ»£¬¿¿½üµç»ú
-#define MOTOR14_length_l        0xe4a8        //ĞĞ³ÌµÍÎ»£¬Ô¶Àëµç»ú-7000
-#define MOTOR14_length_h        0xffff         //ĞĞ³Ì¸ßÎ»£¬Ô¶Àëµç»ú
-#define MOTOR15_length_l        0x0d40         //ĞĞ³ÌµÍÎ»£¬¿¿½üµç»ú200000
-#define MOTOR15_length_h        0x0003         //ĞĞ³Ì¸ßÎ»£¬¿¿½üµç»ú
-#define MOTOR16_length_l        0xf2c0        //ĞĞ³ÌµÍÎ»£¬Ô¶Àëµç»ú-200000
-#define MOTOR16_length_h        0xfffc         //ĞĞ³Ì¸ßÎ»£¬Ô¶Àëµç»ú
-#define MOTOR17_length_l        0x5f00         //ĞĞ³ÌµÍÎ»£¬¿¿½üµç»ú352000
-#define MOTOR17_length_h        0x0005         //ĞĞ³Ì¸ßÎ»£¬¿¿½üµç»ú
+//å½’ä¸­ç”µæœº4~8å…¬ç”¨å¯„å­˜å™¨åœ°å€
+#define speed                  0x009a         //è¿è¡Œé€Ÿåº¦è®¾ç½®
+#define length                 0x00c8         //å›ºå®šè¡Œç¨‹è¿åŠ¨
+#define MOTOR4_RUN             0x0001         //æ­£è½¬è¿ç»­è¿åŠ¨
+#define MOTOR4_deRUN           0x0257         //åè½¬è¿åŠ¨
+#define MOTOR4_stop            0x0256         //åœæ­¢è¿åŠ¨
+#define MOTOR4_speed           0x01f4         //è¿åŠ¨é€Ÿåº¦
+//#define MOTOR5_length_l        0xbf20         //è¡Œç¨‹ä½ä½ï¼Œé è¿‘ç”µæœº180000  
+//#define MOTOR5_length_h        0x0002         //è¡Œç¨‹é«˜ä½ï¼Œé è¿‘ç”µæœº
+#define MOTOR5_length_l        0xaf80         //è¡Œç¨‹ä½ä½ï¼Œé è¿‘ç”µæœº176000  
+#define MOTOR5_length_h        0x0002         //è¡Œç¨‹é«˜ä½ï¼Œé è¿‘ç”µæœº
+//#define MOTOR6_length_l        0x40e0         //è¡Œç¨‹ä½ä½ï¼Œè¿œç¦»ç”µæœº-180000
+//#define MOTOR6_length_h        0xfffd         //è¡Œç¨‹é«˜ä½ï¼Œè¿œç¦»ç”µæœº
+#define MOTOR6_length_l        0x4F00         //è¡Œç¨‹ä½ä½ï¼Œè¿œç¦»ç”µæœº-176000
+#define MOTOR6_length_h        0xfffd         //è¡Œç¨‹é«˜ä½ï¼Œè¿œç¦»ç”µæœº
+#define MOTOR7_length_l        0x5d78         //è¡Œç¨‹ä½ä½ï¼Œé è¿‘ç”µæœº155000
+#define MOTOR7_length_h        0x0002         //è¡Œç¨‹é«˜ä½ï¼Œé è¿‘ç”µæœº
+#define MOTOR8_length_l        0xa8d0        //è¡Œç¨‹ä½ä½ï¼Œè¿œç¦»ç”µæœº-350000  
+#define MOTOR8_length_h        0xfffa         //è¡Œç¨‹é«˜ä½ï¼Œè¿œç¦»ç”µæœº
+#define MOTOR9_length_l        0x5f90         //è¡Œç¨‹ä½ä½ï¼Œé è¿‘ç”µæœº90000
+#define MOTOR9_length_h        0x0001         //è¡Œç¨‹é«˜ä½ï¼Œé è¿‘ç”µæœº
+#define MOTOR10_length_l        0xa070        //è¡Œç¨‹ä½ä½ï¼Œè¿œç¦»ç”µæœº-90000
+#define MOTOR10_length_h        0xfffe         //è¡Œç¨‹é«˜ä½ï¼Œè¿œç¦»ç”µæœº
+#define MOTOR11_length_l        0x82b8         //è¡Œç¨‹ä½ä½ï¼Œé è¿‘ç”µæœº99000
+#define MOTOR11_length_h        0x0001         //è¡Œç¨‹é«˜ä½ï¼Œé è¿‘ç”µæœº
+#define MOTOR12_length_l        0x7d48        //è¡Œç¨‹ä½ä½ï¼Œè¿œç¦»ç”µæœº-99000
+#define MOTOR12_length_h        0xfffe         //è¡Œç¨‹é«˜ä½ï¼Œè¿œç¦»ç”µæœº
+#define MOTOR13_length_l        0x3450         //è¡Œç¨‹ä½ä½ï¼Œé è¿‘ç”µæœº210000
+#define MOTOR13_length_h        0x0003         //è¡Œç¨‹é«˜ä½ï¼Œé è¿‘ç”µæœº
+#define MOTOR14_length_l        0xe4a8        //è¡Œç¨‹ä½ä½ï¼Œè¿œç¦»ç”µæœº-7000
+#define MOTOR14_length_h        0xffff         //è¡Œç¨‹é«˜ä½ï¼Œè¿œç¦»ç”µæœº
+#define MOTOR15_length_l        0x0d40         //è¡Œç¨‹ä½ä½ï¼Œé è¿‘ç”µæœº200000
+#define MOTOR15_length_h        0x0003         //è¡Œç¨‹é«˜ä½ï¼Œé è¿‘ç”µæœº
+#define MOTOR16_length_l        0xf2c0        //è¡Œç¨‹ä½ä½ï¼Œè¿œç¦»ç”µæœº-200000
+#define MOTOR16_length_h        0xfffc         //è¡Œç¨‹é«˜ä½ï¼Œè¿œç¦»ç”µæœº
+#define MOTOR17_length_l        0x5f00         //è¡Œç¨‹ä½ä½ï¼Œé è¿‘ç”µæœº352000
+#define MOTOR17_length_h        0x0005         //è¡Œç¨‹é«˜ä½ï¼Œé è¿‘ç”µæœº
 
-//µç»ú12
-#define MOTOR12_UP        0x0033  // ÉÏÉı
-#define MOTOR12_DOWN      0x0044  // ÏÂ½µ
-#define MOTOR12_STOP      0x0055  // Í£Ö¹
+//ç”µæœº12
+#define MOTOR12_UP        0x0033  // ä¸Šå‡
+#define MOTOR12_DOWN      0x0044  // ä¸‹é™
+#define MOTOR12_STOP      0x0055  // åœæ­¢
 
-// µç»úID·¶Î§ 
-#define ALARM_QUERY_REG     0xA3    // ±¨¾¯×´Ì¬²éÑ¯¼Ä´æÆ÷µØÖ·
-#define ALARM_CLEAR_REG     0xA4    // ±¨¾¯½â³ı¼Ä´æÆ÷µØÖ·
+// ç”µæœºIDèŒƒå›´ 
+#define ALARM_QUERY_REG     0xA3    // æŠ¥è­¦çŠ¶æ€æŸ¥è¯¢å¯„å­˜å™¨åœ°å€
+#define ALARM_CLEAR_REG     0xA4    // æŠ¥è­¦è§£é™¤å¯„å­˜å™¨åœ°å€
 
-// ¼Ä´æÆ÷µØÖ·
-#define REG_CURRENT           0x001A   // ÊµÊ±µçÁ÷£¨µ¥Î»mA£©
-#define REG_ALARM_STATUS      0x00A3   // ±¨¾¯×´Ì¬
-#define REG_CLEAR_ALARM       0x00A4   // Çå³ı±¨¾¯
-#define REG_ENABLE            0x00D4   // Ê¹ÄÜ/ÍÑ»ú¿ØÖÆ
+// å¯„å­˜å™¨åœ°å€
+#define REG_CURRENT           0x001A   // å®æ—¶ç”µæµï¼ˆå•ä½mAï¼‰
+#define REG_ALARM_STATUS      0x00A3   // æŠ¥è­¦çŠ¶æ€
+#define REG_CLEAR_ALARM       0x00A4   // æ¸…é™¤æŠ¥è­¦
+#define REG_ENABLE            0x00D4   // ä½¿èƒ½/è„±æœºæ§åˆ¶
 
-// ¶Â×ªµçÁ÷ãĞÖµ£¨µ¥Î»mA£¬Ğè¸ù¾İµç»úÊµ¼Ê²ÎÊı±ê¶¨£©
-#define STALL_CURRENT_THRESHOLD_MA  2000   // ÀıÈç2A
+// å µè½¬ç”µæµé˜ˆå€¼ï¼ˆå•ä½mAï¼Œéœ€æ ¹æ®ç”µæœºå®é™…å‚æ•°æ ‡å®šï¼‰
+#define STALL_CURRENT_THRESHOLD_MA  2000   // ä¾‹å¦‚2A
 
-// Õı³£¹¤×÷µçÁ÷ÉÏÏŞ£¨²Î¿¼Öµ£¬ÓÃÓÚÆ½»¬ÅĞ¶Ï£¬¿ÉÊ¡ÂÔ£©
+// æ­£å¸¸å·¥ä½œç”µæµä¸Šé™ï¼ˆå‚è€ƒå€¼ï¼Œç”¨äºå¹³æ»‘åˆ¤æ–­ï¼Œå¯çœç•¥ï¼‰
 #define NORMAL_CURRENT_MAX_MA       1500
 #define ALARM_POLL_COUNT_THRESHOLD   200
 
@@ -260,78 +260,78 @@ static const uint8_t motor_slave_addr[] = {
 #define MOTOR_ID_START  0
 #define MOTOR_ID_END    (sizeof(motor_slave_addr)/sizeof(motor_slave_addr[0]) - 1)
 
-// -------------------------- È«¾Ö±äÁ¿ --------------------------
+// -------------------------- å…¨å±€å˜é‡ --------------------------
 
 typedef enum {
-    MASTER_IDLE,        // ¿ÕÏĞ
-    MASTER_SENDING,     // ·¢ËÍÖĞ
-    MASTER_WAIT_RESP,   // µÈ´ıÏìÓ¦
-    MASTER_RESP_OK,     // ÏìÓ¦Õı³£
-    MASTER_RESP_ERR     // ÏìÓ¦´íÎó
+    MASTER_IDLE,        // ç©ºé—²
+    MASTER_SENDING,     // å‘é€ä¸­
+    MASTER_WAIT_RESP,   // ç­‰å¾…å“åº”
+    MASTER_RESP_OK,     // å“åº”æ­£å¸¸
+    MASTER_RESP_ERR     // å“åº”é”™è¯¯
 } ModbusMasterState;
 
 
 
 typedef struct {
-    uint8_t slave_address;      // ´ÓÕ¾µØÖ·
-    uint16_t contrl_reg;       	// ¿ØÖÆ¼Ä´æÆ÷ÆğÊ¼µØÖ·
-    uint16_t len_l;        			 	// ĞĞ³ÌÖµµÍÎ»
-		uint16_t len_h;         		// ĞĞ³ÌÖµ¸ßÎ»
+    uint8_t slave_address;      // ä»ç«™åœ°å€
+    uint16_t contrl_reg;       	// æ§åˆ¶å¯„å­˜å™¨èµ·å§‹åœ°å€
+    uint16_t len_l;        			 	// è¡Œç¨‹å€¼ä½ä½
+		uint16_t len_h;         		// è¡Œç¨‹å€¼é«˜ä½
 } MotorControlParams;
 
-// µç³Ø¸ü»»Á÷³Ì×´Ì¬Ã¶¾Ù
+// ç”µæ± æ›´æ¢æµç¨‹çŠ¶æ€æšä¸¾
 typedef enum {
     SWAP_STATE_IDLE = 0,
-    SWAP_STATE_STEP1,          // ²½Öè1£ºÉèÖÃµç»ú1²ÎÊı
-    SWAP_STATE_WAIT1,          // µÈ´ı1Ãë
-    SWAP_STATE_STEP2,          // ²½Öè2£º×İÏò¹éÖĞ
-    SWAP_STATE_WAIT2,          // £¨ÎŞµÈ´ı£¬Ö±½Óµ½ÏÂÒ»²½£©
-    SWAP_STATE_STEP3,          // ²½Öè3£ººáÏòÒÆ¶¯µ½±ß¶Ë£¨Î´ÊµÏÖ£©
+    SWAP_STATE_STEP1,          // æ­¥éª¤1ï¼šè®¾ç½®ç”µæœº1å‚æ•°
+    SWAP_STATE_WAIT1,          // ç­‰å¾…1ç§’
+    SWAP_STATE_STEP2,          // æ­¥éª¤2ï¼šçºµå‘å½’ä¸­
+    SWAP_STATE_WAIT2,          // ï¼ˆæ— ç­‰å¾…ï¼Œç›´æ¥åˆ°ä¸‹ä¸€æ­¥ï¼‰
+    SWAP_STATE_STEP3,          // æ­¥éª¤3ï¼šæ¨ªå‘ç§»åŠ¨åˆ°è¾¹ç«¯ï¼ˆæœªå®ç°ï¼‰
     SWAP_STATE_WAIT3,
-    SWAP_STATE_STEP4,          // ²½Öè4£ºµç»ú1ÉÏÉı
-    SWAP_STATE_WAIT4,          // µÈ´ı11Ãë
-    SWAP_STATE_STEP5,          // ²½Öè5£ºµç»ú2Ç°½ø
-    SWAP_STATE_WAIT5,          // µÈ´ı7Ãë
-    SWAP_STATE_STEP6,          // ²½Öè6£ºµç»ú3¼Ğ½ô
-    SWAP_STATE_WAIT6,          // µÈ´ı0.5Ãë
-    SWAP_STATE_STEP7,          // ²½Öè7£ºµç»ú2ºóÍË
-    SWAP_STATE_WAIT7,          // µÈ´ı7Ãë
-    SWAP_STATE_STEP8,          // ²½Öè8£ºµç»ú1ÏÂ½µ
-    SWAP_STATE_WAIT8,          // µÈ´ı11Ãë
-    SWAP_STATE_STEP9,          // ²½Öè9£ºµç»ú2Ç°½øÖÁµç³Ø²Ö
-    SWAP_STATE_WAIT9,          // µÈ´ı6Ãë
-    SWAP_STATE_STEP10,         // ²½Öè10£ºµç»ú3ËÉ¿ª
-    SWAP_STATE_WAIT10,         // µÈ´ı0.3Ãë
-    SWAP_STATE_STEP11,         // ²½Öè11£ºµç»ú2½ø0.5ÍòÂö³å
-    SWAP_STATE_WAIT11,         // µÈ´ı0.3Ãë
-    SWAP_STATE_STEP12,         // ²½Öè12£ºµç»ú2ÍË0.5ÍòÂö³å
-    SWAP_STATE_WAIT12,         // µÈ´ı0.3Ãë
-    SWAP_STATE_STEP13,         // ²½Öè13£ºµç»ú3¼Ğ½ô
-    SWAP_STATE_WAIT13,         // µÈ´ı0.5Ãë
-    SWAP_STATE_STEP14,         // ²½Öè14£ºµç»ú2ºóÍËÖÁÔ­µã
-    SWAP_STATE_WAIT14,         // µÈ´ı6Ãë
-    SWAP_STATE_STEP15,         // ²½Öè15£ºµç»ú1ÉÏÉı
-    SWAP_STATE_WAIT15,         // µÈ´ı11Ãë
-    SWAP_STATE_STEP16,         // ²½Öè16£ºµç»ú2Ç°½øÖÁÎŞÈË»ú
-    SWAP_STATE_WAIT16,         // µÈ´ı7Ãë
-    SWAP_STATE_STEP17,         // ²½Öè17£ºµç»ú3ËÉ¿ª
-    SWAP_STATE_WAIT17,         // µÈ´ı0.1Ãë
-    SWAP_STATE_STEP18,         // ²½Öè18£ºµç»ú2½ø1.1ÍòÂö³å
-    SWAP_STATE_WAIT18,         // µÈ´ı0.5Ãë
-    SWAP_STATE_STEP19,         // ²½Öè19£ºµç»ú2ÍË1.1ÍòÂö³å
-    SWAP_STATE_WAIT19,         // µÈ´ı0.2Ãë
-    SWAP_STATE_STEP20,         // ²½Öè20£ºµç»ú2ºóÍËÖÁÔ­µã
-    SWAP_STATE_WAIT20,         // µÈ´ı7Ãë
-    SWAP_STATE_STEP21,         // ²½Öè21£ºµç»ú1ÏÂ½µ
-    SWAP_STATE_WAIT21,         // µÈ´ı11Ãë
-    SWAP_STATE_STEP22,         // ²½Öè22£ººáÏò¹éÖĞ£¨Ô¤Áô£©
-    SWAP_STATE_WAIT22,         // µÈ´ı1Ãë£¨Ñ­»·¼ä¸ô£©
-    SWAP_STATE_FINISH,      	 // Á÷³Ì½áÊø
-    SWAP_STATE_ERROR           // ´íÎó×´Ì¬
+    SWAP_STATE_STEP4,          // æ­¥éª¤4ï¼šç”µæœº1ä¸Šå‡
+    SWAP_STATE_WAIT4,          // ç­‰å¾…11ç§’
+    SWAP_STATE_STEP5,          // æ­¥éª¤5ï¼šç”µæœº2å‰è¿›
+    SWAP_STATE_WAIT5,          // ç­‰å¾…7ç§’
+    SWAP_STATE_STEP6,          // æ­¥éª¤6ï¼šç”µæœº3å¤¹ç´§
+    SWAP_STATE_WAIT6,          // ç­‰å¾…0.5ç§’
+    SWAP_STATE_STEP7,          // æ­¥éª¤7ï¼šç”µæœº2åé€€
+    SWAP_STATE_WAIT7,          // ç­‰å¾…7ç§’
+    SWAP_STATE_STEP8,          // æ­¥éª¤8ï¼šç”µæœº1ä¸‹é™
+    SWAP_STATE_WAIT8,          // ç­‰å¾…11ç§’
+    SWAP_STATE_STEP9,          // æ­¥éª¤9ï¼šç”µæœº2å‰è¿›è‡³ç”µæ± ä»“
+    SWAP_STATE_WAIT9,          // ç­‰å¾…6ç§’
+    SWAP_STATE_STEP10,         // æ­¥éª¤10ï¼šç”µæœº3æ¾å¼€
+    SWAP_STATE_WAIT10,         // ç­‰å¾…0.3ç§’
+    SWAP_STATE_STEP11,         // æ­¥éª¤11ï¼šç”µæœº2è¿›0.5ä¸‡è„‰å†²
+    SWAP_STATE_WAIT11,         // ç­‰å¾…0.3ç§’
+    SWAP_STATE_STEP12,         // æ­¥éª¤12ï¼šç”µæœº2é€€0.5ä¸‡è„‰å†²
+    SWAP_STATE_WAIT12,         // ç­‰å¾…0.3ç§’
+    SWAP_STATE_STEP13,         // æ­¥éª¤13ï¼šç”µæœº3å¤¹ç´§
+    SWAP_STATE_WAIT13,         // ç­‰å¾…0.5ç§’
+    SWAP_STATE_STEP14,         // æ­¥éª¤14ï¼šç”µæœº2åé€€è‡³åŸç‚¹
+    SWAP_STATE_WAIT14,         // ç­‰å¾…6ç§’
+    SWAP_STATE_STEP15,         // æ­¥éª¤15ï¼šç”µæœº1ä¸Šå‡
+    SWAP_STATE_WAIT15,         // ç­‰å¾…11ç§’
+    SWAP_STATE_STEP16,         // æ­¥éª¤16ï¼šç”µæœº2å‰è¿›è‡³æ— äººæœº
+    SWAP_STATE_WAIT16,         // ç­‰å¾…7ç§’
+    SWAP_STATE_STEP17,         // æ­¥éª¤17ï¼šç”µæœº3æ¾å¼€
+    SWAP_STATE_WAIT17,         // ç­‰å¾…0.1ç§’
+    SWAP_STATE_STEP18,         // æ­¥éª¤18ï¼šç”µæœº2è¿›1.1ä¸‡è„‰å†²
+    SWAP_STATE_WAIT18,         // ç­‰å¾…0.5ç§’
+    SWAP_STATE_STEP19,         // æ­¥éª¤19ï¼šç”µæœº2é€€1.1ä¸‡è„‰å†²
+    SWAP_STATE_WAIT19,         // ç­‰å¾…0.2ç§’
+    SWAP_STATE_STEP20,         // æ­¥éª¤20ï¼šç”µæœº2åé€€è‡³åŸç‚¹
+    SWAP_STATE_WAIT20,         // ç­‰å¾…7ç§’
+    SWAP_STATE_STEP21,         // æ­¥éª¤21ï¼šç”µæœº1ä¸‹é™
+    SWAP_STATE_WAIT21,         // ç­‰å¾…11ç§’
+    SWAP_STATE_STEP22,         // æ­¥éª¤22ï¼šæ¨ªå‘å½’ä¸­ï¼ˆé¢„ç•™ï¼‰
+    SWAP_STATE_WAIT22,         // ç­‰å¾…1ç§’ï¼ˆå¾ªç¯é—´éš”ï¼‰
+    SWAP_STATE_FINISH,      	 // æµç¨‹ç»“æŸ
+    SWAP_STATE_ERROR           // é”™è¯¯çŠ¶æ€
 } SwapState;
 
 
-// ¼ÌµçÆ÷×´Ì¬Ã¶¾Ù
+// ç»§ç”µå™¨çŠ¶æ€æšä¸¾
 typedef enum {
     RELAY_STOP = 0,
     RELAY_FORWARD,
@@ -341,34 +341,34 @@ typedef enum {
 
 static SwapState current_state = SWAP_STATE_IDLE;
 static uint32_t wait_until = 0;
-static uint16_t cycle_cnt = 1;      // µ±Ç°Ñ­»·´ÎÊı
-static const uint16_t total_cycles = 100; // ×ÜÑ­»·´ÎÊı
+static uint16_t cycle_cnt = 1;      // å½“å‰å¾ªç¯æ¬¡æ•°
+static const uint16_t total_cycles = 100; // æ€»å¾ªç¯æ¬¡æ•°
 
-//extern u8 RS485_TX_BUFF[500];  // ·¢ËÍ»º³åÇø
-//extern u8 RS485_RX_BUFF[500];  // ½ÓÊÕ»º³åÇø
-// Ö÷Õ¾½ÓÊÕ»º³åÇø
+//extern u8 RS485_TX_BUFF[500];  // å‘é€ç¼“å†²åŒº
+//extern u8 RS485_RX_BUFF[500];  // æ¥æ”¶ç¼“å†²åŒº
+// ä¸»ç«™æ¥æ”¶ç¼“å†²åŒº
 extern volatile uint16_t Master_RX_CNT;
 extern volatile uint8_t Master_FrameFlag;
 extern uint8_t Master_RX_BUFF[2048];
-extern volatile uint32_t Master_LastRxTime;   // ×îºó½ÓÊÕÊ±¼ä
+extern volatile uint32_t Master_LastRxTime;   // æœ€åæ¥æ”¶æ—¶é—´
 
-extern uint16_t RX_LEN;            // ½ÓÊÕÊı¾İ³¤¶È
-extern ModbusMasterState master_state; // Ö÷Õ¾×´Ì¬
-extern uint16_t timeout_cnt;       // ³¬Ê±¼ÆÊıÆ÷
+extern uint16_t RX_LEN;            // æ¥æ”¶æ•°æ®é•¿åº¦
+extern ModbusMasterState master_state; // ä¸»ç«™çŠ¶æ€
+extern uint16_t timeout_cnt;       // è¶…æ—¶è®¡æ•°å™¨
 
-// Íâ²¿º¯ÊıÉùÃ÷£¨Êµ¼ÊµÄ¸´Î»º¯Êı£©
-extern uint8_t Battery_22(void);    // µØÖ·0x02¸´Î»
-extern uint8_t Battery_15(void);    // µØÖ·0x03¸´Î»
-extern uint8_t LeaveCenter1(void);  // µØÖ·0x05~0x0C¸´Î»£¨¼¯Ìå¶¯×÷£©
+// å¤–éƒ¨å‡½æ•°å£°æ˜ï¼ˆå®é™…çš„å¤ä½å‡½æ•°ï¼‰
+extern uint8_t Battery_22(void);    // åœ°å€0x02å¤ä½
+extern uint8_t Battery_15(void);    // åœ°å€0x03å¤ä½
+extern uint8_t LeaveCenter1(void);  // åœ°å€0x05~0x0Cå¤ä½ï¼ˆé›†ä½“åŠ¨ä½œï¼‰
 
-// ========================== ¾²Ì¬±äÁ¿ ==========================
-static uint8_t stall_poll_active = 0;      // ÊÇ·ñÕıÔÚÂÖÑ¯ÖĞ
-static uint8_t stall_motor_index = 0;      // µ±Ç°¼ì²âµÄµç»úË÷Òı£¨0~MOTOR_COUNT-1£©
-static uint8_t stall_poll_counter = 0;     // ¼ÆÊıÆ÷£¬½öµ±·ÇÂÖÑ¯Ê±ÀÛ¼Ó
-static uint8_t stall_triggered = 0;        // ¶Â×ª´¥·¢±êÖ¾£¨·ÀÖ¹ÖØ¸´µ÷ÓÃ¸´Î»£©
-// ÂÖÑ¯Æô¶¯¼ÆÊıãĞÖµ£¨Ö÷Ñ­»·Ã¿µ÷ÓÃÒ»´Î¸ÃÈÎÎñ£¬¼ÆÊıÆ÷+1£¬´ïµ½ãĞÖµÆô¶¯Ò»ÂÖ¼ì²â£©
-#define STALL_POLL_THRESHOLD  200   // ÈôÖ÷Ñ­»· delay_ms(1000)£¬ÔòÔ¼ 3 ÃëÒ»ÂÖ
-// µç»ú´ÓÕ¾µØÖ·ÁĞ±í£¨Óë±¨¾¯ÂÖÑ¯¹²ÓÃ£¬µ«´Ë´¦µ¥¶ÀÁĞ³öÒÔ±£³Ö¶ÀÁ¢ĞÔ£©
+// ========================== é™æ€å˜é‡ ==========================
+static uint8_t stall_poll_active = 0;      // æ˜¯å¦æ­£åœ¨è½®è¯¢ä¸­
+static uint8_t stall_motor_index = 0;      // å½“å‰æ£€æµ‹çš„ç”µæœºç´¢å¼•ï¼ˆ0~MOTOR_COUNT-1ï¼‰
+static uint8_t stall_poll_counter = 0;     // è®¡æ•°å™¨ï¼Œä»…å½“éè½®è¯¢æ—¶ç´¯åŠ 
+static uint8_t stall_triggered = 0;        // å µè½¬è§¦å‘æ ‡å¿—ï¼ˆé˜²æ­¢é‡å¤è°ƒç”¨å¤ä½ï¼‰
+// è½®è¯¢å¯åŠ¨è®¡æ•°é˜ˆå€¼ï¼ˆä¸»å¾ªç¯æ¯è°ƒç”¨ä¸€æ¬¡è¯¥ä»»åŠ¡ï¼Œè®¡æ•°å™¨+1ï¼Œè¾¾åˆ°é˜ˆå€¼å¯åŠ¨ä¸€è½®æ£€æµ‹ï¼‰
+#define STALL_POLL_THRESHOLD  200   // è‹¥ä¸»å¾ªç¯ delay_ms(1000)ï¼Œåˆ™çº¦ 3 ç§’ä¸€è½®
+// ç”µæœºä»ç«™åœ°å€åˆ—è¡¨ï¼ˆä¸æŠ¥è­¦è½®è¯¢å…±ç”¨ï¼Œä½†æ­¤å¤„å•ç‹¬åˆ—å‡ºä»¥ä¿æŒç‹¬ç«‹æ€§ï¼‰
 #define MOTORCOUNT  10
 static const uint8_t stall_motor_addr_list[MOTORCOUNT] = {
     0x02, 0x03, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C
@@ -381,24 +381,24 @@ uint8_t Modbus_03_ReadHoldReg(uint8_t slave_addr, uint16_t start_reg, uint16_t r
 //uint8_t Modbus_04_ReadInReg(uint16_t reg_addr, uint16_t reg_num, uint16_t *data_buf);
 uint8_t Modbus_06_WriteSingleReg(uint8_t slave_addr, uint16_t reg_addr, uint16_t reg_data);
 uint8_t Modbus_10_WriteMultiReg(uint8_t slave_addr, uint16_t start_reg, uint16_t reg_num, uint16_t *write_buff);
-//void RS485_SendData(uint8_t *pData, uint16_t len);  // RS485Êı¾İ·¢ËÍ
+//void RS485_SendData(uint8_t *pData, uint16_t len);  // RS485æ•°æ®å‘é€
 //void RS485_SendData(unsigned char *buff, unsigned char len);
-void RS485_MasterSendData(uint8_t *buff, uint16_t len);//Ö÷Õ¾Êı¾İ·¢ËÍ
-void RS485_SlaveSendData(uint8_t *buff, uint16_t len);//´ÓÕ¾Êı¾İ·¢ËÍ
-uint16_t Modbus_CRC16(uint8_t *pData, uint16_t len); // CRC16Ğ£Ñé
+void RS485_MasterSendData(uint8_t *buff, uint16_t len);//ä¸»ç«™æ•°æ®å‘é€
+void RS485_SlaveSendData(uint8_t *buff, uint16_t len);//ä»ç«™æ•°æ®å‘é€
+uint16_t Modbus_CRC16(uint8_t *pData, uint16_t len); // CRC16æ ¡éªŒ
 
-// Í¨ĞÅ³¬Ê±¼ì²â£¨ĞèÔÚ¶¨Ê±Æ÷ÖĞ¶ÏÖĞµ÷ÓÃ£¬1ms´¥·¢Ò»´Î£©
+// é€šä¿¡è¶…æ—¶æ£€æµ‹ï¼ˆéœ€åœ¨å®šæ—¶å™¨ä¸­æ–­ä¸­è°ƒç”¨ï¼Œ1msè§¦å‘ä¸€æ¬¡ï¼‰
 void Modbus_Timeout_Check(void);
 void SysTick_Init(void);
 void Timer3Init(void);
 void Timer4Init(void);
 
-// ²½½øµç»ú¿ØÖÆ·â×°
-uint8_t Motor_Single_Control(uint8_t slave_addr, uint8_t motor_num, uint16_t motor_cmd); // µ¥µç»ú¿ØÖÆ£¨06¹¦ÄÜÂë£©
-uint8_t Motor_Control(uint8_t motor_id, uint8_t reg_num, uint16_t motor_cmd);// µ¥µç»ú¿ØÖÆ£¨06¹¦ÄÜÂë£©
-uint8_t Motor_Batch_Control(uint8_t slave_addr, uint16_t start_reg, uint16_t reg_num, uint16_t *motor_cmds); // ÅúÁ¿µç»ú¿ØÖÆ£¨10¹¦ÄÜÂë£©
-uint8_t Motor_Read_Status(uint8_t motor_num, uint16_t *motor_status); // ¶ÁÈ¡µ¥µç»ú×´Ì¬£¨03¹¦ÄÜÂë£©
-uint8_t Motor_Batch_Read_Status(uint16_t start_reg, uint16_t motor_num, uint16_t *status_buff); // ÅúÁ¿¶ÁÈ¡×´Ì¬£¨03¹¦ÄÜÂë£©
+// æ­¥è¿›ç”µæœºæ§åˆ¶å°è£…
+uint8_t Motor_Single_Control(uint8_t slave_addr, uint8_t motor_num, uint16_t motor_cmd); // å•ç”µæœºæ§åˆ¶ï¼ˆ06åŠŸèƒ½ç ï¼‰
+uint8_t Motor_Control(uint8_t motor_id, uint8_t reg_num, uint16_t motor_cmd);// å•ç”µæœºæ§åˆ¶ï¼ˆ06åŠŸèƒ½ç ï¼‰
+uint8_t Motor_Batch_Control(uint8_t slave_addr, uint16_t start_reg, uint16_t reg_num, uint16_t *motor_cmds); // æ‰¹é‡ç”µæœºæ§åˆ¶ï¼ˆ10åŠŸèƒ½ç ï¼‰
+uint8_t Motor_Read_Status(uint8_t motor_num, uint16_t *motor_status); // è¯»å–å•ç”µæœºçŠ¶æ€ï¼ˆ03åŠŸèƒ½ç ï¼‰
+uint8_t Motor_Batch_Read_Status(uint16_t start_reg, uint16_t motor_num, uint16_t *status_buff); // æ‰¹é‡è¯»å–çŠ¶æ€ï¼ˆ03åŠŸèƒ½ç ï¼‰
 
 
 void Quick_Motors_Control(MotorControlParams *motors, uint8_t count);
@@ -412,10 +412,10 @@ uint8_t Control_Motors_Complete(MotorControlParams *motors, uint8_t count, uint8
 void battery_swap(void);
 void BatterySwap_Process(void);
 void Sync_Motors_Control(MotorControlParams *motors, uint8_t count);
-void PollAndClearMotorAlarms_NonBlocking(void);//±¨¾¯ÂÖÑ¯
+void PollAndClearMotorAlarms_NonBlocking(void);//æŠ¥è­¦è½®è¯¢
 uint8_t Motor_Reset(uint8_t slave_addr, uint16_t reg_addr, uint16_t reset_value);
 
-//¼ÌµçÆ÷Ïà¹Øº¯Êı
+//ç»§ç”µå™¨ç›¸å…³å‡½æ•°
 void Relay_Init(void);
 void Relay_Control(RelayState state);
 void Relay_Forward(void);
@@ -427,7 +427,7 @@ uint8_t Motor_CheckAndRecoverStall(uint8_t slave_addr, uint16_t current_threshol
 void MotorStallMonitorTask(void);
 void AlarmPoll_Init(void);
 
-uint8_t ReadMotorPosition(uint8_t slave_addr, int32_t *pos); //¶ÁÈ¡µç»úÊµÊ±Î»ÖÃ
-void StopMotors(uint8_t *addrs, uint8_t count); //Í£Ö¹¶à¸öµç»ú
-uint8_t WaitWithPositionCheck(uint8_t *addrs, uint8_t count, uint32_t timeout_ms, uint32_t check_interval_ms, uint8_t stall_threshold, int32_t *target_pos); //´øÎ»ÖÃ¼à²âµÄµÈ´ıº¯Êı
+uint8_t ReadMotorPosition(uint8_t slave_addr, int32_t *pos); //è¯»å–ç”µæœºå®æ—¶ä½ç½®
+void StopMotors(uint8_t *addrs, uint8_t count); //åœæ­¢å¤šä¸ªç”µæœº
+uint8_t WaitWithPositionCheck(uint8_t *addrs, uint8_t count, uint32_t timeout_ms, uint32_t check_interval_ms, uint8_t stall_threshold, int32_t *target_pos); //å¸¦ä½ç½®ç›‘æµ‹çš„ç­‰å¾…å‡½æ•°
 #endif

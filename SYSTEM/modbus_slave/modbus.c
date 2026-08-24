@@ -1,24 +1,24 @@
 #include "project.h"
-#include <stdint.h>   // Ìá¹©uint8_t/uint16_tµÈ¹Ì¶¨¿í¶ÈÕûÊıÀàĞÍ
-#include <string.h>   // Ìá¹©memsetº¯ÊıÉùÃ÷
+#include <stdint.h>   // æä¾›uint8_t/uint16_tç­‰å›ºå®šå®½åº¦æ•´æ•°ç±»å‹
+#include <string.h>   // æä¾›memsetå‡½æ•°å£°æ˜
 
 
-// È«¾Ö±äÁ¿¶¨Òå
-u32 RS485_Baudrate = 9600; //Í¨Ñ¶²¨ÌØÂÊ
-u8 RS485_Parity = 0; //0ÎŞĞ£Ñé£»1ÆæĞ£Ñé£»2Å¼Ğ£Ñé
-u8 SLAVE_ADDR = 0x22;//´Ó»úµØÖ·
-u16 RS485_Frame_Distance = 10;//Êı¾İÖ¡×îĞ¡¼ä¸ô£¨ms),³¬¹ı´ËÊ±¼äÔòÈÏÎªÊÇÏÂÒ»Ö¡
+// å…¨å±€å˜é‡å®šä¹‰
+u32 RS485_Baudrate = 9600; //é€šè®¯æ³¢ç‰¹ç‡
+u8 RS485_Parity = 0; //0æ— æ ¡éªŒï¼›1å¥‡æ ¡éªŒï¼›2å¶æ ¡éªŒ
+u8 SLAVE_ADDR = 0x22;//ä»æœºåœ°å€
+u16 RS485_Frame_Distance = 10;//æ•°æ®å¸§æœ€å°é—´éš”ï¼ˆms),è¶…è¿‡æ­¤æ—¶é—´åˆ™è®¤ä¸ºæ˜¯ä¸‹ä¸€å¸§
 u8 ParaSaveFlag, IDSaveFlag;
 
 //u8 StaID[30];
 //u16 BackSend[20];
-u8 RS485_RX_BUFF[2048];//½ÓÊÕ»º³åÇø2048×Ö½Ú
-volatile  u16 RS485_RX_CNT = 0; //½ÓÊÕ¼ÆÊıÆ÷
-u8 RS485_TX_BUFF[2048];//·¢ËÍ»º³åÇø
-u16 RS485_TX_CNT = 0; //·¢ËÍ¼ÆÊıÆ÷
+u8 RS485_RX_BUFF[2048];//æ¥æ”¶ç¼“å†²åŒº2048å­—èŠ‚
+volatile  u16 RS485_RX_CNT = 0; //æ¥æ”¶è®¡æ•°å™¨
+u8 RS485_TX_BUFF[2048];//å‘é€ç¼“å†²åŒº
+u16 RS485_TX_CNT = 0; //å‘é€è®¡æ•°å™¨
 uint16_t RX_LEN = 0;
 ModbusMasterState master_state = MASTER_IDLE;
-uint16_t timeout_cnt = 0;          // ³¬Ê±¼ÆÊıÆ÷
+uint16_t timeout_cnt = 0;          // è¶…æ—¶è®¡æ•°å™¨
 volatile  u16 RS485_FrameFlag = 0;
 volatile uint16_t Master_RX_CNT = 0;
 volatile uint16_t Master_RX_LEN = 0;
@@ -26,34 +26,34 @@ volatile uint8_t Master_FrameFlag = 0;
 uint8_t Master_RX_BUFF[2048];
 volatile uint32_t Master_LastRxTime = 0;
 
-// ÓÃÓÚÍ¬²½µÄ±êÖ¾
+// ç”¨äºåŒæ­¥çš„æ ‡å¿—
 static volatile uint8_t g_06_wait_done = 0;
 static volatile uint8_t g_06_success = 0;
-// ±¨¾¯ÂÖÑ¯×´Ì¬»ú±äÁ¿
+// æŠ¥è­¦è½®è¯¢çŠ¶æ€æœºå˜é‡
 uint32_t last_alarm_poll_time = 0;
 uint8_t alarm_poll_active = 0;
 uint8_t alarm_motor_index = 0;
-volatile uint8_t alarm_substep = 0;  // 0:¶Á±¨¾¯, 1:Çå³ı±¨¾¯
+volatile uint8_t alarm_substep = 0;  // 0:è¯»æŠ¥è­¦, 1:æ¸…é™¤æŠ¥è­¦
 
-// ¶¨Ê±Æ÷»Øµ÷º¯Êı£¨³¬Ê±Ê±µ÷ÓÃ£©
+// å®šæ—¶å™¨å›è°ƒå‡½æ•°ï¼ˆè¶…æ—¶æ—¶è°ƒç”¨ï¼‰
 static void Modbus06_TimeoutCallback(void)
 {
     g_06_wait_done = 1;
-    g_06_success = 0;   // ³¬Ê±Ê§°Ü
+    g_06_success = 0;   // è¶…æ—¶å¤±è´¥
 }
 
 
-/* Íâ²¿Ó²¼ş¶¨Ê±Æ÷¿ØÖÆº¯Êı£¨ĞèÒªÔÚÄúµÄ´úÂëÖĞÊµÏÖ£© */
-extern void StartFrameTimeout(void);    // Æô¶¯Ö¡³¬Ê±¶¨Ê±Æ÷£¨µ¥´Î£¬3.5×Ö·ûÊ±¼ä£©
-extern void StopFrameTimeout(void);     // Í£Ö¹Ö¡³¬Ê±¶¨Ê±Æ÷
+/* å¤–éƒ¨ç¡¬ä»¶å®šæ—¶å™¨æ§åˆ¶å‡½æ•°ï¼ˆéœ€è¦åœ¨æ‚¨çš„ä»£ç ä¸­å®ç°ï¼‰ */
+extern void StartFrameTimeout(void);    // å¯åŠ¨å¸§è¶…æ—¶å®šæ—¶å™¨ï¼ˆå•æ¬¡ï¼Œ3.5å­—ç¬¦æ—¶é—´ï¼‰
+extern void StopFrameTimeout(void);     // åœæ­¢å¸§è¶…æ—¶å®šæ—¶å™¨
 
-/* ·¢ËÍÊı¾İ£¨Í¨¹ı RS485 ´®¿Ú£© */
+/* å‘é€æ•°æ®ï¼ˆé€šè¿‡ RS485 ä¸²å£ï¼‰ */
 extern void RS485_SlaveSendData(uint8_t *buf, uint16_t len);
 
-/* CRC16 ¼ÆËã£¨Modbus£© */
+/* CRC16 è®¡ç®—ï¼ˆModbusï¼‰ */
 extern uint16_t Modbus_CRC16(uint8_t *buf, uint16_t len);
 
-/* ×Ö½ÚĞò×ª»» */
+/* å­—èŠ‚åºè½¬æ¢ */
 static uint16_t BEBufToUint16(uint8_t *buf)
 {
     return (buf[0] << 8) | buf[1];
@@ -64,7 +64,7 @@ extern u8 uFprint;
 void CnfgrTimer3(void);
 
 
-//CRCĞ£Ñé ×Ô¼ººóÃæÌí¼ÓµÄ
+//CRCæ ¡éªŒ è‡ªå·±åé¢æ·»åŠ çš„
 //void Modbus_10_WriteMultiReg(void);
 //void Modbus_03_Solve(void);
 const u8 auchCRCHi[] =
@@ -127,48 +127,48 @@ void RS485_Init(unsigned long bound)
     NVIC_InitTypeDef NVIC_InitStructure;
 //		TIM_TimeBaseInitTypeDef TIM_TimeBaseStruct;
 
-	    // 1. Ê¹ÄÜÊ±ÖÓ
-		RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA,ENABLE); //Ê¹ÄÜGPIOAÊ±ÖÓ
-		RCC_APB2PeriphClockCmd(RCC_APB2Periph_USART1,ENABLE);//Ê¹ÄÜUSART1Ê±ÖÓ
-		RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART2,ENABLE);//Ê¹ÄÜUSART2Ê±ÖÓ
+	    // 1. ä½¿èƒ½æ—¶é’Ÿ
+		RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA,ENABLE); //ä½¿èƒ½GPIOAæ—¶é’Ÿ
+		RCC_APB2PeriphClockCmd(RCC_APB2Periph_USART1,ENABLE);//ä½¿èƒ½USART1æ—¶é’Ÿ
+		RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART2,ENABLE);//ä½¿èƒ½USART2æ—¶é’Ÿ
 
-		//´®¿Ú1¶ÔÓ¦Òı½Å¸´ÓÃÓ³Éä
-		GPIO_PinAFConfig(GPIOA,GPIO_PinSource9,GPIO_AF_USART1); //GPIOA9¸´ÓÃÎªUSART1
-		GPIO_PinAFConfig(GPIOA,GPIO_PinSource10,GPIO_AF_USART1); //GPIOA10¸´ÓÃÎªUSART1
-			//´®¿Ú2¶ÔÓ¦Òı½Å¸´ÓÃÓ³Éä
-		GPIO_PinAFConfig(GPIOA,GPIO_PinSource2,GPIO_AF_USART2); //GPIOA2¸´ÓÃÎªUSART2
-		GPIO_PinAFConfig(GPIOA,GPIO_PinSource3,GPIO_AF_USART2); //GPIOA3¸´ÓÃÎªUSART2
+		//ä¸²å£1å¯¹åº”å¼•è„šå¤ç”¨æ˜ å°„
+		GPIO_PinAFConfig(GPIOA,GPIO_PinSource9,GPIO_AF_USART1); //GPIOA9å¤ç”¨ä¸ºUSART1
+		GPIO_PinAFConfig(GPIOA,GPIO_PinSource10,GPIO_AF_USART1); //GPIOA10å¤ç”¨ä¸ºUSART1
+			//ä¸²å£2å¯¹åº”å¼•è„šå¤ç”¨æ˜ å°„
+		GPIO_PinAFConfig(GPIOA,GPIO_PinSource2,GPIO_AF_USART2); //GPIOA2å¤ç”¨ä¸ºUSART2
+		GPIO_PinAFConfig(GPIOA,GPIO_PinSource3,GPIO_AF_USART2); //GPIOA3å¤ç”¨ä¸ºUSART2
 		
-		//USART1¶Ë¿ÚÅäÖÃ
+		//USART1ç«¯å£é…ç½®
 		GPIO_InitStructure.GPIO_Pin = GPIO_Pin_9 | GPIO_Pin_10; 
-		GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;//¸´ÓÃ¹¦ÄÜ
-		GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;	//ËÙ¶È50MHz
-		GPIO_InitStructure.GPIO_OType = GPIO_OType_PP; //ÍÆÍì¸´ÓÃÊä³ö
-		GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP; //ÉÏÀ­
-		GPIO_Init(GPIOA,&GPIO_InitStructure); //³õÊ¼»¯PA9£¬PA10
+		GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;//å¤ç”¨åŠŸèƒ½
+		GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;	//é€Ÿåº¦50MHz
+		GPIO_InitStructure.GPIO_OType = GPIO_OType_PP; //æ¨æŒ½å¤ç”¨è¾“å‡º
+		GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP; //ä¸Šæ‹‰
+		GPIO_Init(GPIOA,&GPIO_InitStructure); //åˆå§‹åŒ–PA9ï¼ŒPA10
 		
 		
-		//USART2¶Ë¿ÚÅäÖÃ
-		GPIO_InitStructure.GPIO_Pin = GPIO_Pin_2 | GPIO_Pin_3;//GPIOA2ÓëGPIOA3
+		//USART2ç«¯å£é…ç½®
+		GPIO_InitStructure.GPIO_Pin = GPIO_Pin_2 | GPIO_Pin_3;//GPIOA2ä¸GPIOA3
     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
     GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
     GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
     GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;
     GPIO_Init(GPIOA, &GPIO_InitStructure);
 	
-		//USART1 ³õÊ¼»¯ÉèÖÃ
-		USART_InitStructure.USART_BaudRate = bound;//²¨ÌØÂÊÉèÖÃ
-		USART_InitStructure.USART_WordLength = USART_WordLength_8b;//×Ö³¤Îª8Î»Êı¾İ¸ñÊ½
-		USART_InitStructure.USART_StopBits = USART_StopBits_1;//Ò»¸öÍ£Ö¹Î»
-		USART_InitStructure.USART_Parity = USART_Parity_No;//ÎŞÆæÅ¼Ğ£ÑéÎ»
-		USART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;//ÎŞÓ²¼şÊı¾İÁ÷¿ØÖÆ
-		USART_InitStructure.USART_Mode = USART_Mode_Rx | USART_Mode_Tx;	//ÊÕ·¢Ä£Ê½
-		USART_Init(USART1, &USART_InitStructure); //³õÊ¼»¯´®¿Ú1
-		USART_Cmd(USART1, ENABLE);  //Ê¹ÄÜ´®¿Ú1
+		//USART1 åˆå§‹åŒ–è®¾ç½®
+		USART_InitStructure.USART_BaudRate = bound;//æ³¢ç‰¹ç‡è®¾ç½®
+		USART_InitStructure.USART_WordLength = USART_WordLength_8b;//å­—é•¿ä¸º8ä½æ•°æ®æ ¼å¼
+		USART_InitStructure.USART_StopBits = USART_StopBits_1;//ä¸€ä¸ªåœæ­¢ä½
+		USART_InitStructure.USART_Parity = USART_Parity_No;//æ— å¥‡å¶æ ¡éªŒä½
+		USART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;//æ— ç¡¬ä»¶æ•°æ®æµæ§åˆ¶
+		USART_InitStructure.USART_Mode = USART_Mode_Rx | USART_Mode_Tx;	//æ”¶å‘æ¨¡å¼
+		USART_Init(USART1, &USART_InitStructure); //åˆå§‹åŒ–ä¸²å£1
+		USART_Cmd(USART1, ENABLE);  //ä½¿èƒ½ä¸²å£1
 		USART_ClearFlag(USART1, USART_FLAG_TC);
-		USART_ITConfig(USART1, USART_IT_RXNE, ENABLE);//¿ªÆôÏà¹ØÖĞ¶Ï
+		USART_ITConfig(USART1, USART_IT_RXNE, ENABLE);//å¼€å¯ç›¸å…³ä¸­æ–­
 		
-    // USART2 ³õÊ¼»¯ÉèÖÃ
+    // USART2 åˆå§‹åŒ–è®¾ç½®
     USART_InitStructure.USART_BaudRate = bound;
     USART_InitStructure.USART_WordLength = USART_WordLength_8b;
     USART_InitStructure.USART_StopBits = USART_StopBits_1;
@@ -176,26 +176,26 @@ void RS485_Init(unsigned long bound)
     USART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
     USART_InitStructure.USART_Mode = USART_Mode_Rx | USART_Mode_Tx;
     USART_Init(USART2, &USART_InitStructure);
-		// Ê¹ÄÜ USART2 ²¢¿ªÆô½ÓÊÕÖĞ¶Ï
+		// ä½¿èƒ½ USART2 å¹¶å¼€å¯æ¥æ”¶ä¸­æ–­
     USART_Cmd(USART2, ENABLE);
     USART_ClearFlag(USART2, USART_FLAG_TC);
     USART_ITConfig(USART2, USART_IT_RXNE, ENABLE);
 	
-		//Usart1 NVIC ÅäÖÃ
-		NVIC_InitStructure.NVIC_IRQChannel = USART1_IRQn;//´®¿Ú1ÖĞ¶ÏÍ¨µÀ
-		NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority=0;//ÇÀÕ¼ÓÅÏÈ¼¶1
-		NVIC_InitStructure.NVIC_IRQChannelSubPriority =0;		//×ÓÓÅÏÈ¼¶1
-		NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;			//IRQÍ¨µÀÊ¹ÄÜ
-		NVIC_Init(&NVIC_InitStructure);	//¸ù¾İÖ¸¶¨µÄ²ÎÊı³õÊ¼»¯VIC¼Ä´æÆ÷
+		//Usart1 NVIC é…ç½®
+		NVIC_InitStructure.NVIC_IRQChannel = USART1_IRQn;//ä¸²å£1ä¸­æ–­é€šé“
+		NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority=0;//æŠ¢å ä¼˜å…ˆçº§1
+		NVIC_InitStructure.NVIC_IRQChannelSubPriority =0;		//å­ä¼˜å…ˆçº§1
+		NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;			//IRQé€šé“ä½¿èƒ½
+		NVIC_Init(&NVIC_InitStructure);	//æ ¹æ®æŒ‡å®šçš„å‚æ•°åˆå§‹åŒ–VICå¯„å­˜å™¨
 		
-		// USART2 ÖĞ¶ÏÓÅÏÈ¼¶ÅäÖÃ£¨´ÓÕ¾ÖĞ¶Ï£©
+		// USART2 ä¸­æ–­ä¼˜å…ˆçº§é…ç½®ï¼ˆä»ç«™ä¸­æ–­ï¼‰
     NVIC_InitStructure.NVIC_IRQChannel = USART2_IRQn;
     NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 1;
-    NVIC_InitStructure.NVIC_IRQChannelSubPriority = 1;   // ´ÓÕ¾ÓÅÏÈ¼¶¿ÉÂÔµÍÓÚÖ÷Õ¾
+    NVIC_InitStructure.NVIC_IRQChannelSubPriority = 1;   // ä»ç«™ä¼˜å…ˆçº§å¯ç•¥ä½äºä¸»ç«™
     NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
     NVIC_Init(&NVIC_InitStructure);
 		
-		// Ö÷Õ¾·½ÏòÒı½Å£¨PC0£©
+		// ä¸»ç«™æ–¹å‘å¼•è„šï¼ˆPC0ï¼‰
 		RCC_AHB1PeriphClockCmd( RCC_AHB1Periph_GPIOC, ENABLE);
 		GPIO_InitStructure.GPIO_Pin = USART_RE_MASTER_PIN;
 		GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT; 
@@ -205,41 +205,41 @@ void RS485_Init(unsigned long bound)
 		GPIO_Init(USART_MASTER_RE, &GPIO_InitStructure);
 		GPIO_ResetBits(USART_MASTER_RE, USART_RE_MASTER_PIN);
 		
-	  // ´ÓÕ¾·½ÏòÒı½Å£¨PC1£©
+	  // ä»ç«™æ–¹å‘å¼•è„šï¼ˆPC1ï¼‰
     GPIO_InitStructure.GPIO_Pin = USART_RE_SLAVE_PIN;
     GPIO_Init(USART_SLAVE_RE, &GPIO_InitStructure);
-    GPIO_ResetBits(USART_SLAVE_RE, USART_RE_SLAVE_PIN);   // ³õÊ¼Îª½ÓÊÕÄ£Ê½
+    GPIO_ResetBits(USART_SLAVE_RE, USART_RE_SLAVE_PIN);   // åˆå§‹ä¸ºæ¥æ”¶æ¨¡å¼
 }
 
-//¼ÌµçÆ÷IO¿Ú³õÊ¼»¯
+//ç»§ç”µå™¨IOå£åˆå§‹åŒ–
 void Relay_Init(void)
 {
     GPIO_InitTypeDef GPIO_InitStructure;
 
-    // 1. Ê¹ÄÜGPIOEÊ±ÖÓ
+    // 1. ä½¿èƒ½GPIOEæ—¶é’Ÿ
     RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOE, ENABLE);
 
-    // 2. ÅäÖÃPE2, PE3ÎªÍÆÍìÊä³ö
+    // 2. é…ç½®PE2, PE3ä¸ºæ¨æŒ½è¾“å‡º
     GPIO_InitStructure.GPIO_Pin   = RELAY_ALL_PINS;
-    GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_OUT;      // Êä³öÄ£Ê½
-    GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;      // ÍÆÍìÊä³ö
-    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;   // ¼ÌµçÆ÷ÇĞ»»ËÙ¶ÈÒªÇó²»¸ß£¬50MHz×ã¹»
-    GPIO_InitStructure.GPIO_PuPd  = GPIO_PuPd_NOPULL;   // ÎŞÉÏÏÂÀ­£¨»ò¸ù¾İÓ²¼şÉè¼ÆÑ¡ÔñÏÂÀ­£©
+    GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_OUT;      // è¾“å‡ºæ¨¡å¼
+    GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;      // æ¨æŒ½è¾“å‡º
+    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;   // ç»§ç”µå™¨åˆ‡æ¢é€Ÿåº¦è¦æ±‚ä¸é«˜ï¼Œ50MHzè¶³å¤Ÿ
+    GPIO_InitStructure.GPIO_PuPd  = GPIO_PuPd_NOPULL;   // æ— ä¸Šä¸‹æ‹‰ï¼ˆæˆ–æ ¹æ®ç¡¬ä»¶è®¾è®¡é€‰æ‹©ä¸‹æ‹‰ï¼‰
     GPIO_Init(RELAY_GPIO_PORT, &GPIO_InitStructure);
 
-    // 3. ³õÊ¼×´Ì¬£ºÁ½¸ö¼ÌµçÆ÷¾ù¶Ï¿ª£¨Êä³öµÍµçÆ½£¬¼ÙÉè¸ßµçÆ½ÎüºÏ£©
-    //    Èç¹ûÄãµÄ¼ÌµçÆ÷Ä£¿éÊÇµÍµçÆ½´¥·¢£¬ÕâÀï¸ÄÎª GPIO_SetBits
+    // 3. åˆå§‹çŠ¶æ€ï¼šä¸¤ä¸ªç»§ç”µå™¨å‡æ–­å¼€ï¼ˆè¾“å‡ºä½ç”µå¹³ï¼Œå‡è®¾é«˜ç”µå¹³å¸åˆï¼‰
+    //    å¦‚æœä½ çš„ç»§ç”µå™¨æ¨¡å—æ˜¯ä½ç”µå¹³è§¦å‘ï¼Œè¿™é‡Œæ”¹ä¸º GPIO_SetBits
     GPIO_ResetBits(RELAY_GPIO_PORT, RELAY_ALL_PINS);
 }
 
 
-//¼ÌµçÆ÷¿ØÖÆº¯Êı
+//ç»§ç”µå™¨æ§åˆ¶å‡½æ•°
 void Relay_Control(RelayState state)
 {
-    // ÏÈÈ«²¿¶Ï¿ª£¬ĞÎ³ÉÓ²¼ş»¥Ëø
+    // å…ˆå…¨éƒ¨æ–­å¼€ï¼Œå½¢æˆç¡¬ä»¶äº’é”
     GPIO_ResetBits(RELAY_GPIO_PORT, RELAY_ALL_PINS);
 
-    // ¸ù¾İÖ¸ÁîÎüºÏ¶ÔÓ¦¼ÌµçÆ÷
+    // æ ¹æ®æŒ‡ä»¤å¸åˆå¯¹åº”ç»§ç”µå™¨
     switch(state)
     {
         case RELAY_FORWARD:
@@ -252,12 +252,12 @@ void Relay_Control(RelayState state)
 
         case RELAY_STOP:
         default:
-            // ±£³ÖÈ«²¿¶Ï¿ª
+            // ä¿æŒå…¨éƒ¨æ–­å¼€
             break;
     }
 }
 
-// ÒÔÏÂÎª¼ò»¯µ÷ÓÃ½Ó¿Ú
+// ä»¥ä¸‹ä¸ºç®€åŒ–è°ƒç”¨æ¥å£
 void Relay_Forward(void)  { Relay_Control(RELAY_FORWARD); }
 void Relay_Backward(void) { Relay_Control(RELAY_BACKWARD); }
 void Relay_Stop(void)     { Relay_Control(RELAY_STOP); }
@@ -270,99 +270,99 @@ void RELAY(void)
 		 Relay_Stop();
 }
 
-//Ê¹ÄÜ´®¿Ú
-//¶¨Ê±Æ÷7³õÊ¼»¯
+//ä½¿èƒ½ä¸²å£
+//å®šæ—¶å™¨7åˆå§‹åŒ–
 void CnfgrTimer3(void)
 {
     TIM_TimeBaseInitTypeDef  TIM_TimeBaseStructure;
     NVIC_InitTypeDef NVIC_InitStructure;
 
-    RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM3, ENABLE); //TIM7Ê±ÖÓÊ¹ÄÜ
+    RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM3, ENABLE); //TIM7æ—¶é’Ÿä½¿èƒ½
 
-    //TIM7³õÊ¼»¯ÉèÖÃ
-    TIM_TimeBaseStructure.TIM_Period = RS485_Frame_Distance*999; //ÉèÖÃÔÚÏÂÒ»¸ö¸üĞÂÊÂ¼ş×°Èë»î¶¯µÄ×Ô¶¯ÖØ×°ÔØ¼Ä´æÆ÷ÖÜÆÚµÄÖµ
-    TIM_TimeBaseStructure.TIM_Prescaler = 83; //ÉèÖÃÓÃÀ´×÷ÎªTIMxÊ±ÖÓÆµÂÊ³ıÊıµÄÔ¤·ÖÆµÖµ ÉèÖÃ¼ÆÊıÆµÂÊÎª10kHz
-    TIM_TimeBaseStructure.TIM_ClockDivision = TIM_CKD_DIV1; //ÉèÖÃÊ±ÖÓ·Ö¸î:TDTS = Tck_tim
-    TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;  //TIMÏòÉÏ¼ÆÊıÄ£Ê½
-    TIM_TimeBaseInit(TIM3, &TIM_TimeBaseStructure); //¸ù¾İTIM_TimeBaseInitStructÖĞÖ¸¶¨µÄ²ÎÊı³õÊ¼»¯TIMxµÄÊ±¼ä»ùÊıµ¥Î»
-    TIM_ITConfig(TIM3, TIM_IT_Update, ENABLE); //TIM7 ÔÊĞí¸üĞÂÖĞ¶Ï
+    //TIM7åˆå§‹åŒ–è®¾ç½®
+    TIM_TimeBaseStructure.TIM_Period = RS485_Frame_Distance*999; //è®¾ç½®åœ¨ä¸‹ä¸€ä¸ªæ›´æ–°äº‹ä»¶è£…å…¥æ´»åŠ¨çš„è‡ªåŠ¨é‡è£…è½½å¯„å­˜å™¨å‘¨æœŸçš„å€¼
+    TIM_TimeBaseStructure.TIM_Prescaler = 83; //è®¾ç½®ç”¨æ¥ä½œä¸ºTIMxæ—¶é’Ÿé¢‘ç‡é™¤æ•°çš„é¢„åˆ†é¢‘å€¼ è®¾ç½®è®¡æ•°é¢‘ç‡ä¸º10kHz
+    TIM_TimeBaseStructure.TIM_ClockDivision = TIM_CKD_DIV1; //è®¾ç½®æ—¶é’Ÿåˆ†å‰²:TDTS = Tck_tim
+    TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;  //TIMå‘ä¸Šè®¡æ•°æ¨¡å¼
+    TIM_TimeBaseInit(TIM3, &TIM_TimeBaseStructure); //æ ¹æ®TIM_TimeBaseInitStructä¸­æŒ‡å®šçš„å‚æ•°åˆå§‹åŒ–TIMxçš„æ—¶é—´åŸºæ•°å•ä½
+    TIM_ITConfig(TIM3, TIM_IT_Update, ENABLE); //TIM7 å…è®¸æ›´æ–°ä¸­æ–­
 
-    //TIM7ÖĞ¶Ï·Ö×éÅäÖÃ
-    NVIC_InitStructure.NVIC_IRQChannel = TIM3_IRQn;  //TIM3ÖĞ¶Ï
-    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 1;  //ÏÈÕ¼ÓÅÏÈ¼¶2¼¶
-    NVIC_InitStructure.NVIC_IRQChannelSubPriority = 2;  //´ÓÓÅÏÈ¼¶3¼¶
-    NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE; //IRQÍ¨µÀ±»Ê¹ÄÜ
-    NVIC_Init(&NVIC_InitStructure);  //¸ù¾İNVIC_InitStructÖĞÖ¸¶¨µÄ²ÎÊı³õÊ¼»¯ÍâÉèNVIC¼Ä´æÆ÷
+    //TIM7ä¸­æ–­åˆ†ç»„é…ç½®
+    NVIC_InitStructure.NVIC_IRQChannel = TIM3_IRQn;  //TIM3ä¸­æ–­
+    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 1;  //å…ˆå ä¼˜å…ˆçº§2çº§
+    NVIC_InitStructure.NVIC_IRQChannelSubPriority = 2;  //ä»ä¼˜å…ˆçº§3çº§
+    NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE; //IRQé€šé“è¢«ä½¿èƒ½
+    NVIC_Init(&NVIC_InitStructure);  //æ ¹æ®NVIC_InitStructä¸­æŒ‡å®šçš„å‚æ•°åˆå§‹åŒ–å¤–è®¾NVICå¯„å­˜å™¨
 
 }
 
 /**
- * @brief Ö÷Õ¾£¨USART1£©·¢ËÍÊı¾İ
- * @param buff Êı¾İ»º³åÇø
- * @param len  Êı¾İ³¤¶È£¨×Ö½Ú£©
+ * @brief ä¸»ç«™ï¼ˆUSART1ï¼‰å‘é€æ•°æ®
+ * @param buff æ•°æ®ç¼“å†²åŒº
+ * @param len  æ•°æ®é•¿åº¦ï¼ˆå­—èŠ‚ï¼‰
  */
 
 void RS485_MasterSendData(uint8_t *buff, uint16_t len)
 {
-    // 1. ÇĞ»»Îª·¢ËÍÄ£Ê½
+    // 1. åˆ‡æ¢ä¸ºå‘é€æ¨¡å¼
     GPIO_SetBits(USART_MASTER_RE, USART_RE_MASTER_PIN);
     
-    // 2. ¼«¶ÌÑÓÊ±£¬µÈ´ı RS485 Ğ¾Æ¬ÎïÀíµçÆ½ÇĞ»»ÎÈ¶¨£¨·Ç³£¹Ø¼ü£©
+    // 2. æçŸ­å»¶æ—¶ï¼Œç­‰å¾… RS485 èŠ¯ç‰‡ç‰©ç†ç”µå¹³åˆ‡æ¢ç¨³å®šï¼ˆéå¸¸å…³é”®ï¼‰
     for(volatile int i=0; i<100; i++); 
 
-    // 3. ¡¾¹Ø¼ü¡¿£º·¢ËÍÇ°Ç¿ÖÆÇå³ı TC ±êÖ¾Î»£¬·ÀÖ¹±»ÀúÊ·¿ÕÏĞ×´Ì¬¸ÉÈÅ
+    // 3. ã€å…³é”®ã€‘ï¼šå‘é€å‰å¼ºåˆ¶æ¸…é™¤ TC æ ‡å¿—ä½ï¼Œé˜²æ­¢è¢«å†å²ç©ºé—²çŠ¶æ€å¹²æ‰°
     USART_ClearFlag(USART1, USART_FLAG_TC);
 
-    // 4. ·¢ËÍÊı¾İ
+    // 4. å‘é€æ•°æ®
     while (len--)
     {
         while (USART_GetFlagStatus(USART1, USART_FLAG_TXE) == RESET);
         USART_SendData(USART1, *buff++);
     }
 
-    // 5. ±ØĞëµÈ´ıËùÓĞÊı¾İÕæÕı´ÓÒÆÎ»¼Ä´æÆ÷´ò³öµ½×ÜÏßÉÏ
+    // 5. å¿…é¡»ç­‰å¾…æ‰€æœ‰æ•°æ®çœŸæ­£ä»ç§»ä½å¯„å­˜å™¨æ‰“å‡ºåˆ°æ€»çº¿ä¸Š
     while (USART_GetFlagStatus(USART1, USART_FLAG_TC) == RESET);
 
-    // 6. ÇĞ»»»Ø½ÓÊÕÄ£Ê½
+    // 6. åˆ‡æ¢å›æ¥æ”¶æ¨¡å¼
     GPIO_ResetBits(USART_MASTER_RE, USART_RE_MASTER_PIN);
 }
 //void RS485_MasterSendData(uint8_t *buff, uint16_t len)
 //{
-//    // ÇĞ»»Îª·¢ËÍÄ£Ê½£¨À­¸ß·½ÏòÒı½Å£©
+//    // åˆ‡æ¢ä¸ºå‘é€æ¨¡å¼ï¼ˆæ‹‰é«˜æ–¹å‘å¼•è„šï¼‰
 //    GPIO_SetBits(USART_MASTER_RE, USART_RE_MASTER_PIN);
 
-//    // µÈ´ıÉÏÒ»´Î·¢ËÍÍê³É£¨TC±êÖ¾£©
+//    // ç­‰å¾…ä¸Šä¸€æ¬¡å‘é€å®Œæˆï¼ˆTCæ ‡å¿—ï¼‰
 //    while (USART_GetFlagStatus(USART1, USART_FLAG_TC) == RESET);
 
-//    // ·¢ËÍÊı¾İ
+//    // å‘é€æ•°æ®
 //    while (len--)
 //    {
 //        while (USART_GetFlagStatus(USART1, USART_FLAG_TXE) == RESET);
 //        USART_SendData(USART1, *buff++);
 //    }
 
-//    // µÈ´ıËùÓĞÊı¾İ·¢ËÍÍê³É
+//    // ç­‰å¾…æ‰€æœ‰æ•°æ®å‘é€å®Œæˆ
 //    while (USART_GetFlagStatus(USART1, USART_FLAG_TC) == RESET);
 ////		delay_ms(1); 
 
-//    // ÇĞ»»»Ø½ÓÊÕÄ£Ê½£¨À­µÍ·½ÏòÒı½Å£©
+//    // åˆ‡æ¢å›æ¥æ”¶æ¨¡å¼ï¼ˆæ‹‰ä½æ–¹å‘å¼•è„šï¼‰
 //    GPIO_ResetBits(USART_MASTER_RE, USART_RE_MASTER_PIN);
 //}
 
 
 //void RS485_MasterSendData(uint8_t *buff, uint16_t len)
 //{
-//    printf("½øÈëRS485·¢ËÍ\r\n");
+//    printf("è¿›å…¥RS485å‘é€\r\n");
 
 //    GPIO_SetBits(USART_MASTER_RE, USART_RE_MASTER_PIN);
 
 
-//    printf("µÈ´ıTCÇ°\r\n");
+//    printf("ç­‰å¾…TCå‰\r\n");
 
 //    while (USART_GetFlagStatus(USART1, USART_FLAG_TC) == RESET);
 
 
-//    printf("¿ªÊ¼·¢ËÍ\r\n");
+//    printf("å¼€å§‹å‘é€\r\n");
 
 
 //    while (len--)
@@ -373,108 +373,108 @@ void RS485_MasterSendData(uint8_t *buff, uint16_t len)
 //    }
 
 
-//    printf("µÈ´ı·¢ËÍÍê³É\r\n");
+//    printf("ç­‰å¾…å‘é€å®Œæˆ\r\n");
 
 
 //    while (USART_GetFlagStatus(USART1, USART_FLAG_TC) == RESET);
 
 
-//    printf("ÇĞ»»½ÓÊÕ\r\n");
+//    printf("åˆ‡æ¢æ¥æ”¶\r\n");
 
 
 //    GPIO_ResetBits(USART_MASTER_RE, USART_RE_MASTER_PIN);
 //}
 
 /**
- * @brief ´ÓÕ¾£¨USART2£©·¢ËÍÊı¾İ
- * @param buff Êı¾İ»º³åÇø
- * @param len  Êı¾İ³¤¶È£¨×Ö½Ú£©
+ * @brief ä»ç«™ï¼ˆUSART2ï¼‰å‘é€æ•°æ®
+ * @param buff æ•°æ®ç¼“å†²åŒº
+ * @param len  æ•°æ®é•¿åº¦ï¼ˆå­—èŠ‚ï¼‰
  */
 void RS485_SlaveSendData(uint8_t *buff, uint16_t len)
 {
-    // ÇĞ»»Îª·¢ËÍÄ£Ê½
+    // åˆ‡æ¢ä¸ºå‘é€æ¨¡å¼
     GPIO_SetBits(USART_SLAVE_RE, USART_RE_SLAVE_PIN);
 
-    // µÈ´ıÉÏÒ»´Î·¢ËÍÍê³É
+    // ç­‰å¾…ä¸Šä¸€æ¬¡å‘é€å®Œæˆ
     while (USART_GetFlagStatus(USART2, USART_FLAG_TC) == RESET);
 
-    // ·¢ËÍÊı¾İ
+    // å‘é€æ•°æ®
     while (len--)
     {
         while (USART_GetFlagStatus(USART2, USART_FLAG_TXE) == RESET);
         USART_SendData(USART2, *buff++);
     }
 
-    // µÈ´ıËùÓĞÊı¾İ·¢ËÍÍê³É
+    // ç­‰å¾…æ‰€æœ‰æ•°æ®å‘é€å®Œæˆ
     while (USART_GetFlagStatus(USART2, USART_FLAG_TC) == RESET);
 
-    // ÇĞ»»»Ø½ÓÊÕÄ£Ê½
+    // åˆ‡æ¢å›æ¥æ”¶æ¨¡å¼
     GPIO_ResetBits(USART_SLAVE_RE, USART_RE_SLAVE_PIN);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
-//void USART1_IRQHandler(void)                	//´®¿Ú1ÖĞ¶Ï·şÎñ³ÌĞò
+//void USART1_IRQHandler(void)                	//ä¸²å£1ä¸­æ–­æœåŠ¡ç¨‹åº
 //{
-//		// ´¦ÀíÒç³ö´íÎó£¨ORE£©
+//		// å¤„ç†æº¢å‡ºé”™è¯¯ï¼ˆOREï¼‰
 //    if (USART_GetFlagStatus(USART1, USART_FLAG_ORE) != RESET) 
 //		{
-//        USART_ReceiveData(USART1);               // Çå³ı´íÎó±êÖ¾
-//        Master_RX_CNT = 0;                       // ¸´Î»Ö÷Õ¾½ÓÊÕ×´Ì¬
+//        USART_ReceiveData(USART1);               // æ¸…é™¤é”™è¯¯æ ‡å¿—
+//        Master_RX_CNT = 0;                       // å¤ä½ä¸»ç«™æ¥æ”¶çŠ¶æ€
 //        Master_FrameFlag = 0;
-//        TIM_Cmd(TIM4, DISABLE);                  // Í£Ö¹Ö÷Õ¾Ö¡³¬Ê±¶¨Ê±Æ÷
+//        TIM_Cmd(TIM4, DISABLE);                  // åœæ­¢ä¸»ç«™å¸§è¶…æ—¶å®šæ—¶å™¨
 //    }
 
-//    // ½ÓÊÕÊı¾İ
+//    // æ¥æ”¶æ•°æ®
 //    if (USART_GetITStatus(USART1, USART_IT_RXNE) != RESET) 
 //		{
 //        uint8_t data = USART_ReceiveData(USART1);
-////				printf("UART1 RX: %02X\r\n", data);   // ´òÓ¡Ã¿¸ö×Ö½Ú
+////				printf("UART1 RX: %02X\r\n", data);   // æ‰“å°æ¯ä¸ªå­—èŠ‚
 //        
-//        // ½öµ±´¦ÓÚÖ÷Õ¾µÈ´ıÏìÓ¦Ä£Ê½Ê±£¬²Å´¦Àí½ÓÊÕÊı¾İ
+//        // ä»…å½“å¤„äºä¸»ç«™ç­‰å¾…å“åº”æ¨¡å¼æ—¶ï¼Œæ‰å¤„ç†æ¥æ”¶æ•°æ®
 //        if (master_state == MASTER_WAIT_RESP) 
 //				{
-//            // Èç¹ûÖ¡Î´¾ÍĞ÷ÇÒ»º³åÇøÎ´Âú£¬´æ´¢Êı¾İ
+//            // å¦‚æœå¸§æœªå°±ç»ªä¸”ç¼“å†²åŒºæœªæ»¡ï¼Œå­˜å‚¨æ•°æ®
 //            if (Master_RX_CNT < sizeof(Master_RX_BUFF) && Master_FrameFlag == 0) 
 //						{
 //                Master_RX_BUFF[Master_RX_CNT++] = data;
-//                Master_LastRxTime = GetTick();   // ¸üĞÂÈí¼ş³¬Ê±
+//                Master_LastRxTime = GetTick();   // æ›´æ–°è½¯ä»¶è¶…æ—¶
 //                
-//                // ¸´Î»Ö¡³¬Ê±¶¨Ê±Æ÷
+//                // å¤ä½å¸§è¶…æ—¶å®šæ—¶å™¨
 //                TIM_SetCounter(TIM4, 0);
-//                TIM_Cmd(TIM4, ENABLE);            // ¿ªÊ¼¼ÆÊ±
+//                TIM_Cmd(TIM4, ENABLE);            // å¼€å§‹è®¡æ—¶
 //            } 
 //						else 
 //						{
-//                // »º³åÇøÒç³ö»òÖ¡ÒÑ¾ÍĞ÷£¬¸´Î»½ÓÊÕ×´Ì¬
+//                // ç¼“å†²åŒºæº¢å‡ºæˆ–å¸§å·²å°±ç»ªï¼Œå¤ä½æ¥æ”¶çŠ¶æ€
 //                Master_RX_CNT = 0;               	
 //                TIM_Cmd(TIM4, DISABLE);
 //            }
 //            
-//            // ¸üĞÂÖ÷Õ¾³¬Ê±¼ÆÊıÆ÷
+//            // æ›´æ–°ä¸»ç«™è¶…æ—¶è®¡æ•°å™¨
 //            timeout_cnt = 0;
 //        }
-//        // Èç¹û²»ÔÚÖ÷Õ¾µÈ´ıÏìÓ¦Ä£Ê½£¬Ôò¶ªÆúÊı¾İ£¨²»´æ´¢£©
+//        // å¦‚æœä¸åœ¨ä¸»ç«™ç­‰å¾…å“åº”æ¨¡å¼ï¼Œåˆ™ä¸¢å¼ƒæ•°æ®ï¼ˆä¸å­˜å‚¨ï¼‰
 //    }
 //}
-// ĞŞ¸ÄºóµÄ USART1_IRQHandler
+// ä¿®æ”¹åçš„ USART1_IRQHandler
 void USART1_IRQHandler(void)
 {
-    // ´¦ÀíÒç³ö´íÎó£¨ORE£©
+    // å¤„ç†æº¢å‡ºé”™è¯¯ï¼ˆOREï¼‰
     if (USART_GetFlagStatus(USART1, USART_FLAG_ORE) != RESET) 
     {
         USART_ReceiveData(USART1);               
-        // ORE·¢ÉúÊ±²»ÒªÇåÁã RX_CNT£¬¾¡Á¿ÇÀ¾ÈÒÑÊÕµ½µÄÊı¾İ
+        // OREå‘ç”Ÿæ—¶ä¸è¦æ¸…é›¶ RX_CNTï¼Œå°½é‡æŠ¢æ•‘å·²æ”¶åˆ°çš„æ•°æ®
         TIM_Cmd(TIM4, DISABLE);                  
     }
 
-    // ½ÓÊÕÊı¾İ
+    // æ¥æ”¶æ•°æ®
     if (USART_GetITStatus(USART1, USART_IT_RXNE) != RESET) 
     {
         uint8_t data = USART_ReceiveData(USART1);
         
         if (master_state == MASTER_WAIT_RESP) 
         {
-            // Ö»ÒªÖ¡Ã»ÊÕÍê£¬ÇÒ»º³åÇøÃ»Âú£¬¾Í´æÈë
+            // åªè¦å¸§æ²¡æ”¶å®Œï¼Œä¸”ç¼“å†²åŒºæ²¡æ»¡ï¼Œå°±å­˜å…¥
             if (Master_RX_CNT < sizeof(Master_RX_BUFF) && Master_FrameFlag == 0) 
             {
                 Master_RX_BUFF[Master_RX_CNT++] = data;
@@ -485,18 +485,18 @@ void USART1_IRQHandler(void)
             } 
             else 
             {
-                // ¡¾ĞŞ¸ÄÕâÀï¡¿£ºÈç¹ûÊÇÖ¡½áÊøºóµÄ¶àÓàÔëµã£¬¹Ø¶¨Ê±Æ÷¼´¿É£¬²»×÷ÈÎºÎ´¦Àí¡£
-                // ¾ø¶Ô²»ÄÜÖ´ĞĞ Master_RX_CNT = 0; ·ñÔò»áÇå¿Õ¸ÕÊÕµ½µÄÍêÕû±¨ÎÄ£¡
+                // ã€ä¿®æ”¹è¿™é‡Œã€‘ï¼šå¦‚æœæ˜¯å¸§ç»“æŸåçš„å¤šä½™å™ªç‚¹ï¼Œå…³å®šæ—¶å™¨å³å¯ï¼Œä¸ä½œä»»ä½•å¤„ç†ã€‚
+                // ç»å¯¹ä¸èƒ½æ‰§è¡Œ Master_RX_CNT = 0; å¦åˆ™ä¼šæ¸…ç©ºåˆšæ”¶åˆ°çš„å®Œæ•´æŠ¥æ–‡ï¼
                 TIM_Cmd(TIM4, DISABLE);
             }
             timeout_cnt = 0;
         }
     }
 }
-//´®¿Ú2ÖĞ¶Ï·şÎñ³ÌĞò
+//ä¸²å£2ä¸­æ–­æœåŠ¡ç¨‹åº
 void USART2_IRQHandler(void)
 {
-//	// ´¦ÀíÒç³ö´íÎó£¨ORE£©
+//	// å¤„ç†æº¢å‡ºé”™è¯¯ï¼ˆOREï¼‰
 //    if (USART_GetFlagStatus(USART2, USART_FLAG_ORE) != RESET)			
 //		{
 //        USART_ReceiveData(USART2);
@@ -505,136 +505,136 @@ void USART2_IRQHandler(void)
 //        TIM_Cmd(TIM3, DISABLE);
 //    }
 
-//    // ½ÓÊÕÊı¾İ
+//    // æ¥æ”¶æ•°æ®
 //    if (USART_GetITStatus(USART2, USART_IT_RXNE) != RESET) 
 //		{
 //        uint8_t data = USART_ReceiveData(USART2);
 //				MODS_ReciveNew(data);
 //    }
-	// 1. ¸ü¼Ó¾ø¶Ô½¡×³µÄ ORE Òç³ö´íÎó´¦Àí
+	// 1. æ›´åŠ ç»å¯¹å¥å£®çš„ ORE æº¢å‡ºé”™è¯¯å¤„ç†
     if (USART_GetFlagStatus(USART2, USART_FLAG_ORE) != RESET)			
     {
-        // STM32 Çå³ı ORE ±êÖ¾µÄ±ê×¼Ç¿ÖÆ¶¯×÷£ºÏÈ¶Á SR£¬ÔÙ¶Á DR
-        // Ê¹ÓÃ volatile ·ÀÖ¹¸ß½×±àÒëÆ÷ÓÅ»¯µôÕâ¼¸ĞĞ¡°¿´ËÆÎŞÓÃ¡±µÄ¶ÁÈ¡²Ù×÷
+        // STM32 æ¸…é™¤ ORE æ ‡å¿—çš„æ ‡å‡†å¼ºåˆ¶åŠ¨ä½œï¼šå…ˆè¯» SRï¼Œå†è¯» DR
+        // ä½¿ç”¨ volatile é˜²æ­¢é«˜é˜¶ç¼–è¯‘å™¨ä¼˜åŒ–æ‰è¿™å‡ è¡Œâ€œçœ‹ä¼¼æ— ç”¨â€çš„è¯»å–æ“ä½œ
         volatile uint16_t temp = USART2->SR;
         temp = USART2->DR;
-        (void)temp; // Ïû³ı¡°±äÁ¿Î´Ê¹ÓÃ¡±µÄ±àÒë¾¯¸æ
+        (void)temp; // æ¶ˆé™¤â€œå˜é‡æœªä½¿ç”¨â€çš„ç¼–è¯‘è­¦å‘Š
 
-        TIM_Cmd(TIM3, DISABLE); // ±£ÁôÄãÔ­ÓĞµÄ£º¹Ø±ÕModbusÖ¡³¬Ê±¶¨Ê±Æ÷
+        TIM_Cmd(TIM3, DISABLE); // ä¿ç•™ä½ åŸæœ‰çš„ï¼šå…³é—­Modbuså¸§è¶…æ—¶å®šæ—¶å™¨
         
-        // ¡¾½¨ÒéĞÂÔö¡¿£ºÈç¹ûÊÇÔÚµÈ´ıµç»úÏìÓ¦ÆÚ¼ä·¢ÉúÒç³ö£¬¿ÉÒÔ¼Ó¸ö±êÖ¾Î»ÅÅ²é
-        // ×¢Òâ£ºÇ§Íò²»ÒªÔÚÖĞ¶ÏÀïµ÷ÓÃ printf£¡
+        // ã€å»ºè®®æ–°å¢ã€‘ï¼šå¦‚æœæ˜¯åœ¨ç­‰å¾…ç”µæœºå“åº”æœŸé—´å‘ç”Ÿæº¢å‡ºï¼Œå¯ä»¥åŠ ä¸ªæ ‡å¿—ä½æ’æŸ¥
+        // æ³¨æ„ï¼šåƒä¸‡ä¸è¦åœ¨ä¸­æ–­é‡Œè°ƒç”¨ printfï¼
     }
 
-    // 2. Õı³£½ÓÊÕÊı¾İ´¦Àí
+    // 2. æ­£å¸¸æ¥æ”¶æ•°æ®å¤„ç†
     if (USART_GetITStatus(USART2, USART_IT_RXNE) != RESET) 
     {
         uint8_t data = USART_ReceiveData(USART2);
         
-        // ¡¾¹Ø¼üÂß¼­°²È«È·ÈÏ¡¿£º
-        // Èç¹ûÄãµÄ MODS_ReciveNew(data) ÄÚ²¿ÒÑ¾­´¦ÀíÁË Master_RX_BUFF µÄĞ´Èë£¬¿ÉÒÔÖ±½ÓÓÃÏÂÃæÕâĞĞ£º
+        // ã€å…³é”®é€»è¾‘å®‰å…¨ç¡®è®¤ã€‘ï¼š
+        // å¦‚æœä½ çš„ MODS_ReciveNew(data) å†…éƒ¨å·²ç»å¤„ç†äº† Master_RX_BUFF çš„å†™å…¥ï¼Œå¯ä»¥ç›´æ¥ç”¨ä¸‹é¢è¿™è¡Œï¼š
         MODS_ReciveNew(data);
 		}
 }
 
 
-// TIM4 ÖĞ¶Ï·şÎñº¯Êı£¨Ö÷Õ¾Ö¡³¬Ê±¼ì²â£©
+// TIM4 ä¸­æ–­æœåŠ¡å‡½æ•°ï¼ˆä¸»ç«™å¸§è¶…æ—¶æ£€æµ‹ï¼‰
 void TIM4_IRQHandler(void)
 {
     if (TIM_GetITStatus(TIM4, TIM_IT_Update) != RESET)
     {
-        // Çå³ıÖĞ¶Ï±êÖ¾
+        // æ¸…é™¤ä¸­æ–­æ ‡å¿—
         TIM_ClearITPendingBit(TIM4, TIM_IT_Update);
-        // Í£Ö¹¶¨Ê±Æ÷£¬µÈ´ıÏÂÒ»Ö¡½ÓÊÕ¿ªÊ¼
+        // åœæ­¢å®šæ—¶å™¨ï¼Œç­‰å¾…ä¸‹ä¸€å¸§æ¥æ”¶å¼€å§‹
         TIM_Cmd(TIM4, DISABLE);
         
-        // ========== 1. ±ê¼ÇÖ¡½ÓÊÕÍê³É ==========
-        // Èç¹ûÖ÷Õ¾½ÓÊÕ»º³åÇøÓĞÊı¾İÇÒÖ¡Î´´¦Àí£¬Ôò±ê¼ÇÒ»Ö¡½ÓÊÕÍê³É
+        // ========== 1. æ ‡è®°å¸§æ¥æ”¶å®Œæˆ ==========
+        // å¦‚æœä¸»ç«™æ¥æ”¶ç¼“å†²åŒºæœ‰æ•°æ®ä¸”å¸§æœªå¤„ç†ï¼Œåˆ™æ ‡è®°ä¸€å¸§æ¥æ”¶å®Œæˆ
 //        if (Master_RX_CNT > 0 && Master_FrameFlag == 0)
 //        {
-//            Master_FrameFlag = 1;   // Í¨ÖªÖ÷Ñ­»·ÏìÓ¦ÒÑÍêÕû½ÓÊÕ
+//            Master_FrameFlag = 1;   // é€šçŸ¥ä¸»å¾ªç¯å“åº”å·²å®Œæ•´æ¥æ”¶
 //        }
     }
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
-//ÓÃ¶¨Ê±Æ÷3ÅĞ¶Ï½ÓÊÕ¿ÕÏĞÊ±¼ä£¬µ±¿ÕÏĞÊ±¼ä´óÓÚÖ¸¶¨Ê±¼ä£¬ÈÏÎªÒ»Ö¡½áÊø
-//¶¨Ê±Æ÷3ÖĞ¶Ï·şÎñ³ÌĞò
+//ç”¨å®šæ—¶å™¨3åˆ¤æ–­æ¥æ”¶ç©ºé—²æ—¶é—´ï¼Œå½“ç©ºé—²æ—¶é—´å¤§äºæŒ‡å®šæ—¶é—´ï¼Œè®¤ä¸ºä¸€å¸§ç»“æŸ
+//å®šæ—¶å™¨3ä¸­æ–­æœåŠ¡ç¨‹åº
 void TIM3_IRQHandler(void)
 {
     if (TIM_GetITStatus(TIM3, TIM_IT_Update) != RESET) 
 		{
         TIM_ClearITPendingBit(TIM3, TIM_IT_Update);
-        TIM_Cmd(TIM3, DISABLE);          // Í£Ö¹¶¨Ê±Æ÷
+        TIM_Cmd(TIM3, DISABLE);          // åœæ­¢å®šæ—¶å™¨
 				if (g_tModS.RxCount > 0) 
 				{            
-						g_mods_timeout = 1;         // Í¨Öª´ÓÕ¾Ò»Ö¡½ÓÊÕÍê³É
+						g_mods_timeout = 1;         // é€šçŸ¥ä»ç«™ä¸€å¸§æ¥æ”¶å®Œæˆ
 				}            
     }
 }
 
 
-//´ÓÕ¾¶¨Ê±Æ÷
+//ä»ç«™å®šæ—¶å™¨
 void Timer3Init(void)                //999,71
 {
   TIM_TimeBaseInitTypeDef TIM_TimeBaseInitStructure;
 	NVIC_InitTypeDef NVIC_InitStructure;
 	
-	RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM3,ENABLE);  ///Ê¹ÄÜTIM3Ê±ÖÓ
+	RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM3,ENABLE);  ///ä½¿èƒ½TIM3æ—¶é’Ÿ
 	
-  TIM_TimeBaseInitStructure.TIM_Period = RS485_Frame_Distance*999; 	//×Ô¶¯ÖØ×°ÔØÖµ
-	TIM_TimeBaseInitStructure.TIM_Prescaler=83;  //¶¨Ê±Æ÷·ÖÆµ
-	TIM_TimeBaseInitStructure.TIM_CounterMode=TIM_CounterMode_Up; //ÏòÉÏ¼ÆÊıÄ£Ê½
+  TIM_TimeBaseInitStructure.TIM_Period = RS485_Frame_Distance*999; 	//è‡ªåŠ¨é‡è£…è½½å€¼
+	TIM_TimeBaseInitStructure.TIM_Prescaler=83;  //å®šæ—¶å™¨åˆ†é¢‘
+	TIM_TimeBaseInitStructure.TIM_CounterMode=TIM_CounterMode_Up; //å‘ä¸Šè®¡æ•°æ¨¡å¼
 	TIM_TimeBaseInitStructure.TIM_ClockDivision=TIM_CKD_DIV1; 
 	
-	TIM_TimeBaseInit(TIM3,&TIM_TimeBaseInitStructure);//³õÊ¼»¯TIM3
+	TIM_TimeBaseInit(TIM3,&TIM_TimeBaseInitStructure);//åˆå§‹åŒ–TIM3
 	
 	
-	// Çå³ıÖĞ¶Ï±êÖ¾
+	// æ¸…é™¤ä¸­æ–­æ ‡å¿—
 	TIM_ClearITPendingBit(TIM3, TIM_IT_Update);
 	
-	TIM_ITConfig(TIM3,TIM_IT_Update,ENABLE); //ÔÊĞí¶¨Ê±Æ÷3¸üĞÂÖĞ¶Ï
-	TIM_Cmd(TIM3,ENABLE); //Ê¹ÄÜ¶¨Ê±Æ÷3
+	TIM_ITConfig(TIM3,TIM_IT_Update,ENABLE); //å…è®¸å®šæ—¶å™¨3æ›´æ–°ä¸­æ–­
+	TIM_Cmd(TIM3,ENABLE); //ä½¿èƒ½å®šæ—¶å™¨3
 	
-	NVIC_InitStructure.NVIC_IRQChannel=TIM3_IRQn; //¶¨Ê±Æ÷3ÖĞ¶Ï
-	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority=1; //ÇÀÕ¼ÓÅÏÈ¼¶1
-	NVIC_InitStructure.NVIC_IRQChannelSubPriority=3; //×ÓÓÅÏÈ¼¶3
+	NVIC_InitStructure.NVIC_IRQChannel=TIM3_IRQn; //å®šæ—¶å™¨3ä¸­æ–­
+	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority=1; //æŠ¢å ä¼˜å…ˆçº§1
+	NVIC_InitStructure.NVIC_IRQChannelSubPriority=3; //å­ä¼˜å…ˆçº§3
 	NVIC_InitStructure.NVIC_IRQChannelCmd=ENABLE;
 	NVIC_Init(&NVIC_InitStructure);
 }
-//Ö÷Õ¾¶¨Ê±Æ÷
+//ä¸»ç«™å®šæ—¶å™¨
 void Timer4Init(void)
 {
     TIM_TimeBaseInitTypeDef TIM_TimeBaseInitStructure;
     NVIC_InitTypeDef NVIC_InitStructure;
     
-    // Ê¹ÄÜ TIM4 Ê±ÖÓ£¨APB1 ×ÜÏß£©
+    // ä½¿èƒ½ TIM4 æ—¶é’Ÿï¼ˆAPB1 æ€»çº¿ï¼‰
     RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM4, ENABLE);
     
-    // ¶¨Ê±Æ÷ÅäÖÃ£º¼ÙÉèÏµÍ³Ê±ÖÓ 168MHz£¬APB1 ¶¨Ê±Æ÷Ê±ÖÓ 84MHz£¬·ÖÆµ 83 ¡ú 1MHz ¼ÆÊıÆµÂÊ
-    // ³¬Ê±Ê±¼ä£º3.5 ×Ö·ûÊ±¼ä @ 9600bps ¡Ö 3.6ms£¬ÉèÖÃ Period = 3600 - 1
-    TIM_TimeBaseInitStructure.TIM_Period = 9999;   // ×Ô¶¯ÖØ×°ÔØÖµ
-    TIM_TimeBaseInitStructure.TIM_Prescaler = 83;      // Ô¤·ÖÆµÆ÷
+    // å®šæ—¶å™¨é…ç½®ï¼šå‡è®¾ç³»ç»Ÿæ—¶é’Ÿ 168MHzï¼ŒAPB1 å®šæ—¶å™¨æ—¶é’Ÿ 84MHzï¼Œåˆ†é¢‘ 83 â†’ 1MHz è®¡æ•°é¢‘ç‡
+    // è¶…æ—¶æ—¶é—´ï¼š3.5 å­—ç¬¦æ—¶é—´ @ 9600bps â‰ˆ 3.6msï¼Œè®¾ç½® Period = 3600 - 1
+    TIM_TimeBaseInitStructure.TIM_Period = 9999;   // è‡ªåŠ¨é‡è£…è½½å€¼
+    TIM_TimeBaseInitStructure.TIM_Prescaler = 83;      // é¢„åˆ†é¢‘å™¨
     TIM_TimeBaseInitStructure.TIM_CounterMode = TIM_CounterMode_Up;
     TIM_TimeBaseInitStructure.TIM_ClockDivision = TIM_CKD_DIV1;
     TIM_TimeBaseInit(TIM4, &TIM_TimeBaseInitStructure);
     
-    // Çå³ıÖĞ¶Ï±êÖ¾
+    // æ¸…é™¤ä¸­æ–­æ ‡å¿—
     TIM_ClearITPendingBit(TIM4, TIM_IT_Update);
-    TIM_ITConfig(TIM4, TIM_IT_Update, ENABLE);   // Ê¹ÄÜ¸üĞÂÖĞ¶Ï
+    TIM_ITConfig(TIM4, TIM_IT_Update, ENABLE);   // ä½¿èƒ½æ›´æ–°ä¸­æ–­
     
-    // ÖĞ¶ÏÓÅÏÈ¼¶ÅäÖÃ£ºÇÀÕ¼ÓÅÏÈ¼¶µÍÓÚ UART1£¬¸ßÓÚÖ÷Ñ­»·£¨ÀıÈçÇÀÕ¼ 1£¬×ÓÓÅÏÈ¼¶ 1£©
+    // ä¸­æ–­ä¼˜å…ˆçº§é…ç½®ï¼šæŠ¢å ä¼˜å…ˆçº§ä½äº UART1ï¼Œé«˜äºä¸»å¾ªç¯ï¼ˆä¾‹å¦‚æŠ¢å  1ï¼Œå­ä¼˜å…ˆçº§ 1ï¼‰
     NVIC_InitStructure.NVIC_IRQChannel = TIM4_IRQn;
     NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 2;
     NVIC_InitStructure.NVIC_IRQChannelSubPriority = 1;
     NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
     NVIC_Init(&NVIC_InitStructure);
     
-    // ×¢Òâ£º¶¨Ê±Æ÷Ä¬ÈÏ²»Æô¶¯£¬µÈ´ıÊÕµ½µÚÒ»¸ö×Ö½ÚºóÓÉÖĞ¶ÏÆô¶¯
+    // æ³¨æ„ï¼šå®šæ—¶å™¨é»˜è®¤ä¸å¯åŠ¨ï¼Œç­‰å¾…æ”¶åˆ°ç¬¬ä¸€ä¸ªå­—èŠ‚åç”±ä¸­æ–­å¯åŠ¨
     TIM_Cmd(TIM4, DISABLE);
 //		TIM_Cmd(TIM4, ENABLE);
 }
-// ======================== Modbus CRC16Ğ£Ñé¼ÆËã ========================
+// ======================== Modbus CRC16æ ¡éªŒè®¡ç®— ========================
 uint16_t Modbus_CRC16(uint8_t *pData, uint16_t len)
 {
     uint16_t crc = 0xFFFF;
@@ -645,25 +645,25 @@ uint16_t Modbus_CRC16(uint8_t *pData, uint16_t len)
 								else crc >>= 1;
 						}
 				}
-				return crc;  // ·µ»ØµÍ×Ö½ÚÔÚÇ°£¨¼´·µ»ØµÄÖµµÍ×Ö½ÚÏÈ·¢ËÍ£©
+				return crc;  // è¿”å›ä½å­—èŠ‚åœ¨å‰ï¼ˆå³è¿”å›çš„å€¼ä½å­—èŠ‚å…ˆå‘é€ï¼‰
 }
 
 
 
-//Modbus¹¦ÄÜÂë03´¦Àí³ÌĞò///////////////////////////////////////////////////////////////////////////////////////ÒÑÑéÖ¤³ÌĞòOK
-//¶Á±£³Ö¼Ä´æÆ÷
+//ModbusåŠŸèƒ½ç 03å¤„ç†ç¨‹åº///////////////////////////////////////////////////////////////////////////////////////å·²éªŒè¯ç¨‹åºOK
+//è¯»ä¿æŒå¯„å­˜å™¨
 uint8_t Modbus_03_ReadHoldReg(uint8_t slave_addr, uint16_t start_reg, uint16_t reg_num, uint16_t *read_buff)
 {
-		// 1. ²ÎÊı¼ì²é
+		// 1. å‚æ•°æ£€æŸ¥
 		if (master_state != MASTER_IDLE || reg_num == 0 || reg_num > 125) 
 		{
-				printf("03²ÎÊı´íÎó£ºmaster_state=%d, reg_num=%d\n", master_state, reg_num);
+				printf("03å‚æ•°é”™è¯¯ï¼šmaster_state=%d, reg_num=%d\n", master_state, reg_num);
 				return 1;
     }
 
-    printf("03ÇëÇó£ºµØÖ·0x%02X, ¼Ä´æÆ÷0x%04X, ÊıÁ¿%d\n", slave_addr, start_reg, reg_num);
+    printf("03è¯·æ±‚ï¼šåœ°å€0x%02X, å¯„å­˜å™¨0x%04X, æ•°é‡%d\n", slave_addr, start_reg, reg_num);
 
-    // 2. ¹¹½¨ 03 ÇëÇóÖ¡£¨ÓëÖ®Ç°ÏàÍ¬£©
+    // 2. æ„å»º 03 è¯·æ±‚å¸§ï¼ˆä¸ä¹‹å‰ç›¸åŒï¼‰
     uint8_t frame[8];
     frame[0] = slave_addr;
     frame[1] = 0x03;
@@ -675,25 +675,25 @@ uint8_t Modbus_03_ReadHoldReg(uint8_t slave_addr, uint16_t start_reg, uint16_t r
     frame[6] = crc & 0xFF;
     frame[7] = (crc >> 8) & 0xFF;
 		
-		// ´òÓ¡·¢ËÍÖ¡
+		// æ‰“å°å‘é€å¸§
     printf("03 TX: ");
     for (int i=0; i<8; i++) printf("%02X ", frame[i]);
     printf("\r\n");
 
-    // 3. Çå¿Õ½ÓÊÕ»º³åÇø£¨±ÜÃâ¾ÉÊı¾İ¸ÉÈÅ£©
+    // 3. æ¸…ç©ºæ¥æ”¶ç¼“å†²åŒºï¼ˆé¿å…æ—§æ•°æ®å¹²æ‰°ï¼‰
     __disable_irq();
     Master_RX_CNT = 0;
     __enable_irq();
     memset(Master_RX_BUFF, 0, sizeof(Master_RX_BUFF));
 
-    // 4. ·¢ËÍÇëÇó
+    // 4. å‘é€è¯·æ±‚
     master_state = MASTER_WAIT_RESP;
     RS485_MasterSendData(frame, 8);
 
-    // 5. ·Ç×èÈûÂÖÑ¯µÈ´ıÏìÓ¦£¨³¬Ê± 50ms£©
+    // 5. éé˜»å¡è½®è¯¢ç­‰å¾…å“åº”ï¼ˆè¶…æ—¶ 50msï¼‰
     uint32_t start = GetTick();
     uint32_t timeout_ms = 50;
-    uint16_t expected_len = 3 + reg_num * 2 + 2;  // µØÖ·+¹¦ÄÜ+×Ö½ÚÊı+Êı¾İ+CRC = 5 + reg_num*2
+    uint16_t expected_len = 3 + reg_num * 2 + 2;  // åœ°å€+åŠŸèƒ½+å­—èŠ‚æ•°+æ•°æ®+CRC = 5 + reg_num*2
     uint16_t last_len = 0;
 
     while ((GetTick() - start) < timeout_ms) {
@@ -701,7 +701,7 @@ uint8_t Modbus_03_ReadHoldReg(uint8_t slave_addr, uint16_t start_reg, uint16_t r
         uint16_t len = Master_RX_CNT;
         __enable_irq();
 
-				// Ã¿´Î³¤¶È±ä»¯Ê±´òÓ¡»º³åÇøÄÚÈİ
+				// æ¯æ¬¡é•¿åº¦å˜åŒ–æ—¶æ‰“å°ç¼“å†²åŒºå†…å®¹
         if (len != last_len) {
             printf("03 RX_len=%d: ", len);
             for (uint16_t i = 0; i < len; i++) printf("%02X ", Master_RX_BUFF[i]);
@@ -709,22 +709,22 @@ uint8_t Modbus_03_ReadHoldReg(uint8_t slave_addr, uint16_t start_reg, uint16_t r
             last_len = len;
         }
 			
-        // ¼ì²éÊÇ·ñÊÕµ½ÍêÕûÏìÓ¦£¨ÖÁÉÙ°üº¬µØÖ·¡¢¹¦ÄÜÂë¡¢×Ö½ÚÊı¡¢CRC×îĞ¡³¤¶È£©
+        // æ£€æŸ¥æ˜¯å¦æ”¶åˆ°å®Œæ•´å“åº”ï¼ˆè‡³å°‘åŒ…å«åœ°å€ã€åŠŸèƒ½ç ã€å­—èŠ‚æ•°ã€CRCæœ€å°é•¿åº¦ï¼‰
         if (len >= 5) {
-            // ÏÈĞ£ÑéµØÖ·ºÍ¹¦ÄÜÂë
+            // å…ˆæ ¡éªŒåœ°å€å’ŒåŠŸèƒ½ç 
             if (Master_RX_BUFF[0] == slave_addr && Master_RX_BUFF[1] == 0x03) {
                 uint8_t byte_count = Master_RX_BUFF[2];
-                // ×Ö½ÚÊı±ØĞëµÈÓÚ reg_num*2
+                // å­—èŠ‚æ•°å¿…é¡»ç­‰äº reg_num*2
                 if (byte_count == reg_num * 2 && len >= (3 + byte_count + 2)) {
-                    // Ğ£Ñé CRC£¨×¢ÒâCRCµÍ×Ö½ÚÔÚÇ°£©
+                    // æ ¡éªŒ CRCï¼ˆæ³¨æ„CRCä½å­—èŠ‚åœ¨å‰ï¼‰
                     uint16_t recv_crc = (Master_RX_BUFF[3 + byte_count + 1] << 8) | Master_RX_BUFF[3 + byte_count];
-                    uint16_t calc_crc = Modbus_CRC16(Master_RX_BUFF, 3 + byte_count); // CRC¼ÆËã²»°üº¬CRC±¾Éí
+                    uint16_t calc_crc = Modbus_CRC16(Master_RX_BUFF, 3 + byte_count); // CRCè®¡ç®—ä¸åŒ…å«CRCæœ¬èº«
                     if (recv_crc == calc_crc) {
-                        // ³É¹¦£ºÌáÈ¡¼Ä´æÆ÷Êı¾İ
+                        // æˆåŠŸï¼šæå–å¯„å­˜å™¨æ•°æ®
                         for (uint16_t i = 0; i < reg_num; i++) {
                             read_buff[i] = (Master_RX_BUFF[3 + i * 2] << 8) | Master_RX_BUFF[4 + i * 2];
                         }
-                        // ÒÆ³ıÒÑ´¦ÀíÖ¡£¨·ÀÖ¹Õ³°ü£©
+                        // ç§»é™¤å·²å¤„ç†å¸§ï¼ˆé˜²æ­¢ç²˜åŒ…ï¼‰
                         __disable_irq();
                         if (Master_RX_CNT >= (3 + byte_count + 2)) {
                             memmove(Master_RX_BUFF, Master_RX_BUFF + (3 + byte_count + 2), Master_RX_CNT - (3 + byte_count + 2));
@@ -734,30 +734,30 @@ uint8_t Modbus_03_ReadHoldReg(uint8_t slave_addr, uint16_t start_reg, uint16_t r
                         }
                         __enable_irq();
                         master_state = MASTER_IDLE;
-                        printf("03Ö¸Áî³É¹¦\r\n");
+                        printf("03æŒ‡ä»¤æˆåŠŸ\r\n");
                         return 0;
                     }
                 }
             }
-            // ²»Æ¥Åä£º¶ªÆúÊ××Ö½Ú£¬¼ÌĞøÆ´×°ÏÂÒ»Ö¡
+            // ä¸åŒ¹é…ï¼šä¸¢å¼ƒé¦–å­—èŠ‚ï¼Œç»§ç»­æ‹¼è£…ä¸‹ä¸€å¸§
             __disable_irq();
             memmove(Master_RX_BUFF, Master_RX_BUFF + 1, Master_RX_CNT - 1);
             Master_RX_CNT--;
             __enable_irq();
         }
-        delay_ms(1); // ±ÜÃâÃ¦µÈ
+        delay_ms(1); // é¿å…å¿™ç­‰
     }
 
-    // 6. ³¬Ê±´¦Àí£º¼ì²éÊÇ·ñÊÕµ½²¿·ÖÓĞĞ§ÏìÓ¦£¨Èİ´í£©
+    // 6. è¶…æ—¶å¤„ç†ï¼šæ£€æŸ¥æ˜¯å¦æ”¶åˆ°éƒ¨åˆ†æœ‰æ•ˆå“åº”ï¼ˆå®¹é”™ï¼‰
     if (Master_RX_CNT >= 4) {
         if (Master_RX_BUFF[0] == slave_addr && Master_RX_BUFF[1] == 0x03) {
             uint8_t byte_count = Master_RX_BUFF[2];
             if (byte_count == reg_num * 2 && Master_RX_CNT >= (3 + byte_count)) {
-                // ËäÈ±ÉÙCRC£¬µ«¿ÉÊÓÎª³É¹¦£¨¼«¶ËÇé¿ö£©
+                // è™½ç¼ºå°‘CRCï¼Œä½†å¯è§†ä¸ºæˆåŠŸï¼ˆæç«¯æƒ…å†µï¼‰
                 for (uint16_t i = 0; i < reg_num; i++) {
                     read_buff[i] = (Master_RX_BUFF[3 + i * 2] << 8) | Master_RX_BUFF[4 + i * 2];
                 }
-                printf("03Ö¸Áî²¿·ÖÏìÓ¦£¨³¤¶È%d£©£¬ÊÓÎª³É¹¦\r\n", Master_RX_CNT);
+                printf("03æŒ‡ä»¤éƒ¨åˆ†å“åº”ï¼ˆé•¿åº¦%dï¼‰ï¼Œè§†ä¸ºæˆåŠŸ\r\n", Master_RX_CNT);
                 __disable_irq();
                 Master_RX_CNT = 0;
                 __enable_irq();
@@ -766,26 +766,26 @@ uint8_t Modbus_03_ReadHoldReg(uint8_t slave_addr, uint16_t start_reg, uint16_t r
             }
         }
     }
-    // ³¬Ê±ºó´òÓ¡×îÖÕ»º³åÇøÄÚÈİ
-    printf("03Ö¸Áî³¬Ê±£¬×îºó»º³åÇø³¤¶È=%d, ÄÚÈİ: ", Master_RX_CNT);
+    // è¶…æ—¶åæ‰“å°æœ€ç»ˆç¼“å†²åŒºå†…å®¹
+    printf("03æŒ‡ä»¤è¶…æ—¶ï¼Œæœ€åç¼“å†²åŒºé•¿åº¦=%d, å†…å®¹: ", Master_RX_CNT);
     for (uint16_t i = 0; i < Master_RX_CNT; i++) printf("%02X ", Master_RX_BUFF[i]);
     printf("\r\n");
     master_state = MASTER_IDLE;
-    return 2; // ³¬Ê±´íÎó
+    return 2; // è¶…æ—¶é”™è¯¯
 }
 
 	
 
 
-//Modbus¹¦ÄÜÂë06´¦Àí³ÌĞò   //////////////////////////////////////////////////////////////////////
-//Ğ´µ¥¸ö±£³Ö¼Ä´æÆ÷
-// 06¹¦ÄÜÂë£ºĞ´µ¥¸ö¼Ä´æÆ÷ - ¿ØÖÆµç»úÆôÍ£/ÉèÖÃÂö³åÊı/·½ÏòµÈµ¥²ÎÊı
+//ModbusåŠŸèƒ½ç 06å¤„ç†ç¨‹åº   //////////////////////////////////////////////////////////////////////
+//å†™å•ä¸ªä¿æŒå¯„å­˜å™¨
+// 06åŠŸèƒ½ç ï¼šå†™å•ä¸ªå¯„å­˜å™¨ - æ§åˆ¶ç”µæœºå¯åœ/è®¾ç½®è„‰å†²æ•°/æ–¹å‘ç­‰å•å‚æ•°
 //uint8_t Modbus_06_WriteSingleReg(uint8_t slave_addr, uint16_t reg_addr, uint16_t reg_data)
 //{
 ////		printf("Modbus_06: reg_data = 0x%04X\n", reg_data);  
-//		// 1. Ç¿ÖÆÖØÖÃÖ÷Õ¾×´Ì¬£¨Èç¹û´¦ÓÚÒì³££©
+//		// 1. å¼ºåˆ¶é‡ç½®ä¸»ç«™çŠ¶æ€ï¼ˆå¦‚æœå¤„äºå¼‚å¸¸ï¼‰
 //    if (master_state != MASTER_IDLE) {
-//        printf("Modbus_06: Ç¿ÖÆÖØÖÃ×´Ì¬£¬Ô­×´Ì¬=%d\r\n", master_state);
+//        printf("Modbus_06: å¼ºåˆ¶é‡ç½®çŠ¶æ€ï¼ŒåŸçŠ¶æ€=%d\r\n", master_state);
 //        master_state = MASTER_IDLE;
 //        timeout_cnt = 0;
 //        __disable_irq();
@@ -794,13 +794,13 @@ uint8_t Modbus_03_ReadHoldReg(uint8_t slave_addr, uint16_t start_reg, uint16_t r
 //        memset(Master_RX_BUFF, 0, sizeof(Master_RX_BUFF));
 //    }
 
-//    // 2. Çå¿Õ½ÓÊÕ»º³åÇø£¨È·±£ÎŞ²ĞÁô£©
+//    // 2. æ¸…ç©ºæ¥æ”¶ç¼“å†²åŒºï¼ˆç¡®ä¿æ— æ®‹ç•™ï¼‰
 //    __disable_irq();
 //    Master_RX_CNT = 0;
 //    __enable_irq();
 //    memset(Master_RX_BUFF, 0, sizeof(Master_RX_BUFF));
 
-//    // 3. ¹¹½¨06Ö¡
+//    // 3. æ„å»º06å¸§
 //    uint8_t frame[8];
 //    frame[0] = slave_addr;
 //    frame[1] = 0x06;
@@ -812,11 +812,11 @@ uint8_t Modbus_03_ReadHoldReg(uint8_t slave_addr, uint16_t start_reg, uint16_t r
 //    frame[6] = crc & 0xFF;
 //    frame[7] = (crc >> 8) & 0xFF;
 
-//    // 4. ·¢ËÍÖ¸Áî
+//    // 4. å‘é€æŒ‡ä»¤
 //    master_state = MASTER_WAIT_RESP;
 //    RS485_MasterSendData(frame, 8);
 
-//    // 5. Èí¼ş³¬Ê±µÈ´ıÏìÓ¦£¨50ms£©
+//    // 5. è½¯ä»¶è¶…æ—¶ç­‰å¾…å“åº”ï¼ˆ50msï¼‰
 //    uint32_t start = GetTick();
 //    uint32_t timeout_ms = 50;
 //    uint16_t last_len = 0;
@@ -824,7 +824,7 @@ uint8_t Modbus_03_ReadHoldReg(uint8_t slave_addr, uint16_t start_reg, uint16_t r
 //    while ((GetTick() - start) < timeout_ms) 
 //		{
 //				
-//				MODS_Poll();   // ´¦Àí´ÓÕ¾Ö¡£¨·Ç×èÈû£¬ÈôÃ»ÓĞÍêÕûÖ¡Ôò¿ìËÙ·µ»Ø£©
+//				MODS_Poll();   // å¤„ç†ä»ç«™å¸§ï¼ˆéé˜»å¡ï¼Œè‹¥æ²¡æœ‰å®Œæ•´å¸§åˆ™å¿«é€Ÿè¿”å›ï¼‰
 //			
 //        __disable_irq();
 //        uint16_t len = Master_RX_CNT;
@@ -843,7 +843,7 @@ uint8_t Modbus_03_ReadHoldReg(uint8_t slave_addr, uint16_t start_reg, uint16_t r
 //                uint16_t recv_crc = (Master_RX_BUFF[7] << 8) | Master_RX_BUFF[6];
 //                uint16_t calc_crc = Modbus_CRC16(Master_RX_BUFF, 6);
 //                if (recv_crc == calc_crc) {
-//                    // ³É¹¦£ºÒÆ³ı¸ÃÖ¡
+//                    // æˆåŠŸï¼šç§»é™¤è¯¥å¸§
 //                    __disable_irq();
 //                    if (Master_RX_CNT >= 8) {
 //                        memmove(Master_RX_BUFF, Master_RX_BUFF + 8, Master_RX_CNT - 8);
@@ -853,18 +853,18 @@ uint8_t Modbus_03_ReadHoldReg(uint8_t slave_addr, uint16_t start_reg, uint16_t r
 //                    }
 //                    __enable_irq();
 //                    master_state = MASTER_IDLE;
-//                    printf("06Ö¸Áî³É¹¦\r\n");
+//                    printf("06æŒ‡ä»¤æˆåŠŸ\r\n");
 //                    return 0;
 //                }
 //            }
-//            // ²»Æ¥Åä£¬¶ªÆúÊ××Ö½Ú£¬¼ÌĞøµÈ´ı
+//            // ä¸åŒ¹é…ï¼Œä¸¢å¼ƒé¦–å­—èŠ‚ï¼Œç»§ç»­ç­‰å¾…
 //            __disable_irq();
 //            memmove(Master_RX_BUFF, Master_RX_BUFF + 1, Master_RX_CNT - 1);
 //            Master_RX_CNT--;
 //            __enable_irq();
 //        }
 //        else if (len == 7) {
-//            // ÈİÈÌ¶ªÊ§Ê××Ö½ÚµÄÇé¿ö
+//            // å®¹å¿ä¸¢å¤±é¦–å­—èŠ‚çš„æƒ…å†µ
 //            if (Master_RX_BUFF[0] == 0x06 &&
 //                ((Master_RX_BUFF[1] << 8) | Master_RX_BUFF[2]) == reg_addr) {
 //                uint8_t full_buf[8];
@@ -873,7 +873,7 @@ uint8_t Modbus_03_ReadHoldReg(uint8_t slave_addr, uint16_t start_reg, uint16_t r
 //                uint16_t recv_crc = (full_buf[7] << 8) | full_buf[6];
 //                uint16_t calc_crc = Modbus_CRC16(full_buf, 6);
 //                if (recv_crc == calc_crc) {
-//                    printf("¼ì²âµ½¶ªÊ§µØÖ·µÄ7×Ö½ÚÏìÓ¦£¬ÊÓÎª³É¹¦\r\n");
+//                    printf("æ£€æµ‹åˆ°ä¸¢å¤±åœ°å€çš„7å­—èŠ‚å“åº”ï¼Œè§†ä¸ºæˆåŠŸ\r\n");
 //                    __disable_irq();
 //                    Master_RX_CNT = 0;
 //                    __enable_irq();
@@ -885,11 +885,11 @@ uint8_t Modbus_03_ReadHoldReg(uint8_t slave_addr, uint16_t start_reg, uint16_t r
 ////        delay_ms(1);
 //    }
 
-//    // ³¬Ê±´¦Àí£º¼ì²éÊÇ·ñÊÕµ½²¿·ÖÓĞĞ§Êı¾İ
+//    // è¶…æ—¶å¤„ç†ï¼šæ£€æŸ¥æ˜¯å¦æ”¶åˆ°éƒ¨åˆ†æœ‰æ•ˆæ•°æ®
 //    if (Master_RX_CNT >= 4) {
 //        if (Master_RX_BUFF[0] == slave_addr && Master_RX_BUFF[1] == 0x06 &&
 //            ((Master_RX_BUFF[2] << 8) | Master_RX_BUFF[3]) == reg_addr) {
-//            printf("06Ö¸Áî²¿·ÖÏìÓ¦£¨³¤¶È%d£©£¬ÊÓÎª³É¹¦\r\n", Master_RX_CNT);
+//            printf("06æŒ‡ä»¤éƒ¨åˆ†å“åº”ï¼ˆé•¿åº¦%dï¼‰ï¼Œè§†ä¸ºæˆåŠŸ\r\n", Master_RX_CNT);
 //            __disable_irq();
 //            Master_RX_CNT = 0;
 //            __enable_irq();
@@ -898,7 +898,7 @@ uint8_t Modbus_03_ReadHoldReg(uint8_t slave_addr, uint16_t start_reg, uint16_t r
 //        }
 //    }
 
-//    printf("06Ö¸Áî³¬Ê±£¬×îºó³¤¶È=%d\r\n", Master_RX_CNT);
+//    printf("06æŒ‡ä»¤è¶…æ—¶ï¼Œæœ€åé•¿åº¦=%d\r\n", Master_RX_CNT);
 //    master_state = MASTER_IDLE;
 //    return 2;
 //}
@@ -906,12 +906,12 @@ uint8_t Modbus_03_ReadHoldReg(uint8_t slave_addr, uint16_t start_reg, uint16_t r
 uint8_t Modbus_06_WriteSingleReg(uint8_t slave_addr, uint16_t reg_addr, uint16_t reg_data)
 {
 	printf("Modbus_06 entry: state=%d, addr=0x%04X\n", master_state, reg_addr);
-    // 1. ×´Ì¬¼ì²é
+    // 1. çŠ¶æ€æ£€æŸ¥
     if (master_state != MASTER_IDLE || reg_addr == 0) {
-        return 1; // ×´Ì¬³åÍ»»ò²ÎÊı´íÎó
+        return 1; // çŠ¶æ€å†²çªæˆ–å‚æ•°é”™è¯¯
     }
 
-    // 2. ¹¹½¨06¹¦ÄÜÂëÖ¡£¨Ê¹ÓÃ¾Ö²¿»º³åÇø£©
+    // 2. æ„å»º06åŠŸèƒ½ç å¸§ï¼ˆä½¿ç”¨å±€éƒ¨ç¼“å†²åŒºï¼‰
     uint8_t local_tx_buff[8];
     local_tx_buff[0] = slave_addr;
     local_tx_buff[1] = 0x06;
@@ -923,10 +923,10 @@ uint8_t Modbus_06_WriteSingleReg(uint8_t slave_addr, uint16_t reg_addr, uint16_t
     local_tx_buff[6] = crc & 0xFF;
     local_tx_buff[7] = (crc >> 8) & 0xFF;
 
-    // ¸´ÖÆµ½È«¾Ö·¢ËÍ»º³åÇø
+    // å¤åˆ¶åˆ°å…¨å±€å‘é€ç¼“å†²åŒº
     memcpy(RS485_TX_BUFF, local_tx_buff, 8);
 
-    // 3. ÖØÖÃ½ÓÊÕ»º³åÇøºÍ×´Ì¬
+    // 3. é‡ç½®æ¥æ”¶ç¼“å†²åŒºå’ŒçŠ¶æ€
     memset(Master_RX_BUFF, 0, sizeof(Master_RX_BUFF));
     Master_RX_CNT = 0;
     master_state = MASTER_SENDING;
@@ -939,11 +939,11 @@ uint8_t Modbus_06_WriteSingleReg(uint8_t slave_addr, uint16_t reg_addr, uint16_t
 //    }
 //    printf("\r\n");
 
-    // 4. ·¢ËÍÖ¡Êı¾İ
+    // 4. å‘é€å¸§æ•°æ®
     RS485_MasterSendData(RS485_TX_BUFF, 8);
     master_state = MASTER_WAIT_RESP;
 
-    // 5. µÈ´ıÏìÓ¦£¨Ë«ÖØ³¬Ê±»úÖÆ£©
+    // 5. ç­‰å¾…å“åº”ï¼ˆåŒé‡è¶…æ—¶æœºåˆ¶ï¼‰
     uint32_t local_timeout = 0;
     const uint32_t LOCAL_TIMEOUT_MAX = 50;
     uint16_t last_rx_len = 0;
@@ -951,21 +951,21 @@ uint8_t Modbus_06_WriteSingleReg(uint8_t slave_addr, uint16_t reg_addr, uint16_t
         local_timeout++;
         if (timeout_cnt > TIMEOUT_MS || local_timeout > LOCAL_TIMEOUT_MAX) {
 					
-//            MODS_Poll();   // ´¦Àí´ÓÕ¾Ö¡£¨·Ç×èÈû£©
+//            MODS_Poll();   // å¤„ç†ä»ç«™å¸§ï¼ˆéé˜»å¡ï¼‰
 					
-            // ³¬Ê±Ç°¼ì²éÊÇ·ñÓĞÊı¾İ½ÓÊÕ£¨¿íËÉĞ£Ñé£©
+            // è¶…æ—¶å‰æ£€æŸ¥æ˜¯å¦æœ‰æ•°æ®æ¥æ”¶ï¼ˆå®½æ¾æ ¡éªŒï¼‰
             if (Master_RX_CNT > 0) {
                 if (Master_RX_BUFF[0] == slave_addr && Master_RX_BUFF[1] == 0x06) {
                     uint16_t resp_reg = (Master_RX_BUFF[2] << 8) | Master_RX_BUFF[3];
-                    printf("¿íËÉĞ£Ñé: resp_reg=0x%04X, reg_addr=0x%04X\n", resp_reg, reg_addr);
+                    printf("å®½æ¾æ ¡éªŒ: resp_reg=0x%04X, reg_addr=0x%04X\n", resp_reg, reg_addr);
                     if (resp_reg == reg_addr) {
-                        // ÒÆ³ıÒÑ´¦ÀíµÄ8×Ö½ÚÖ¡
+                        // ç§»é™¤å·²å¤„ç†çš„8å­—èŠ‚å¸§
                         __disable_irq();
                         if (Master_RX_CNT >= 8) {
                             memmove(Master_RX_BUFF, Master_RX_BUFF + 8, Master_RX_CNT - 8);
                             Master_RX_CNT -= 8;
                         } else if (Master_RX_CNT == 7) {
-                            // ÈİÈÌ¶ªÊ§Ê××Ö½Ú
+                            // å®¹å¿ä¸¢å¤±é¦–å­—èŠ‚
                             if (Master_RX_BUFF[0] == 0x06 &&
                                 ((Master_RX_BUFF[1] << 8) | Master_RX_BUFF[2]) == reg_addr) {
                                 uint8_t full_buf[8];
@@ -974,7 +974,7 @@ uint8_t Modbus_06_WriteSingleReg(uint8_t slave_addr, uint16_t reg_addr, uint16_t
                                 uint16_t recv_crc = (full_buf[7] << 8) | full_buf[6];
                                 uint16_t calc_crc = Modbus_CRC16(full_buf, 6);
                                 if (recv_crc == calc_crc) {
-                                    printf("¼ì²âµ½¶ªÊ§µØÖ·µÄ7×Ö½ÚÏìÓ¦£¬ÊÓÎª³É¹¦\r\n");
+                                    printf("æ£€æµ‹åˆ°ä¸¢å¤±åœ°å€çš„7å­—èŠ‚å“åº”ï¼Œè§†ä¸ºæˆåŠŸ\r\n");
                                     __disable_irq();
                                     Master_RX_CNT = 0;
                                     __enable_irq();
@@ -988,15 +988,15 @@ uint8_t Modbus_06_WriteSingleReg(uint8_t slave_addr, uint16_t reg_addr, uint16_t
                         __enable_irq();
                         master_state = MASTER_IDLE;
                         timeout_cnt = 0;
-                        return 0; // ³É¹¦
+                        return 0; // æˆåŠŸ
                     }
                 }
             }
-            printf("06³¬Ê±ÍË³ö£ºlocal_timeout=%d, Master_RX_CNT=%d\r\n", local_timeout, Master_RX_CNT);
+            printf("06è¶…æ—¶é€€å‡ºï¼šlocal_timeout=%d, Master_RX_CNT=%d\r\n", local_timeout, Master_RX_CNT);
             master_state = MASTER_IDLE;
             timeout_cnt = 0;
 						delay_ms(10);
-            return 2; // ³¬Ê±´íÎó
+            return 2; // è¶…æ—¶é”™è¯¯
         }
 
         if (Master_RX_CNT != last_rx_len) {
@@ -1010,13 +1010,13 @@ uint8_t Modbus_06_WriteSingleReg(uint8_t slave_addr, uint16_t reg_addr, uint16_t
         delay_ms(10);
     }
 
-    // 6. ÏìÓ¦Ğ£Ñé£¨master_state == MASTER_RESP_OK£©
+    // 6. å“åº”æ ¡éªŒï¼ˆmaster_state == MASTER_RESP_OKï¼‰
     if (master_state == MASTER_RESP_OK) {
         printf("06 strict: len=%d, data=", Master_RX_CNT);
         for (uint16_t i = 0; i < Master_RX_CNT; i++) printf("%02X ", Master_RX_BUFF[i]);
         printf("\r\n");
 
-        if (Master_RX_CNT != 8) return 3; // ÏìÓ¦³¤¶È´íÎó
+        if (Master_RX_CNT != 8) return 3; // å“åº”é•¿åº¦é”™è¯¯
         if (Master_RX_BUFF[0] != slave_addr || Master_RX_BUFF[1] != 0x06) return 4;
 
         uint16_t resp_reg_addr = (Master_RX_BUFF[2] << 8) | Master_RX_BUFF[3];
@@ -1030,19 +1030,19 @@ uint8_t Modbus_06_WriteSingleReg(uint8_t slave_addr, uint16_t reg_addr, uint16_t
         if (resp_crc != calc_crc) return 6;
 
         master_state = MASTER_IDLE;
-        return 0; // ³É¹¦
+        return 0; // æˆåŠŸ
     } else {
         master_state = MASTER_IDLE;
-        return 7; // ÏìÓ¦Òì³£
+        return 7; // å“åº”å¼‚å¸¸
     }
 }
 
-// Modbus¹¦ÄÜÂë06´¦Àí³ÌĞò
-// Ğ´µ¥¸ö±£³Ö¼Ä´æÆ÷
-// ·µ»Ø:
-// 0:³É¹¦
-// 1:²ÎÊı´íÎó
-// 2:³¬Ê±
+// ModbusåŠŸèƒ½ç 06å¤„ç†ç¨‹åº
+// å†™å•ä¸ªä¿æŒå¯„å­˜å™¨
+// è¿”å›:
+// 0:æˆåŠŸ
+// 1:å‚æ•°é”™è¯¯
+// 2:è¶…æ—¶
 //uint8_t Modbus_06_WriteSingleReg(uint8_t slave_addr, 
 //                                 uint16_t reg_addr, 
 //                                 uint16_t reg_data)
@@ -1050,18 +1050,18 @@ uint8_t Modbus_06_WriteSingleReg(uint8_t slave_addr, uint16_t reg_addr, uint16_t
 //    uint8_t frame[8];
 
 //    /*
-//     * 1. ¼ì²éÖ÷Õ¾×´Ì¬
-//     * ²»ÔÊĞíÇ¿ÖÆÇå×´Ì¬
+//     * 1. æ£€æŸ¥ä¸»ç«™çŠ¶æ€
+//     * ä¸å…è®¸å¼ºåˆ¶æ¸…çŠ¶æ€
 //     */
 //    if (master_state != MASTER_IDLE)
 //    {
-//        printf("Modbus_06: Ö÷Õ¾Ã¦£¬×´Ì¬=%d\r\n", master_state);
+//        printf("Modbus_06: ä¸»ç«™å¿™ï¼ŒçŠ¶æ€=%d\r\n", master_state);
 //        return 2;
 //    }
 
 
 //    /*
-//     * 2. Çå¿Õ½ÓÊÕ»º´æ
+//     * 2. æ¸…ç©ºæ¥æ”¶ç¼“å­˜
 //     */
 //    __disable_irq();
 //    Master_RX_CNT = 0;
@@ -1071,13 +1071,13 @@ uint8_t Modbus_06_WriteSingleReg(uint8_t slave_addr, uint16_t reg_addr, uint16_t
 
 
 //    /*
-//     * 3. ¹¹Ôì06¹¦ÄÜÂëÖ¡
+//     * 3. æ„é€ 06åŠŸèƒ½ç å¸§
 //     *
-//     * ¸ñÊ½:
-//     * µØÖ·
+//     * æ ¼å¼:
+//     * åœ°å€
 //     * 06
-//     * ¼Ä´æÆ÷µØÖ·
-//     * Êı¾İ
+//     * å¯„å­˜å™¨åœ°å€
+//     * æ•°æ®
 //     * CRC
 //     */
 //    frame[0] = slave_addr;
@@ -1105,7 +1105,7 @@ uint8_t Modbus_06_WriteSingleReg(uint8_t slave_addr, uint16_t reg_addr, uint16_t
 
 
 //    /*
-//     * 4. ·¢ËÍÊı¾İ
+//     * 4. å‘é€æ•°æ®
 //     */
 //    master_state = MASTER_WAIT_RESP;
 
@@ -1113,12 +1113,12 @@ uint8_t Modbus_06_WriteSingleReg(uint8_t slave_addr, uint16_t reg_addr, uint16_t
 
 
 //    /*
-//     * 5. µÈ´ıÏìÓ¦
+//     * 5. ç­‰å¾…å“åº”
 //     *
-//     * ×¢Òâ£º
-//     * ÕâÀï²»ÔÙµ÷ÓÃ MODS_Poll()
+//     * æ³¨æ„ï¼š
+//     * è¿™é‡Œä¸å†è°ƒç”¨ MODS_Poll()
 //     *
-//     * ½ÓÊÕÓÉÖ÷Ñ­»·Í³Ò»´¦Àí
+//     * æ¥æ”¶ç”±ä¸»å¾ªç¯ç»Ÿä¸€å¤„ç†
 //     */
 //    uint32_t start = GetTick();
 
@@ -1134,10 +1134,10 @@ uint8_t Modbus_06_WriteSingleReg(uint8_t slave_addr, uint16_t reg_addr, uint16_t
 
 
 //        /*
-//         * ÊÕµ½ÍêÕû06ÏìÓ¦
+//         * æ”¶åˆ°å®Œæ•´06å“åº”
 //         *
-//         * ¸ñÊ½:
-//         * µØÖ· 06 ¼Ä´æÆ÷ Êı¾İ CRC
+//         * æ ¼å¼:
+//         * åœ°å€ 06 å¯„å­˜å™¨ æ•°æ® CRC
 //         */
 //        if(len >= 8)
 //        {
@@ -1177,7 +1177,7 @@ uint8_t Modbus_06_WriteSingleReg(uint8_t slave_addr, uint16_t reg_addr, uint16_t
 //                    master_state = MASTER_IDLE;
 
 
-//                    printf("06Ö¸Áî³É¹¦\r\n");
+//                    printf("06æŒ‡ä»¤æˆåŠŸ\r\n");
 
 //                    return 0;
 //                }
@@ -1185,7 +1185,7 @@ uint8_t Modbus_06_WriteSingleReg(uint8_t slave_addr, uint16_t reg_addr, uint16_t
 
 
 //            /*
-//             * ·ÇÄ¿±êÖ¡£¬¶ªÆú
+//             * éç›®æ ‡å¸§ï¼Œä¸¢å¼ƒ
 //             */
 //            __disable_irq();
 
@@ -1208,10 +1208,10 @@ uint8_t Modbus_06_WriteSingleReg(uint8_t slave_addr, uint16_t reg_addr, uint16_t
 
 
 //    /*
-//     * 6. ³¬Ê±´¦Àí
+//     * 6. è¶…æ—¶å¤„ç†
 //     */
 
-//    printf("06Ö¸Áî³¬Ê±£¬RX³¤¶È=%d\r\n",
+//    printf("06æŒ‡ä»¤è¶…æ—¶ï¼ŒRXé•¿åº¦=%d\r\n",
 //           Master_RX_CNT);
 
 
@@ -1226,79 +1226,79 @@ uint8_t Modbus_06_WriteSingleReg(uint8_t slave_addr, uint16_t reg_addr, uint16_t
 //    return 2;
 //}	
 
-//Modbus¹¦ÄÜÂë10´¦Àí³ÌĞò 
-//Ğ´¶à¸ö±£³Ö¼Ä´æÆ÷
+//ModbusåŠŸèƒ½ç 10å¤„ç†ç¨‹åº 
+//å†™å¤šä¸ªä¿æŒå¯„å­˜å™¨
 uint8_t Modbus_10_WriteMultiReg(uint8_t slave_addr, uint16_t start_reg, uint16_t reg_num, uint16_t *write_buff)
 {
-  					// Çå¿Õ»º³åÇø
+  					// æ¸…ç©ºç¼“å†²åŒº
 			memset(Master_RX_BUFF, 0, sizeof(Master_RX_BUFF));
 			__disable_irq();
 			Master_RX_CNT = 0;
 			__enable_irq();  
-	if(master_state != MASTER_IDLE || reg_num == 0 || reg_num > 123) return 1; // ²ÎÊı´íÎó
-		// Ê¹ÓÃ¾Ö²¿»º³åÇø£¬±ÜÃâÈ«¾Ö»º³åÇø±»ÎÛÈ¾
+	if(master_state != MASTER_IDLE || reg_num == 0 || reg_num > 123) return 1; // å‚æ•°é”™è¯¯
+		// ä½¿ç”¨å±€éƒ¨ç¼“å†²åŒºï¼Œé¿å…å…¨å±€ç¼“å†²åŒºè¢«æ±¡æŸ“
     uint8_t local_tx_buff[256];
-    // 10¹¦ÄÜÂëÖ¡¸ñÊ½£º´ÓÕ¾µØÖ·(1) + ¹¦ÄÜÂë10(1) + ÆğÊ¼¼Ä´æÆ÷(2) + ¼Ä´æÆ÷Êı(2) + ×Ö½ÚÊı(1) + ¼Ä´æÆ÷Êı¾İ(N*2) + CRC(2)
+    // 10åŠŸèƒ½ç å¸§æ ¼å¼ï¼šä»ç«™åœ°å€(1) + åŠŸèƒ½ç 10(1) + èµ·å§‹å¯„å­˜å™¨(2) + å¯„å­˜å™¨æ•°(2) + å­—èŠ‚æ•°(1) + å¯„å­˜å™¨æ•°æ®(N*2) + CRC(2)
     uint8_t frame_len = 7 + reg_num * 2 +2;
-    local_tx_buff[0] = slave_addr;                          // ´ÓÕ¾µØÖ·
-    local_tx_buff[1] = 0x10;                                // 10¹¦ÄÜÂë£¨0x10=16½øÖÆ£©
-    local_tx_buff[2] = (start_reg >> 8) & 0xFF;             // ÆğÊ¼¼Ä´æÆ÷¸ß×Ö½Ú
-    local_tx_buff[3] = start_reg & 0xFF;                    // ÆğÊ¼¼Ä´æÆ÷µÍ×Ö½Ú
-    local_tx_buff[4] = (reg_num >> 8) & 0xFF;               // ¼Ä´æÆ÷ÊıÁ¿¸ß×Ö½Ú
-    local_tx_buff[5] = reg_num & 0xFF;                      // ¼Ä´æÆ÷ÊıÁ¿µÍ×Ö½Ú
-    local_tx_buff[6] = reg_num * 2;                         // ×Ö½ÚÊı£¨¼Ä´æÆ÷Êı*2£©
+    local_tx_buff[0] = slave_addr;                          // ä»ç«™åœ°å€
+    local_tx_buff[1] = 0x10;                                // 10åŠŸèƒ½ç ï¼ˆ0x10=16è¿›åˆ¶ï¼‰
+    local_tx_buff[2] = (start_reg >> 8) & 0xFF;             // èµ·å§‹å¯„å­˜å™¨é«˜å­—èŠ‚
+    local_tx_buff[3] = start_reg & 0xFF;                    // èµ·å§‹å¯„å­˜å™¨ä½å­—èŠ‚
+    local_tx_buff[4] = (reg_num >> 8) & 0xFF;               // å¯„å­˜å™¨æ•°é‡é«˜å­—èŠ‚
+    local_tx_buff[5] = reg_num & 0xFF;                      // å¯„å­˜å™¨æ•°é‡ä½å­—èŠ‚
+    local_tx_buff[6] = reg_num * 2;                         // å­—èŠ‚æ•°ï¼ˆå¯„å­˜å™¨æ•°*2ï¼‰
 
-    // Ìî³äĞ´ÈëÊı¾İ£¨¸ß×Ö½ÚÔÚÇ°£©
+    // å¡«å……å†™å…¥æ•°æ®ï¼ˆé«˜å­—èŠ‚åœ¨å‰ï¼‰
     for(uint16_t i=0; i<reg_num; i++)
     {
         local_tx_buff[7 + i*2] = (write_buff[i] >> 8) & 0xFF;
         local_tx_buff[8 + i*2] = write_buff[i] & 0xFF;
-//				printf("Ñ­»·i=%d£ºÌî³äÎ»ÖÃ[%d]=%02X, [%d]=%02X\n", 
+//				printf("å¾ªç¯i=%dï¼šå¡«å……ä½ç½®[%d]=%02X, [%d]=%02X\n", 
 //           i, 7+i*2, RS485_TX_BUFF[7+i*2], 8+i*2, RS485_TX_BUFF[8+i*2]);
 //			printf("\r\n");
     }
 
-    // ¼ÆËãCRC
+    // è®¡ç®—CRC
     uint16_t crc = Modbus_CRC16(local_tx_buff, frame_len - 2);
     local_tx_buff[frame_len - 2] = crc & 0xFF;
     local_tx_buff[frame_len - 1] = (crc >> 8) & 0xFF;
-		// ¸´ÖÆµ½È«¾Ö·¢ËÍ»º³åÇø
+		// å¤åˆ¶åˆ°å…¨å±€å‘é€ç¼“å†²åŒº
     memcpy(RS485_TX_BUFF, local_tx_buff, frame_len);
 
-    // ÖØÖÃ½ÓÊÕ»º³åÇøºÍ×´Ì¬
+    // é‡ç½®æ¥æ”¶ç¼“å†²åŒºå’ŒçŠ¶æ€
     memset(Master_RX_BUFF, 0, sizeof(Master_RX_BUFF));
     Master_RX_CNT = 0;
     master_state = MASTER_SENDING;
     timeout_cnt = 0;
 		
-		printf("·¢ËÍ10Ö¸Áî: ");
+		printf("å‘é€10æŒ‡ä»¤: ");
 		for (int i=0; i<frame_len; i++) printf("%02X ", local_tx_buff[i]);
 		printf("\r\n");
 
-    // ·¢ËÍÖ¡Êı¾İ
+    // å‘é€å¸§æ•°æ®
     RS485_MasterSendData(RS485_TX_BUFF, frame_len);
     master_state = MASTER_WAIT_RESP;
-    // µÈ´ıÏìÓ¦»ò³¬Ê±
-    uint32_t local_timeout = 0; // ±¾µØ³¬Ê±¼ÆÊıÆ÷£¬±ÜÃâÒÀÀµÈ«¾ÖTIM3
+    // ç­‰å¾…å“åº”æˆ–è¶…æ—¶
+    uint32_t local_timeout = 0; // æœ¬åœ°è¶…æ—¶è®¡æ•°å™¨ï¼Œé¿å…ä¾èµ–å…¨å±€TIM3
 		const uint32_t LOCAL_TIMEOUT_MAX = 50; 
 		uint16_t last_rx_len = 0; 
 		while(master_state == MASTER_WAIT_RESP)
 		{
 				local_timeout++;
-				// Ë«ÖØ³¬Ê±ÅĞ¶Ï£ºÈ«¾Ötimeout_cnt³¬Ê± OR ±¾µØ¼ÆÊı¶µµ×³¬Ê±£¨
+				// åŒé‡è¶…æ—¶åˆ¤æ–­ï¼šå…¨å±€timeout_cntè¶…æ—¶ OR æœ¬åœ°è®¡æ•°å…œåº•è¶…æ—¶ï¼ˆ
 				if(timeout_cnt > TIMEOUT_MS || local_timeout > LOCAL_TIMEOUT_MAX) 
 				{
-//						 MODS_Poll();   // ´¦Àí´ÓÕ¾Ö¡£¨·Ç×èÈû£¬ÈôÃ»ÓĞÍêÕûÖ¡Ôò¿ìËÙ·µ»Ø£©
-						// ³¬Ê±Ç°ÏÈ¼ì²éÊÇ·ñÓĞÊı¾İ½ÓÊÕ£¨ÓĞÊı¾İ=ÏìÓ¦ÒÑµ½£¬¿íËÉĞ£Ñé£©
+//						 MODS_Poll();   // å¤„ç†ä»ç«™å¸§ï¼ˆéé˜»å¡ï¼Œè‹¥æ²¡æœ‰å®Œæ•´å¸§åˆ™å¿«é€Ÿè¿”å›ï¼‰
+						// è¶…æ—¶å‰å…ˆæ£€æŸ¥æ˜¯å¦æœ‰æ•°æ®æ¥æ”¶ï¼ˆæœ‰æ•°æ®=å“åº”å·²åˆ°ï¼Œå®½æ¾æ ¡éªŒï¼‰
 						if(Master_RX_CNT > 0)
 						{
 								if (Master_RX_BUFF[0] == slave_addr && Master_RX_BUFF[1] == 0x10) 
 								{
 									uint16_t resp_reg = (Master_RX_BUFF[2]<<8) | Master_RX_BUFF[3];
-									printf("¿íËÉĞ£Ñé: resp_reg=0x%04X, start_reg=0x%04X\n", resp_reg, start_reg);
+									printf("å®½æ¾æ ¡éªŒ: resp_reg=0x%04X, start_reg=0x%04X\n", resp_reg, start_reg);
 									if (resp_reg == start_reg)  
 									{
-										// ÒÆ³ıÒÑ´¦ÀíµÄ8×Ö½ÚÖ¡
+										// ç§»é™¤å·²å¤„ç†çš„8å­—èŠ‚å¸§
 										__disable_irq();
 										if (Master_RX_CNT >= 8) 
 										{
@@ -1307,7 +1307,7 @@ uint8_t Modbus_10_WriteMultiReg(uint8_t slave_addr, uint16_t start_reg, uint16_t
 										}
 										else if (Master_RX_CNT == 7) 
 										{
-												// ÈİÈÌ¶ªÊ§Ê××Ö½ÚµÄÇé¿ö
+												// å®¹å¿ä¸¢å¤±é¦–å­—èŠ‚çš„æƒ…å†µ
 												if (Master_RX_BUFF[0] == 0x10 &&
 														((Master_RX_BUFF[1] << 8) | Master_RX_BUFF[2]) == start_reg) {
 														uint8_t full_buf[8];
@@ -1316,7 +1316,7 @@ uint8_t Modbus_10_WriteMultiReg(uint8_t slave_addr, uint16_t start_reg, uint16_t
 														uint16_t recv_crc = (full_buf[7] << 8) | full_buf[6];
 														uint16_t calc_crc = Modbus_CRC16(full_buf, 6);
 														if (recv_crc == calc_crc) {
-																printf("¼ì²âµ½¶ªÊ§µØÖ·µÄ7×Ö½ÚÏìÓ¦£¬ÊÓÎª³É¹¦\r\n");
+																printf("æ£€æµ‹åˆ°ä¸¢å¤±åœ°å€çš„7å­—èŠ‚å“åº”ï¼Œè§†ä¸ºæˆåŠŸ\r\n");
 																__disable_irq();
 																Master_RX_CNT = 0;
 																__enable_irq();
@@ -1327,23 +1327,23 @@ uint8_t Modbus_10_WriteMultiReg(uint8_t slave_addr, uint16_t start_reg, uint16_t
 										}										
 										else 
 										{
-												Master_RX_CNT = 0; // °²È«Æğ¼û£¬Çå¿Õ
+												Master_RX_CNT = 0; // å®‰å…¨èµ·è§ï¼Œæ¸…ç©º
 										}
 										__enable_irq();	
 									
 										master_state = MASTER_IDLE;
 										timeout_cnt = 0;
-										return 0; // ³É¹¦
+										return 0; // æˆåŠŸ
 									}
 								}
 						}
-						// ÎŞÊı¾İ/Ğ£ÑéÊ§°Ü£¬·µ»Ø³¬Ê±
-						printf("³¬Ê±ÍË³ö£ºlocal_timeout=%d, Master_RX_CNT=%d\r\n", local_timeout, Master_RX_CNT);
-						fflush(stdout); // È·±£´òÓ¡Êä³ö
+						// æ— æ•°æ®/æ ¡éªŒå¤±è´¥ï¼Œè¿”å›è¶…æ—¶
+						printf("è¶…æ—¶é€€å‡ºï¼šlocal_timeout=%d, Master_RX_CNT=%d\r\n", local_timeout, Master_RX_CNT);
+						fflush(stdout); // ç¡®ä¿æ‰“å°è¾“å‡º
 						
 						master_state = MASTER_IDLE;
 						timeout_cnt = 0;
-						return 2; // ³¬Ê±´íÎó
+						return 2; // è¶…æ—¶é”™è¯¯
 				}
 				
 				if (Master_RX_CNT != last_rx_len) {
@@ -1353,73 +1353,73 @@ uint8_t Modbus_10_WriteMultiReg(uint8_t slave_addr, uint16_t start_reg, uint16_t
 				last_rx_len = Master_RX_CNT;
 				}
 				
-				// ±¾µØ¼ÆÊıÒç³öÖØÖÃ
+				// æœ¬åœ°è®¡æ•°æº¢å‡ºé‡ç½®
 				if(local_timeout > 500000) local_timeout = 0;
-				// ²¹³ä¶ÌÑÓÊ±£¬½µµÍCPUÕ¼ÓÃ£¨±Ø¼Ó£©
+				// è¡¥å……çŸ­å»¶æ—¶ï¼Œé™ä½CPUå ç”¨ï¼ˆå¿…åŠ ï¼‰
 //				delay_ms(10);
 				delay_us(500);
 		}
 
-    // Ğ£ÑéÏìÓ¦£¨10¹¦ÄÜÂëÏìÓ¦ÎªÔ­ÇëÇóµÄÆğÊ¼¼Ä´æÆ÷+ÊıÁ¿£©
+    // æ ¡éªŒå“åº”ï¼ˆ10åŠŸèƒ½ç å“åº”ä¸ºåŸè¯·æ±‚çš„èµ·å§‹å¯„å­˜å™¨+æ•°é‡ï¼‰
     if(master_state == MASTER_RESP_OK)
     {
         printf("10 func strict: len=%d, data=", Master_RX_CNT);
 				for (uint16_t i=0; i<Master_RX_CNT; i++) printf("%02X ", Master_RX_BUFF[i]);
 				printf("\r\n");  
 			
-			// 10¹¦ÄÜÂëÏìÓ¦¸ñÊ½£º´ÓÕ¾µØÖ·(1) + ¹¦ÄÜÂë10(1) + ÆğÊ¼¼Ä´æÆ÷(2) + ¼Ä´æÆ÷Êı(2) + CRC(2)
-        if(Master_RX_CNT != 8) return 3; // ÏìÓ¦³¤¶È´íÎó
+			// 10åŠŸèƒ½ç å“åº”æ ¼å¼ï¼šä»ç«™åœ°å€(1) + åŠŸèƒ½ç 10(1) + èµ·å§‹å¯„å­˜å™¨(2) + å¯„å­˜å™¨æ•°(2) + CRC(2)
+        if(Master_RX_CNT != 8) return 3; // å“åº”é•¿åº¦é”™è¯¯
         if(Master_RX_BUFF[0] != slave_addr || Master_RX_BUFF[1] != 0x10) return 4;
 
-        // Ğ£ÑéÆğÊ¼¼Ä´æÆ÷ºÍÊıÁ¿
+        // æ ¡éªŒèµ·å§‹å¯„å­˜å™¨å’Œæ•°é‡
         uint16_t resp_start_reg = (Master_RX_BUFF[2] << 8) | Master_RX_BUFF[3];
         uint16_t resp_reg_num = (Master_RX_BUFF[4] << 8) | Master_RX_BUFF[5];
 				printf("resp_start_reg: %d, start_reg: %d\r\n", resp_start_reg, start_reg);
         if(resp_start_reg != start_reg || resp_reg_num != reg_num) return 5;
 
-        // Ğ£ÑéCRC
+        // æ ¡éªŒCRC
         uint16_t resp_crc = (Master_RX_BUFF[7] << 8) | Master_RX_BUFF[6];
         uint16_t calc_crc = Modbus_CRC16(Master_RX_BUFF, 6);
         if(resp_crc != calc_crc) return 6;
 
         master_state = MASTER_IDLE;
-        return 0; // ³É¹¦
+        return 0; // æˆåŠŸ
     }
     else
     {
         master_state = MASTER_IDLE;
-        return 7; // ÏìÓ¦Òì³£
+        return 7; // å“åº”å¼‚å¸¸
     }
 }
 
 /**
- * @brief ÂÖÑ¯µç»ú2¡¢5~12µÄ±¨¾¯×´Ì¬£¬ÈçÓĞ±¨¾¯Ôò´æÈë0x17²¢Çå³ı±¨¾¯
- * @return 0:È«²¿³É¹¦; ·Ç0:Ä³¸öµç»ú²Ù×÷Ê§°Ü£¨¿É¼ÇÂ¼´íÎóÂë£©
+ * @brief è½®è¯¢ç”µæœº2ã€5~12çš„æŠ¥è­¦çŠ¶æ€ï¼Œå¦‚æœ‰æŠ¥è­¦åˆ™å­˜å…¥0x17å¹¶æ¸…é™¤æŠ¥è­¦
+ * @return 0:å…¨éƒ¨æˆåŠŸ; é0:æŸä¸ªç”µæœºæ“ä½œå¤±è´¥ï¼ˆå¯è®°å½•é”™è¯¯ç ï¼‰
  */
 //void PollAndClearMotorAlarms_NonBlocking(void)
 //{
-//    static uint8_t poll_counter = 0;   // ¼ÆÊıÆ÷£¬½öµ±²»ÔÚÂÖÑ¯Ê±ÀÛ¼Ó
+//    static uint8_t poll_counter = 0;   // è®¡æ•°å™¨ï¼Œä»…å½“ä¸åœ¨è½®è¯¢æ—¶ç´¯åŠ 
 ////		printf("poll_cnt=%d, state=%d, busy=%d\r\n", poll_counter, master_state, Sequence_IsBusy());
-//    // ---------- 1. Æô¶¯ÂÖÑ¯£¨»ùÓÚ¼ÆÊı£© ----------
+//    // ---------- 1. å¯åŠ¨è½®è¯¢ï¼ˆåŸºäºè®¡æ•°ï¼‰ ----------
 //    if (!alarm_poll_active) {
 //        poll_counter++;
 //        if (poll_counter >= ALARM_POLL_COUNT_THRESHOLD &&
 //        master_state == MASTER_IDLE && !Sequence_IsBusy()) {
-//            poll_counter = 0;                       // ¸´Î»¼ÆÊı
-//            alarm_poll_active = 1;                  // ½øÈëÂÖÑ¯×´Ì¬
-//            alarm_motor_index = MOTOR_ID_START;     // ´ÓµÚÒ»¸öµç»ú¿ªÊ¼
-//            alarm_substep = 0;                      // ³õÊ¼²½Öè£º¶Á±¨¾¯
-//            printf("Æô¶¯±¨¾¯ÂÖÑ¯£¨¼ÆÊı´¥·¢£©\n");
+//            poll_counter = 0;                       // å¤ä½è®¡æ•°
+//            alarm_poll_active = 1;                  // è¿›å…¥è½®è¯¢çŠ¶æ€
+//            alarm_motor_index = MOTOR_ID_START;     // ä»ç¬¬ä¸€ä¸ªç”µæœºå¼€å§‹
+//            alarm_substep = 0;                      // åˆå§‹æ­¥éª¤ï¼šè¯»æŠ¥è­¦
+//            printf("å¯åŠ¨æŠ¥è­¦è½®è¯¢ï¼ˆè®¡æ•°è§¦å‘ï¼‰\n");
 //        } else {
-//            return;  // Î´´ïµ½ãĞÖµ£¬±¾´Î²»Ö´ĞĞ
+//            return;  // æœªè¾¾åˆ°é˜ˆå€¼ï¼Œæœ¬æ¬¡ä¸æ‰§è¡Œ
 //        }
 //    }
 
-//    // ---------- 2. ÂÖÑ¯Ö´ĞĞ£¨Ò»´Îº¯Êıµ÷ÓÃ´¦ÀíÒ»¸öµç»úµÄÒ»¸ö²½Öè£© ----------
+//    // ---------- 2. è½®è¯¢æ‰§è¡Œï¼ˆä¸€æ¬¡å‡½æ•°è°ƒç”¨å¤„ç†ä¸€ä¸ªç”µæœºçš„ä¸€ä¸ªæ­¥éª¤ï¼‰ ----------
 //    if (alarm_motor_index > MOTOR_ID_END) {
-//        // ËùÓĞµç»ú´¦ÀíÍê±Ï£¬½áÊøÂÖÑ¯
+//        // æ‰€æœ‰ç”µæœºå¤„ç†å®Œæ¯•ï¼Œç»“æŸè½®è¯¢
 //        alarm_poll_active = 0;
-//        // ×¢Òâ£º²»ÔÚ´Ë´¦¸´Î»¼ÆÊıÆ÷£¬ÏÂ´Î½øÈëÊ±½«´Ó0¿ªÊ¼ÀÛ¼Ó
+//        // æ³¨æ„ï¼šä¸åœ¨æ­¤å¤„å¤ä½è®¡æ•°å™¨ï¼Œä¸‹æ¬¡è¿›å…¥æ—¶å°†ä»0å¼€å§‹ç´¯åŠ 
 //        return;
 //    }
 
@@ -1427,69 +1427,69 @@ uint8_t Modbus_10_WriteMultiReg(uint8_t slave_addr, uint16_t start_reg, uint16_t
 //    uint16_t alarm_value;
 //    uint8_t ret;
 
-//    MasterBusy_Acquire();   // »ñÈ¡×ÜÏßËø£¬·ÀÖ¹ÓëÆäËûÖ÷Õ¾Í¨ĞÅ³åÍ»
+//    MasterBusy_Acquire();   // è·å–æ€»çº¿é”ï¼Œé˜²æ­¢ä¸å…¶ä»–ä¸»ç«™é€šä¿¡å†²çª
 
 //    if (alarm_substep == 0) {
-//        // ²½Öè0£º¶ÁÈ¡±¨¾¯Öµ
+//        // æ­¥éª¤0ï¼šè¯»å–æŠ¥è­¦å€¼
 //        ret = Modbus_03_ReadHoldReg(slave, ALARM_QUERY_REG, 1, &alarm_value);
-//        printf("µç»ú0x%02X ±¨¾¯Öµ: 0x%04X\r\n", slave, alarm_value);
+//        printf("ç”µæœº0x%02X æŠ¥è­¦å€¼: 0x%04X\r\n", slave, alarm_value);
 //        if (ret != 0) {
-//            printf("µç»ú0x%02X ¶Á±¨¾¯Ê§°Ü\r\n", slave);
-//            alarm_motor_index++;               // Ê§°ÜÔòÌø¹ı¸Ãµç»ú
+//            printf("ç”µæœº0x%02X è¯»æŠ¥è­¦å¤±è´¥\r\n", slave);
+//            alarm_motor_index++;               // å¤±è´¥åˆ™è·³è¿‡è¯¥ç”µæœº
 //            MasterBusy_Release();
 //            return;
 //        }
 //        if ((alarm_value & 0x000F) != 0) 
 //				{    
-//            alarm_substep = 1;                 // ÓĞ±¨¾¯£¬½øÈëÇå³ı²½Öè
+//            alarm_substep = 1;                 // æœ‰æŠ¥è­¦ï¼Œè¿›å…¥æ¸…é™¤æ­¥éª¤
 //        }
 //				else
 //				{
-//            alarm_motor_index++;               // ÎŞ±¨¾¯£¬¼ÌĞøÏÂÒ»¸öµç»ú
+//            alarm_motor_index++;               // æ— æŠ¥è­¦ï¼Œç»§ç»­ä¸‹ä¸€ä¸ªç”µæœº
 //        }
 //    } else if (alarm_substep == 1) {
-//        // ²½Öè1£ºÇå³ı±¨¾¯£¨²¢ÖØĞÂÊ¹ÄÜ£©
+//        // æ­¥éª¤1ï¼šæ¸…é™¤æŠ¥è­¦ï¼ˆå¹¶é‡æ–°ä½¿èƒ½ï¼‰
 //        ret = Modbus_06_WriteSingleReg(slave, ALARM_CLEAR_REG, 0x0000);
 //        if (ret == 0) {
-//            printf("µç»ú0x%02X Çå³ı±¨¾¯³É¹¦\n", slave);
-//            Modbus_06_WriteSingleReg(slave, REG_ENABLE, 0x0000);  // ÖØĞÂÊ¹ÄÜ
+//            printf("ç”µæœº0x%02X æ¸…é™¤æŠ¥è­¦æˆåŠŸ\n", slave);
+//            Modbus_06_WriteSingleReg(slave, REG_ENABLE, 0x0000);  // é‡æ–°ä½¿èƒ½
 //        } else {
-//            printf("µç»ú0x%02X Çå³ı±¨¾¯Ê§°Ü\n", slave);
+//            printf("ç”µæœº0x%02X æ¸…é™¤æŠ¥è­¦å¤±è´¥\n", slave);
 //        }
-//        alarm_motor_index++;      // ÎŞÂÛ³É¹¦Óë·ñ£¬½øÈëÏÂÒ»¸öµç»ú
-//        alarm_substep = 0;        // ¸´Î»²½Öè
+//        alarm_motor_index++;      // æ— è®ºæˆåŠŸä¸å¦ï¼Œè¿›å…¥ä¸‹ä¸€ä¸ªç”µæœº
+//        alarm_substep = 0;        // å¤ä½æ­¥éª¤
 //    }
 
-//    MasterBusy_Release();   // ÊÍ·Å×ÜÏßËø
+//    MasterBusy_Release();   // é‡Šæ”¾æ€»çº¿é”
 //}
 /**
- * @brief ÂÖÑ¯µç»ú2¡¢5~12µÄ±¨¾¯×´Ì¬£¬ÈçÓĞ±¨¾¯Ôò´æÈë0x17²¢Çå³ı±¨¾¯£¨»ùÓÚ GetTick ·Ç×èÈûÊµÏÖ£©
- * @return 0:È«²¿³É¹¦; ·Ç0:Ä³¸öµç»ú²Ù×÷Ê§°Ü£¨¿É¼ÇÂ¼´íÎóÂë£©
+ * @brief è½®è¯¢ç”µæœº2ã€5~12çš„æŠ¥è­¦çŠ¶æ€ï¼Œå¦‚æœ‰æŠ¥è­¦åˆ™å­˜å…¥0x17å¹¶æ¸…é™¤æŠ¥è­¦ï¼ˆåŸºäº GetTick éé˜»å¡å®ç°ï¼‰
+ * @return 0:å…¨éƒ¨æˆåŠŸ; é0:æŸä¸ªç”µæœºæ“ä½œå¤±è´¥ï¼ˆå¯è®°å½•é”™è¯¯ç ï¼‰
  */
 void PollAndClearMotorAlarms_NonBlocking(void)
 {
-    static uint32_t last_poll_tick = 0;   // ¼ÇÂ¼ÉÏÒ»´ÎÆô¶¯ÂÖÑ¯µÄÏµÍ³Ê±¼ä´Á
-    const uint32_t poll_interval_ms = 1000; // ÂÖÑ¯Ê±¼ä¼ä¸ô£¬µ¥Î»ºÁÃë£¨¿É¸ù¾İĞèÒªµ÷Õû£¬ÀıÈç 1000ms = 1Ãë£©
+    static uint32_t last_poll_tick = 0;   // è®°å½•ä¸Šä¸€æ¬¡å¯åŠ¨è½®è¯¢çš„ç³»ç»Ÿæ—¶é—´æˆ³
+    const uint32_t poll_interval_ms = 1000; // è½®è¯¢æ—¶é—´é—´éš”ï¼Œå•ä½æ¯«ç§’ï¼ˆå¯æ ¹æ®éœ€è¦è°ƒæ•´ï¼Œä¾‹å¦‚ 1000ms = 1ç§’ï¼‰
 
-    // ---------- 1. ¼ì²éÊÇ·ñµ½´ï´¥·¢Ê±¼äÆô¶¯ÂÖÑ¯ ----------
+    // ---------- 1. æ£€æŸ¥æ˜¯å¦åˆ°è¾¾è§¦å‘æ—¶é—´å¯åŠ¨è½®è¯¢ ----------
     if (!alarm_poll_active) {
-        // Ê¹ÓÃÎŞ·ûºÅ¼õ·¨£¬ÌìÈ»Ö§³Ö sys_tick Òç³ö»ØÈÆ
+        // ä½¿ç”¨æ— ç¬¦å·å‡æ³•ï¼Œå¤©ç„¶æ”¯æŒ sys_tick æº¢å‡ºå›ç»•
         if ((GetTick() - last_poll_tick) >= poll_interval_ms) {
-            // Âú×ãÊ±¼ä¼ä¸ô£¬¼ì²éÏµÍ³ÊÇ·ñ¿ÕÏĞ
+            // æ»¡è¶³æ—¶é—´é—´éš”ï¼Œæ£€æŸ¥ç³»ç»Ÿæ˜¯å¦ç©ºé—²
             if (master_state == MASTER_IDLE && !Sequence_IsBusy()) {
-                last_poll_tick = GetTick();             // ¸üĞÂÉÏ´Î´¥·¢Ê±¼ä
-                alarm_poll_active = 1;                  // ½øÈëÂÖÑ¯×´Ì¬
-                alarm_motor_index = MOTOR_ID_START;     // ´ÓµÚÒ»¸öµç»ú¿ªÊ¼
-                alarm_substep = 0;                      // ³õÊ¼²½Öè£º¶Á±¨¾¯
-                printf("Æô¶¯±¨¾¯ÂÖÑ¯£¨Ê±¼ä´Á´¥·¢£©\n");
+                last_poll_tick = GetTick();             // æ›´æ–°ä¸Šæ¬¡è§¦å‘æ—¶é—´
+                alarm_poll_active = 1;                  // è¿›å…¥è½®è¯¢çŠ¶æ€
+                alarm_motor_index = MOTOR_ID_START;     // ä»ç¬¬ä¸€ä¸ªç”µæœºå¼€å§‹
+                alarm_substep = 0;                      // åˆå§‹æ­¥éª¤ï¼šè¯»æŠ¥è­¦
+                printf("å¯åŠ¨æŠ¥è­¦è½®è¯¢ï¼ˆæ—¶é—´æˆ³è§¦å‘ï¼‰\n");
             }
         }
-        return;  // Î´´ïµ½Ê±¼ä¼ä¸ô»òÏµÍ³Ã¦£¬±¾´Î²»Ö´ĞĞ
+        return;  // æœªè¾¾åˆ°æ—¶é—´é—´éš”æˆ–ç³»ç»Ÿå¿™ï¼Œæœ¬æ¬¡ä¸æ‰§è¡Œ
     }
 
-    // ---------- 2. ÂÖÑ¯Ö´ĞĞ£¨Ò»´Îº¯Êıµ÷ÓÃ´¦ÀíÒ»¸öµç»úµÄÒ»¸ö²½Öè£© ----------
+    // ---------- 2. è½®è¯¢æ‰§è¡Œï¼ˆä¸€æ¬¡å‡½æ•°è°ƒç”¨å¤„ç†ä¸€ä¸ªç”µæœºçš„ä¸€ä¸ªæ­¥éª¤ï¼‰ ----------
     if (alarm_motor_index > MOTOR_ID_END) {
-        // ËùÓĞµç»ú´¦ÀíÍê±Ï£¬½áÊøÂÖÑ¯
+        // æ‰€æœ‰ç”µæœºå¤„ç†å®Œæ¯•ï¼Œç»“æŸè½®è¯¢
         alarm_poll_active = 0;
         return;
     }
@@ -1498,76 +1498,76 @@ void PollAndClearMotorAlarms_NonBlocking(void)
     uint16_t alarm_value;
     uint8_t ret;
 
-    MasterBusy_Acquire();   // »ñÈ¡×ÜÏßËø£¬·ÀÖ¹ÓëÆäËûÖ÷Õ¾Í¨ĞÅ³åÍ»
+    MasterBusy_Acquire();   // è·å–æ€»çº¿é”ï¼Œé˜²æ­¢ä¸å…¶ä»–ä¸»ç«™é€šä¿¡å†²çª
 
     if (alarm_substep == 0) {
-        // ²½Öè0£º¶ÁÈ¡±¨¾¯Öµ
+        // æ­¥éª¤0ï¼šè¯»å–æŠ¥è­¦å€¼
         ret = Modbus_03_ReadHoldReg(slave, ALARM_QUERY_REG, 1, &alarm_value);
-        printf("µç»ú0x%02X ±¨¾¯Öµ: 0x%04X\r\n", slave, alarm_value);
+        printf("ç”µæœº0x%02X æŠ¥è­¦å€¼: 0x%04X\r\n", slave, alarm_value);
         if (ret != 0) {
-            printf("µç»ú0x%02X ¶Á±¨¾¯Ê§°Ü\r\n", slave);
-            alarm_motor_index++;               // Ê§°ÜÔòÌø¹ı¸Ãµç»ú
+            printf("ç”µæœº0x%02X è¯»æŠ¥è­¦å¤±è´¥\r\n", slave);
+            alarm_motor_index++;               // å¤±è´¥åˆ™è·³è¿‡è¯¥ç”µæœº
             MasterBusy_Release();
             return;
         }
         if ((alarm_value & 0x000F) != 0) {    
-            alarm_substep = 1;                 // ÓĞ±¨¾¯£¬½øÈëÇå³ı²½Öè
+            alarm_substep = 1;                 // æœ‰æŠ¥è­¦ï¼Œè¿›å…¥æ¸…é™¤æ­¥éª¤
         } else {
-            alarm_motor_index++;               // ÎŞ±¨¾¯£¬¼ÌĞøÏÂÒ»¸öµç»ú
+            alarm_motor_index++;               // æ— æŠ¥è­¦ï¼Œç»§ç»­ä¸‹ä¸€ä¸ªç”µæœº
         }
     } else if (alarm_substep == 1) {
-        // ²½Öè1£ºÇå³ı±¨¾¯£¨²¢ÖØĞÂÊ¹ÄÜ£©
+        // æ­¥éª¤1ï¼šæ¸…é™¤æŠ¥è­¦ï¼ˆå¹¶é‡æ–°ä½¿èƒ½ï¼‰
         ret = Modbus_06_WriteSingleReg(slave, ALARM_CLEAR_REG, 0x0000);
         if (ret == 0) {
-            printf("µç»ú0x%02X Çå³ı±¨¾¯³É¹¦\n", slave);
-            Modbus_06_WriteSingleReg(slave, REG_ENABLE, 0x0000);  // ÖØĞÂÊ¹ÄÜ
+            printf("ç”µæœº0x%02X æ¸…é™¤æŠ¥è­¦æˆåŠŸ\n", slave);
+            Modbus_06_WriteSingleReg(slave, REG_ENABLE, 0x0000);  // é‡æ–°ä½¿èƒ½
         } else {
-            printf("µç»ú0x%02X Çå³ı±¨¾¯Ê§°Ü\n", slave);
+            printf("ç”µæœº0x%02X æ¸…é™¤æŠ¥è­¦å¤±è´¥\n", slave);
         }
-        alarm_motor_index++;      // ÎŞÂÛ³É¹¦Óë·ñ£¬½øÈëÏÂÒ»¸öµç»ú
-        alarm_substep = 0;        // ¸´Î»²½Öè
+        alarm_motor_index++;      // æ— è®ºæˆåŠŸä¸å¦ï¼Œè¿›å…¥ä¸‹ä¸€ä¸ªç”µæœº
+        alarm_substep = 0;        // å¤ä½æ­¥éª¤
     }
 
-    MasterBusy_Release();   // ÊÍ·Å×ÜÏßËø
+    MasterBusy_Release();   // é‡Šæ”¾æ€»çº¿é”
 }
-// ======================== ²½½øµç»ú¿ØÖÆ·â×°º¯Êı ========================
-// µ¥µç»ú¿ØÖÆ£¨06¹¦ÄÜÂë£©
+// ======================== æ­¥è¿›ç”µæœºæ§åˆ¶å°è£…å‡½æ•° ========================
+// å•ç”µæœºæ§åˆ¶ï¼ˆ06åŠŸèƒ½ç ï¼‰
 uint8_t Motor_Single_Control(uint8_t slave_addr, uint8_t motor_num, uint16_t motor_cmd)
 {
     uint16_t reg_addr;
-    // Ğ£Ñéµç»ú±àºÅ
+    // æ ¡éªŒç”µæœºç¼–å·
     if(motor_num < 1 || motor_num >6) return 1;
-    // Æ¥Åäµç»ú¼Ä´æÆ÷µØÖ·
+    // åŒ¹é…ç”µæœºå¯„å­˜å™¨åœ°å€
     switch(motor_num)
     {
         case 1: reg_addr = MOTOR1_CTRL_REG1; break;
         default: return 1;
     }
-		if(reg_addr > 0x0FFF) // ¼ÙÉè´ÓÕ¾×î´óÖ§³Ö0x0FFFµØÖ·
+		if(reg_addr > 0x0FFF) // å‡è®¾ä»ç«™æœ€å¤§æ”¯æŒ0x0FFFåœ°å€
     {
-        return 6; // ¼Ä´æÆ÷µØÖ·Ô½½ç
+        return 6; // å¯„å­˜å™¨åœ°å€è¶Šç•Œ
     }
-    // µ÷ÓÃ06¹¦ÄÜÂë
+    // è°ƒç”¨06åŠŸèƒ½ç 
     return Modbus_06_WriteSingleReg(slave_addr, reg_addr, motor_cmd);
 }
 
 uint8_t Motor_Control(uint8_t motor_id, uint8_t reg_num, uint16_t motor_cmd)
 {
-    uint8_t slave_addr;  // µç»ú¶ÔÓ¦µÄ´ÓÕ¾µØÖ·
-    uint16_t reg_addr;   // ¼Ä´æÆ÷ID¶ÔÓ¦µÄÊµ¼ÊµØÖ·
+    uint8_t slave_addr;  // ç”µæœºå¯¹åº”çš„ä»ç«™åœ°å€
+    uint16_t reg_addr;   // å¯„å­˜å™¨IDå¯¹åº”çš„å®é™…åœ°å€
 
-    // 1. µç»úIDºÏ·¨ĞÔĞ£Ñé
+    // 1. ç”µæœºIDåˆæ³•æ€§æ ¡éªŒ
     if(motor_id < MOTOR_ID_3 || motor_id > MOTOR_ID_13)
     {
-        return 1; // µç»úID´íÎó
+        return 1; // ç”µæœºIDé”™è¯¯
     }
 
-    // 2. ºËĞÄÓ³Éä£ºµç»úID + ¼Ä´æÆ÷ID ¡ú ´ÓÕ¾µØÖ· + Êµ¼Ê¼Ä´æÆ÷µØÖ·
+    // 2. æ ¸å¿ƒæ˜ å°„ï¼šç”µæœºID + å¯„å­˜å™¨ID â†’ ä»ç«™åœ°å€ + å®é™…å¯„å­˜å™¨åœ°å€
     switch(motor_id)
     {
-        case MOTOR_ID_1: // µç»ú1
-            slave_addr = MOTOR1_SLAVE_ADDR; // µç»ú1¹Ì¶¨´ÓÕ¾µØÖ·0x01
-            // µç»ú1µÄ¼Ä´æÆ÷IDÓ³Éäµ½Êµ¼ÊµØÖ·
+        case MOTOR_ID_1: // ç”µæœº1
+            slave_addr = MOTOR1_SLAVE_ADDR; // ç”µæœº1å›ºå®šä»ç«™åœ°å€0x01
+            // ç”µæœº1çš„å¯„å­˜å™¨IDæ˜ å°„åˆ°å®é™…åœ°å€
             switch(reg_num)
             {
 								case 1: reg_addr = MOTOR1_CTRL_REG1; break;
@@ -1575,9 +1575,9 @@ uint8_t Motor_Control(uint8_t motor_id, uint8_t reg_num, uint16_t motor_cmd)
             }
             break;
 
-        case MOTOR_ID_2: // µç»ú2
-            slave_addr = MOTOR2_SLAVE_ADDR; // µç»ú2¹Ì¶¨´ÓÕ¾µØÖ·0x02
-            // µç»ú2µÄ¼Ä´æÆ÷IDÓ³Éäµ½Êµ¼ÊµØÖ·
+        case MOTOR_ID_2: // ç”µæœº2
+            slave_addr = MOTOR2_SLAVE_ADDR; // ç”µæœº2å›ºå®šä»ç«™åœ°å€0x02
+            // ç”µæœº2çš„å¯„å­˜å™¨IDæ˜ å°„åˆ°å®é™…åœ°å€
             switch(reg_num)
             {
 								case 1: reg_addr = MOTOR2_CTRL_REG1; break;
@@ -1585,9 +1585,9 @@ uint8_t Motor_Control(uint8_t motor_id, uint8_t reg_num, uint16_t motor_cmd)
             }
             break;
 						
-				case MOTOR_ID_3: // µç»ú3
-            slave_addr = MOTOR3_SLAVE_ADDR; // µç»ú3¹Ì¶¨´ÓÕ¾µØÖ·0x03
-            // µç»ú2µÄ¼Ä´æÆ÷IDÓ³Éäµ½Êµ¼ÊµØÖ·
+				case MOTOR_ID_3: // ç”µæœº3
+            slave_addr = MOTOR3_SLAVE_ADDR; // ç”µæœº3å›ºå®šä»ç«™åœ°å€0x03
+            // ç”µæœº2çš„å¯„å­˜å™¨IDæ˜ å°„åˆ°å®é™…åœ°å€
             switch(reg_num)
             {
 								case 1: reg_addr = MOTOR3_CTRL_REG1; break;
@@ -1597,9 +1597,9 @@ uint8_t Motor_Control(uint8_t motor_id, uint8_t reg_num, uint16_t motor_cmd)
             }
             break;
 						 
-				case MOTOR_ID_4: // µç»ú4
-            slave_addr = MOTOR4_SLAVE_ADDR; // µç»ú4¹Ì¶¨´ÓÕ¾µØÖ·0x04
-            // µç»ú1µÄ¼Ä´æÆ÷IDÓ³Éäµ½Êµ¼ÊµØÖ·
+				case MOTOR_ID_4: // ç”µæœº4
+            slave_addr = MOTOR4_SLAVE_ADDR; // ç”µæœº4å›ºå®šä»ç«™åœ°å€0x04
+            // ç”µæœº1çš„å¯„å­˜å™¨IDæ˜ å°„åˆ°å®é™…åœ°å€
 						switch(reg_num)
             {
 								case 1: reg_addr = MOTOR4_CTRL_REG1; break;
@@ -1607,9 +1607,9 @@ uint8_t Motor_Control(uint8_t motor_id, uint8_t reg_num, uint16_t motor_cmd)
             }
             break;
 				
-				case MOTOR_ID_13: // µç»ú13
-            slave_addr = MOTOR13_SLAVE_ADDR; // µç»ú4¹Ì¶¨´ÓÕ¾µØÖ·0x0d
-            // µç»ú1µÄ¼Ä´æÆ÷IDÓ³Éäµ½Êµ¼ÊµØÖ·
+				case MOTOR_ID_13: // ç”µæœº13
+            slave_addr = MOTOR13_SLAVE_ADDR; // ç”µæœº4å›ºå®šä»ç«™åœ°å€0x0d
+            // ç”µæœº1çš„å¯„å­˜å™¨IDæ˜ å°„åˆ°å®é™…åœ°å€
 						switch(reg_num)
             {
 								case 1: reg_addr = MOTOR13_CTRL_REG1; break;
@@ -1618,20 +1618,20 @@ uint8_t Motor_Control(uint8_t motor_id, uint8_t reg_num, uint16_t motor_cmd)
             break;
 
         default:
-            return 1; // µç»úIDÒì³£
+            return 1; // ç”µæœºIDå¼‚å¸¸
     }
 
-    // 3. µ÷ÓÃModbusĞ´¼Ä´æÆ÷
+    // 3. è°ƒç”¨Modbuså†™å¯„å­˜å™¨
     return Modbus_06_WriteSingleReg(slave_addr, reg_addr, motor_cmd);
 }
 
-// ÅúÁ¿µç»ú¿ØÖÆ£¨10¹¦ÄÜÂë£©
+// æ‰¹é‡ç”µæœºæ§åˆ¶ï¼ˆ10åŠŸèƒ½ç ï¼‰
 uint8_t Motor_Batch_Control(uint8_t slave_addr, uint16_t start_reg, uint16_t reg_num, uint16_t *motor_cmds)
 {
     return Modbus_10_WriteMultiReg(slave_addr, start_reg, reg_num, motor_cmds);
 }
 
-// ¶ÁÈ¡µ¥µç»ú×´Ì¬£¨03¹¦ÄÜÂë£©
+// è¯»å–å•ç”µæœºçŠ¶æ€ï¼ˆ03åŠŸèƒ½ç ï¼‰
 uint8_t Motor_Read_Status(uint8_t motor_num, uint16_t *motor_status)
 {
 //    uint16_t reg_addr;
@@ -1648,85 +1648,85 @@ uint8_t Motor_Read_Status(uint8_t motor_num, uint16_t *motor_status)
 //    return Modbus_03_ReadHoldReg(MODBUS_SLAVE_ADDR, reg_addr, 1, motor_status);
 }
 
-// ÅúÁ¿¶ÁÈ¡µç»ú×´Ì¬£¨03¹¦ÄÜÂë£©
+// æ‰¹é‡è¯»å–ç”µæœºçŠ¶æ€ï¼ˆ03åŠŸèƒ½ç ï¼‰
 uint8_t Motor_Batch_Read_Status(uint16_t start_reg, uint16_t motor_num, uint16_t *status_buff)
 {
 //    if(start_reg < MOTOR1_STATUS_REG || start_reg > MOTOR5_STATUS_REG || motor_num == 0 ||
 //       (start_reg + motor_num - 1) > MOTOR5_STATUS_REG)
 //    {
-//        return 1; // µØÖ·Ô½½ç
+//        return 1; // åœ°å€è¶Šç•Œ
 //    }
 //    return Modbus_03_ReadHoldReg(MODBUS_SLAVE_ADDR, start_reg, motor_num, status_buff);
 }
 
-// ======================== ³¬Ê±¼ì²âº¯Êı ========================
+// ======================== è¶…æ—¶æ£€æµ‹å‡½æ•° ========================
 void Modbus_Timeout_Check(void)
 {
     if(master_state == MASTER_WAIT_RESP)
     {
-        // ½öÔÚTIM3Î´´¥·¢Ê±£¬µİÔö³¬Ê±¼ÆÊı£¨±ÜÃâÖØ¸´¼ÆÊı£©
+        // ä»…åœ¨TIM3æœªè§¦å‘æ—¶ï¼Œé€’å¢è¶…æ—¶è®¡æ•°ï¼ˆé¿å…é‡å¤è®¡æ•°ï¼‰
         if((TIM3->CR1 & TIM_CR1_CEN) != RESET) 
         {
             timeout_cnt++;
-            // ³¬Ê±ãĞÖµÅĞ¶Ï
+            // è¶…æ—¶é˜ˆå€¼åˆ¤æ–­
             if(timeout_cnt > TIMEOUT_MS)
             {
                 master_state = MASTER_RESP_ERR;
-                TIM_Cmd(TIM3, DISABLE); // Í£Ö¹TIM3
-                RS485_RX_CNT = 0; // Çå¿Õ¼ÆÊı
+                TIM_Cmd(TIM3, DISABLE); // åœæ­¢TIM3
+                RS485_RX_CNT = 0; // æ¸…ç©ºè®¡æ•°
             }
         }
     }
 }
 
 
-// È«¾Ö±äÁ¿£º1ms¶ÔÓ¦µÄSysTick¼ÆÊıÖµ£¨ĞèÌáÇ°³õÊ¼»¯£©
+// å…¨å±€å˜é‡ï¼š1mså¯¹åº”çš„SysTickè®¡æ•°å€¼ï¼ˆéœ€æå‰åˆå§‹åŒ–ï¼‰
 u32 fac_ms = 0;  
 
-// ³õÊ¼»¯SysTick£¬±ØĞëÔÚmainº¯Êı¿ªÍ·µ÷ÓÃ£¡
+// åˆå§‹åŒ–SysTickï¼Œå¿…é¡»åœ¨mainå‡½æ•°å¼€å¤´è°ƒç”¨ï¼
 void SysTick_Init(void)
 {
-    // ÅäÖÃSysTickÊ±ÖÓÔ´ÎªAHB£¨72MHz£©£¬¹Ø±ÕSysTick
-    SysTick->CTRL &= ~SysTick_CTRL_CLKSOURCE_Msk; // 0=AHB/8(9MHz)£¬1=AHB(72MHz)
-    // ÈôÓÃAHB/8£¬×¢ÊÍÉÏÃæ£¬´ò¿ªÏÂÃæ£º
+    // é…ç½®SysTickæ—¶é’Ÿæºä¸ºAHBï¼ˆ72MHzï¼‰ï¼Œå…³é—­SysTick
+    SysTick->CTRL &= ~SysTick_CTRL_CLKSOURCE_Msk; // 0=AHB/8(9MHz)ï¼Œ1=AHB(72MHz)
+    // è‹¥ç”¨AHB/8ï¼Œæ³¨é‡Šä¸Šé¢ï¼Œæ‰“å¼€ä¸‹é¢ï¼š
     // SysTick->CTRL |= SysTick_CTRL_CLKSOURCE_Msk; 
     
-    // ¼ÆËã1ms¶ÔÓ¦µÄ¼ÆÊıÖµ
+    // è®¡ç®—1mså¯¹åº”çš„è®¡æ•°å€¼
     if(SysTick->CTRL & SysTick_CTRL_CLKSOURCE_Msk)
     {
-        fac_ms = SystemCoreClock / 1000; // AHB=72MHz ¡ú fac_ms=72000
+        fac_ms = SystemCoreClock / 1000; // AHB=72MHz â†’ fac_ms=72000
     }
     else
     {
-        fac_ms = SystemCoreClock / 8 / 1000; // AHB/8=9MHz ¡ú fac_ms=9000
+        fac_ms = SystemCoreClock / 8 / 1000; // AHB/8=9MHz â†’ fac_ms=9000
     }
     
-    // ¹Ø±ÕSysTick£¬Çå¿Õ¼ÆÊıÆ÷
+    // å…³é—­SysTickï¼Œæ¸…ç©ºè®¡æ•°å™¨
     SysTick->CTRL &= ~SysTick_CTRL_ENABLE_Msk;
     SysTick->VAL = 0x00;
 }
 
 
 /**
- * @brief ¿ìËÙ¿ØÖÆµç»ú4ºÍ5£¬ÊµÏÖ½Ó½üÍ¬Ê±Ö´ĞĞ
- * @param motor4_length µç»ú4µÄĞĞ³ÌÖµ
- * @param motor5_length µç»ú5µÄĞĞ³ÌÖµ
+ * @brief å¿«é€Ÿæ§åˆ¶ç”µæœº4å’Œ5ï¼Œå®ç°æ¥è¿‘åŒæ—¶æ‰§è¡Œ
+ * @param motor4_length ç”µæœº4çš„è¡Œç¨‹å€¼
+ * @param motor5_length ç”µæœº5çš„è¡Œç¨‹å€¼
  * 
- * ¹¦ÄÜ£º¹¹½¨Á½ÌõModbusÖ¸Áî£¬¿ìËÙÁ¬Ğø·¢ËÍ¸øµç»ú4ºÍ5
- * ·¢ËÍ¼ä¸ô£ºÔ¼200-500Î¢Ãë
- * ×¢Òâ£º´Ëº¯Êı²»µÈ´ıÏìÓ¦£¬ÈçĞèÏìÓ¦ÇëºóĞøµ÷ÓÃ×´Ì¬²éÑ¯º¯Êı
+ * åŠŸèƒ½ï¼šæ„å»ºä¸¤æ¡ModbusæŒ‡ä»¤ï¼Œå¿«é€Ÿè¿ç»­å‘é€ç»™ç”µæœº4å’Œ5
+ * å‘é€é—´éš”ï¼šçº¦200-500å¾®ç§’
+ * æ³¨æ„ï¼šæ­¤å‡½æ•°ä¸ç­‰å¾…å“åº”ï¼Œå¦‚éœ€å“åº”è¯·åç»­è°ƒç”¨çŠ¶æ€æŸ¥è¯¢å‡½æ•°
  */
 void Quick_Motors_Control(MotorControlParams *motors, uint8_t count)
 {
-    // ½ûÓÃ´ÓÕ¾½ÓÊÕ£¬±ÜÃâ¸ÉÈÅ
+    // ç¦ç”¨ä»ç«™æ¥æ”¶ï¼Œé¿å…å¹²æ‰°
     USART_ITConfig(USART2, USART_IT_RXNE, DISABLE);
 
-    // Í³Ò»Çå¿Õ»º³åÇø£¨½öÒ»´Î£©
+    // ç»Ÿä¸€æ¸…ç©ºç¼“å†²åŒºï¼ˆä»…ä¸€æ¬¡ï¼‰
     __disable_irq();
     Master_RX_CNT = 0;
     Master_FrameFlag = 0;
     __enable_irq();
-    master_state = MASTER_WAIT_RESP;   // ÉèÖÃÒ»´Î
+    master_state = MASTER_WAIT_RESP;   // è®¾ç½®ä¸€æ¬¡
 
     for (uint8_t i = 0; i < count; i++) {
         uint16_t cmds[2] = {motors[i].len_l, motors[i].len_h};
@@ -1734,7 +1734,7 @@ void Quick_Motors_Control(MotorControlParams *motors, uint8_t count)
         uint8_t len = Build_Modbus_Frame(motors[i].slave_address, 0x10,
                                          motors[i].contrl_reg, 2, cmds, frame);
         if (len == 0) {
-            printf("¹¹½¨µç»ú%dÖ¡Ê§°Ü\n", i+1);
+            printf("æ„å»ºç”µæœº%då¸§å¤±è´¥\n", i+1);
             continue;
         }
         printf("Send to 0x%02X: ", motors[i].slave_address);
@@ -1742,78 +1742,78 @@ void Quick_Motors_Control(MotorControlParams *motors, uint8_t count)
         printf("\r\n");
 
         RS485_MasterSendData(frame, len);
-        // ¼«¶ÌÑÓÊ±£¬±ÜÃâ×ÜÏß³åÍ»£¬²»Ó°ÏìÀÛ»ıÏìÓ¦
+        // æçŸ­å»¶æ—¶ï¼Œé¿å…æ€»çº¿å†²çªï¼Œä¸å½±å“ç´¯ç§¯å“åº”
 				delay_ms(20); 
     }
 		USART_ITConfig(USART2, USART_IT_RXNE, ENABLE);
-    // µÈ´ıËùÓĞµç»ú·µ»ØÏìÓ¦£¨±ØÒª£©
+    // ç­‰å¾…æ‰€æœ‰ç”µæœºè¿”å›å“åº”ï¼ˆå¿…è¦ï¼‰
      
 
     master_state = MASTER_IDLE;
     
 }
 /**
- * @brief ·Ç×èÈûModbus·¢ËÍº¯Êı
- * @param slave_addr ´ÓÕ¾µØÖ·
- * @param start_reg ÆğÊ¼¼Ä´æÆ÷µØÖ·
- * @param reg_num ¼Ä´æÆ÷ÊıÁ¿
- * @param data ÒªĞ´ÈëµÄÊı¾İÊı×é
- * @return 0:³É¹¦, 1:²ÎÊı´íÎó, 2:Ö÷Õ¾Ã¦
+ * @brief éé˜»å¡Modbuså‘é€å‡½æ•°
+ * @param slave_addr ä»ç«™åœ°å€
+ * @param start_reg èµ·å§‹å¯„å­˜å™¨åœ°å€
+ * @param reg_num å¯„å­˜å™¨æ•°é‡
+ * @param data è¦å†™å…¥çš„æ•°æ®æ•°ç»„
+ * @return 0:æˆåŠŸ, 1:å‚æ•°é”™è¯¯, 2:ä¸»ç«™å¿™
  * 
- * ¹¦ÄÜ£º¹¹½¨Modbus 0x10¹¦ÄÜÂëÖ¡²¢·¢ËÍ£¬²»µÈ´ıÏìÓ¦
- * ×¢Òâ£º´Ëº¯Êı²»»á×èÈû£¬µ÷ÓÃºóÁ¢¼´·µ»Ø
+ * åŠŸèƒ½ï¼šæ„å»ºModbus 0x10åŠŸèƒ½ç å¸§å¹¶å‘é€ï¼Œä¸ç­‰å¾…å“åº”
+ * æ³¨æ„ï¼šæ­¤å‡½æ•°ä¸ä¼šé˜»å¡ï¼Œè°ƒç”¨åç«‹å³è¿”å›
  */
 uint8_t Modbus_Send_NonBlocking(uint8_t slave_addr, uint16_t start_reg, uint16_t reg_num, uint16_t *data)
 {
     uint8_t frame[256];
     uint8_t frame_len = 0;
     
-    // ²ÎÊı¼ì²é
+    // å‚æ•°æ£€æŸ¥
     if(reg_num == 0 || reg_num > 123) {
-        printf("´íÎó£º¼Ä´æÆ÷ÊıÁ¿ÎŞĞ§£¬reg_num=%d\r\n", reg_num);
+        printf("é”™è¯¯ï¼šå¯„å­˜å™¨æ•°é‡æ— æ•ˆï¼Œreg_num=%d\r\n", reg_num);
         return 1;
     }
     
     if(master_state != MASTER_IDLE) {
-        printf("¾¯¸æ£ºÖ÷Õ¾Ã¦£¬×´Ì¬=%d\r\n", master_state);
+        printf("è­¦å‘Šï¼šä¸»ç«™å¿™ï¼ŒçŠ¶æ€=%d\r\n", master_state);
         return 2;
     }
     
-    // ¹¹½¨ModbusÖ¡
+    // æ„å»ºModbuså¸§
     frame_len = Build_Modbus_Frame(slave_addr, 0x10, start_reg, reg_num, data, frame);
     if(frame_len == 0) {
-        printf("´íÎó£º¹¹½¨ModbusÖ¡Ê§°Ü\r\n");
+        printf("é”™è¯¯ï¼šæ„å»ºModbuså¸§å¤±è´¥\r\n");
         return 3;
     }
     
-    // ¸üĞÂÖ÷Õ¾×´Ì¬
+    // æ›´æ–°ä¸»ç«™çŠ¶æ€
     master_state = MASTER_SENDING;
     timeout_cnt = 0;
     
-    // ·¢ËÍÊı¾İ
+    // å‘é€æ•°æ®
     RS485_MasterSendData(frame, frame_len);
     
-    // ÇĞ»»×´Ì¬µ½µÈ´ıÏìÓ¦
+    // åˆ‡æ¢çŠ¶æ€åˆ°ç­‰å¾…å“åº”
     master_state = MASTER_WAIT_RESP;
     
-    printf("ÒÑ·¢ËÍÖ¸Áî: µØÖ·=0x%02X, ¼Ä´æÆ÷=0x%04X, ³¤¶È=%d×Ö½Ú\r\n", 
+    printf("å·²å‘é€æŒ‡ä»¤: åœ°å€=0x%02X, å¯„å­˜å™¨=0x%04X, é•¿åº¦=%då­—èŠ‚\r\n", 
            slave_addr, start_reg, frame_len);
     
     return 0;
 }
 
 /**
- * @brief ¹¹½¨Modbus RTUÖ¡
- * @param slave_addr ´ÓÕ¾µØÖ·
- * @param func_code ¹¦ÄÜÂë
- * @param start_reg ÆğÊ¼¼Ä´æÆ÷µØÖ·
- * @param reg_num ¼Ä´æÆ÷ÊıÁ¿
- * @param data Êı¾İÊı×é
- * @param frame Êä³öÖ¡»º³åÇø
- * @return Ö¡³¤¶È
+ * @brief æ„å»ºModbus RTUå¸§
+ * @param slave_addr ä»ç«™åœ°å€
+ * @param func_code åŠŸèƒ½ç 
+ * @param start_reg èµ·å§‹å¯„å­˜å™¨åœ°å€
+ * @param reg_num å¯„å­˜å™¨æ•°é‡
+ * @param data æ•°æ®æ•°ç»„
+ * @param frame è¾“å‡ºå¸§ç¼“å†²åŒº
+ * @return å¸§é•¿åº¦
  * 
- * ¹¦ÄÜ£º¸ù¾İ²ÎÊı¹¹½¨ÍêÕûµÄModbus RTUÖ¡
- * Ö§³Ö¹¦ÄÜÂë0x10£¨Ğ´¶à¸ö¼Ä´æÆ÷£©ºÍ0x03£¨¶Á±£³Ö¼Ä´æÆ÷£©
+ * åŠŸèƒ½ï¼šæ ¹æ®å‚æ•°æ„å»ºå®Œæ•´çš„Modbus RTUå¸§
+ * æ”¯æŒåŠŸèƒ½ç 0x10ï¼ˆå†™å¤šä¸ªå¯„å­˜å™¨ï¼‰å’Œ0x03ï¼ˆè¯»ä¿æŒå¯„å­˜å™¨ï¼‰
  */
 uint8_t Build_Modbus_Frame(uint8_t slave_addr, uint8_t func_code, uint16_t start_reg, 
                           uint8_t reg_num, uint16_t *data, uint8_t *frame)
@@ -1821,116 +1821,116 @@ uint8_t Build_Modbus_Frame(uint8_t slave_addr, uint8_t func_code, uint16_t start
     uint8_t idx = 0;
 		uint8_t local_tx_buff[256];
     
-    // Ö¡Í·
-    local_tx_buff[idx++] = slave_addr;      // ´ÓÕ¾µØÖ·
-    local_tx_buff[idx++] = func_code;       // ¹¦ÄÜÂë
+    // å¸§å¤´
+    local_tx_buff[idx++] = slave_addr;      // ä»ç«™åœ°å€
+    local_tx_buff[idx++] = func_code;       // åŠŸèƒ½ç 
     
-    // ¼Ä´æÆ÷µØÖ·
-    local_tx_buff[idx++] = (start_reg >> 8) & 0xFF;  // ¸ß×Ö½Ú
-    local_tx_buff[idx++] = start_reg & 0xFF;         // µÍ×Ö½Ú
+    // å¯„å­˜å™¨åœ°å€
+    local_tx_buff[idx++] = (start_reg >> 8) & 0xFF;  // é«˜å­—èŠ‚
+    local_tx_buff[idx++] = start_reg & 0xFF;         // ä½å­—èŠ‚
     
-    if(func_code == 0x10) {  // Ğ´¶à¸ö¼Ä´æÆ÷
-        // ¼Ä´æÆ÷ÊıÁ¿
-        local_tx_buff[idx++] = 0x00;              // ¼Ä´æÆ÷ÊıÁ¿¸ß×Ö½Ú£¨Í¨³£Îª0£©
-        local_tx_buff[idx++] = reg_num;           // ¼Ä´æÆ÷ÊıÁ¿µÍ×Ö½Ú
+    if(func_code == 0x10) {  // å†™å¤šä¸ªå¯„å­˜å™¨
+        // å¯„å­˜å™¨æ•°é‡
+        local_tx_buff[idx++] = 0x00;              // å¯„å­˜å™¨æ•°é‡é«˜å­—èŠ‚ï¼ˆé€šå¸¸ä¸º0ï¼‰
+        local_tx_buff[idx++] = reg_num;           // å¯„å­˜å™¨æ•°é‡ä½å­—èŠ‚
         
-        // ×Ö½ÚÊı
-        local_tx_buff[idx++] = reg_num * 2;       // ×Ö½ÚÊı = ¼Ä´æÆ÷ÊıÁ¿ * 2
+        // å­—èŠ‚æ•°
+        local_tx_buff[idx++] = reg_num * 2;       // å­—èŠ‚æ•° = å¯„å­˜å™¨æ•°é‡ * 2
         
-        // Êı¾İ
+        // æ•°æ®
         for(uint8_t i = 0; i < reg_num; i++) {
-            local_tx_buff[idx++] = (data[i] >> 8) & 0xFF;  // Êı¾İ¸ß×Ö½Ú
-            local_tx_buff[idx++] = data[i] & 0xFF;         // Êı¾İµÍ×Ö½Ú
+            local_tx_buff[idx++] = (data[i] >> 8) & 0xFF;  // æ•°æ®é«˜å­—èŠ‚
+            local_tx_buff[idx++] = data[i] & 0xFF;         // æ•°æ®ä½å­—èŠ‚
         }
-    } else if(func_code == 0x03) {  // ¶Á±£³Ö¼Ä´æÆ÷
-        // ¼Ä´æÆ÷ÊıÁ¿
-        local_tx_buff[idx++] = 0x00;              // ¼Ä´æÆ÷ÊıÁ¿¸ß×Ö½Ú
-        local_tx_buff[idx++] = reg_num;           // ¼Ä´æÆ÷ÊıÁ¿µÍ×Ö½Ú
+    } else if(func_code == 0x03) {  // è¯»ä¿æŒå¯„å­˜å™¨
+        // å¯„å­˜å™¨æ•°é‡
+        local_tx_buff[idx++] = 0x00;              // å¯„å­˜å™¨æ•°é‡é«˜å­—èŠ‚
+        local_tx_buff[idx++] = reg_num;           // å¯„å­˜å™¨æ•°é‡ä½å­—èŠ‚
     } else {
-       // printf("´íÎó£º²»Ö§³ÖµÄ¹¦ÄÜÂë 0x%02X\r\n", func_code);
+       // printf("é”™è¯¯ï¼šä¸æ”¯æŒçš„åŠŸèƒ½ç  0x%02X\r\n", func_code);
         return 0;
     }
     
-    // ¼ÆËãCRC
+    // è®¡ç®—CRC
     uint16_t crc = Modbus_CRC16(local_tx_buff, idx);
-    local_tx_buff[idx++] = crc & 0xFF;        // CRCµÍ×Ö½ÚÔÚÇ°
-    local_tx_buff[idx++] = (crc >> 8) & 0xFF; // CRC¸ß×Ö½ÚÔÚºó
+    local_tx_buff[idx++] = crc & 0xFF;        // CRCä½å­—èŠ‚åœ¨å‰
+    local_tx_buff[idx++] = (crc >> 8) & 0xFF; // CRCé«˜å­—èŠ‚åœ¨å
 		memcpy(frame, local_tx_buff, idx);
     
-    return idx;  // ·µ»ØÖ¡³¤¶È
+    return idx;  // è¿”å›å¸§é•¿åº¦
 }
 
 /**
- * @brief ¼ì²éModbusÏìÓ¦
- * @param slave_addr ´ÓÕ¾µØÖ·
- * @param start_reg ÆğÊ¼¼Ä´æÆ÷µØÖ·£¨ÓÃÓÚĞ£Ñé£©
- * @param result Êä³ö½á¹û£¨¿ÉÑ¡£©
- * @param timeout_ms ³¬Ê±Ê±¼ä£¨ºÁÃë£©
- * @return 0:³É¹¦, 1:²ÎÊı´íÎó, 2:³¬Ê±, 3:ÏìÓ¦¸ñÊ½´íÎó, 4:CRC´íÎó
+ * @brief æ£€æŸ¥Modbuså“åº”
+ * @param slave_addr ä»ç«™åœ°å€
+ * @param start_reg èµ·å§‹å¯„å­˜å™¨åœ°å€ï¼ˆç”¨äºæ ¡éªŒï¼‰
+ * @param result è¾“å‡ºç»“æœï¼ˆå¯é€‰ï¼‰
+ * @param timeout_ms è¶…æ—¶æ—¶é—´ï¼ˆæ¯«ç§’ï¼‰
+ * @return 0:æˆåŠŸ, 1:å‚æ•°é”™è¯¯, 2:è¶…æ—¶, 3:å“åº”æ ¼å¼é”™è¯¯, 4:CRCé”™è¯¯
  * 
- * ¹¦ÄÜ£ºµÈ´ı²¢¼ì²éÖ¸¶¨´ÓÕ¾µÄModbusÏìÓ¦
+ * åŠŸèƒ½ï¼šç­‰å¾…å¹¶æ£€æŸ¥æŒ‡å®šä»ç«™çš„Modbuså“åº”
  */
 uint8_t Modbus_Check_Response(uint8_t slave_addr, uint16_t start_reg, uint16_t *result, uint16_t timeout_ms)
 {
-    uint32_t start_tick = GetTick();  // ¼ÇÂ¼ÆğÊ¼Ê±¼ä
+    uint32_t start_tick = GetTick();  // è®°å½•èµ·å§‹æ—¶é—´
 
     if (slave_addr == 0) {
-        printf("´íÎó£º´ÓÕ¾µØÖ·²»ÄÜÎª0\r\n");
+        printf("é”™è¯¯ï¼šä»ç«™åœ°å€ä¸èƒ½ä¸º0\r\n");
         return 1;
     }
 
-//    printf("µÈ´ı´ÓÕ¾0x%02XÏìÓ¦£¬³¬Ê±=%dms...\r\n", slave_addr, timeout_ms);
+//    printf("ç­‰å¾…ä»ç«™0x%02Xå“åº”ï¼Œè¶…æ—¶=%dms...\r\n", slave_addr, timeout_ms);
 
-    while ((GetTick() - start_tick) < timeout_ms) {  // ³¬Ê±ÅĞ¶Ï
+    while ((GetTick() - start_tick) < timeout_ms) {  // è¶…æ—¶åˆ¤æ–­
         if (Master_RX_CNT  > 0) {
-            // ÖÁÉÙĞèÒª 8 ×Ö½ÚÍêÕûÖ¡
+            // è‡³å°‘éœ€è¦ 8 å­—èŠ‚å®Œæ•´å¸§
             if (Master_RX_CNT  < 8) {
-                delay_ms(1);  // µÈ´ı¸ü¶àÊı¾İ
+                delay_ms(1);  // ç­‰å¾…æ›´å¤šæ•°æ®
                 continue;
             }
 
-            // ¼ì²é´ÓÕ¾µØÖ·
+            // æ£€æŸ¥ä»ç«™åœ°å€
             if (Master_RX_BUFF[0] != slave_addr) {
                 memmove(Master_RX_BUFF, Master_RX_BUFF + 1, Master_RX_CNT  - 1);
                 Master_RX_CNT --;
                 continue;
             }
 
-            // ¼ì²é¹¦ÄÜÂë£¨Ğ´¶à¸ö¼Ä´æÆ÷Ó¦Îª 0x10£©
+            // æ£€æŸ¥åŠŸèƒ½ç ï¼ˆå†™å¤šä¸ªå¯„å­˜å™¨åº”ä¸º 0x10ï¼‰
             if (Master_RX_BUFF[1] != 0x10) {
-                printf("¹¦ÄÜÂë´íÎó: ÆÚÍû0x10, ÊÕµ½0x%02X\r\n", Master_RX_BUFF[1]);
+                printf("åŠŸèƒ½ç é”™è¯¯: æœŸæœ›0x10, æ”¶åˆ°0x%02X\r\n", Master_RX_BUFF[1]);
                 memmove(Master_RX_BUFF, Master_RX_BUFF + 1, Master_RX_CNT  - 1);
                 Master_RX_CNT --;
                 continue;
             }
 
-            // ¼ì²éÆğÊ¼¼Ä´æÆ÷
+            // æ£€æŸ¥èµ·å§‹å¯„å­˜å™¨
             uint16_t resp_start_reg = (Master_RX_BUFF[2] << 8) | Master_RX_BUFF[3];
             if (resp_start_reg != start_reg) {
-                printf("ÆğÊ¼¼Ä´æÆ÷²»Æ¥Åä: ÆÚÍû0x%04X, ÊÕµ½0x%04X\r\n", start_reg, resp_start_reg);
+                printf("èµ·å§‹å¯„å­˜å™¨ä¸åŒ¹é…: æœŸæœ›0x%04X, æ”¶åˆ°0x%04X\r\n", start_reg, resp_start_reg);
                 memmove(Master_RX_BUFF, Master_RX_BUFF + 1, Master_RX_CNT  - 1);
                 Master_RX_CNT --;
                 continue;
             }
 
-            // ¼ì²é CRC
+            // æ£€æŸ¥ CRC
             uint16_t resp_crc = (Master_RX_BUFF[7] << 8) | Master_RX_BUFF[6];
             uint16_t calc_crc = Modbus_CRC16(Master_RX_BUFF, 6);
             if (resp_crc != calc_crc) {
-                printf("CRCĞ£ÑéÊ§°Ü: ÊÕµ½0x%04X, ¼ÆËã0x%04X\r\n", resp_crc, calc_crc);
+                printf("CRCæ ¡éªŒå¤±è´¥: æ”¶åˆ°0x%04X, è®¡ç®—0x%04X\r\n", resp_crc, calc_crc);
                 memmove(Master_RX_BUFF, Master_RX_BUFF + 1, Master_RX_CNT  - 1);
                 Master_RX_CNT --;
                 continue;
             }
 
-            // ³É¹¦£¬ÒÆ³ıÒÑ´¦ÀíµÄÖ¡£¨8×Ö½Ú£©
+            // æˆåŠŸï¼Œç§»é™¤å·²å¤„ç†çš„å¸§ï¼ˆ8å­—èŠ‚ï¼‰
             memmove(Master_RX_BUFF, Master_RX_BUFF + 8, Master_RX_CNT  - 8);
             Master_RX_CNT  -= 8;
-            printf("´ÓÕ¾0x%02XÏìÓ¦³É¹¦\r\n", slave_addr);
+            printf("ä»ç«™0x%02Xå“åº”æˆåŠŸ\r\n", slave_addr);
             if (result != NULL) *result = 0x0001;
             return 0;
         }
-        // ÎŞÊı¾İ£¬¶ÌÔİÑÓÊ±±ÜÃâ¿Õ×ª
+        // æ— æ•°æ®ï¼ŒçŸ­æš‚å»¶æ—¶é¿å…ç©ºè½¬
         delay_ms(1);
     }
 
@@ -1938,14 +1938,14 @@ uint8_t Modbus_Check_Response(uint8_t slave_addr, uint16_t start_reg, uint16_t *
 }
 
 /**
- * @brief ÅúÁ¿¿ØÖÆµç»ú4ºÍ5²¢¼ì²é×´Ì¬
- * @return 0:È«²¿³É¹¦, 1:µç»ú4Ê§°Üµç»ú5³É¹¦, 2:µç»ú4³É¹¦µç»ú5Ê§°Ü, 3:È«²¿Ê§°Ü
+ * @brief æ‰¹é‡æ§åˆ¶ç”µæœº4å’Œ5å¹¶æ£€æŸ¥çŠ¶æ€
+ * @return 0:å…¨éƒ¨æˆåŠŸ, 1:ç”µæœº4å¤±è´¥ç”µæœº5æˆåŠŸ, 2:ç”µæœº4æˆåŠŸç”µæœº5å¤±è´¥, 3:å…¨éƒ¨å¤±è´¥
  * 
- * ¹¦ÄÜ£ºÍêÕûµÄµç»ú¿ØÖÆÁ÷³Ì£¬°üÀ¨·¢ËÍÖ¸Áî¡¢¼ì²éÏìÓ¦¡¢¶ÁÈ¡×´Ì¬
+ * åŠŸèƒ½ï¼šå®Œæ•´çš„ç”µæœºæ§åˆ¶æµç¨‹ï¼ŒåŒ…æ‹¬å‘é€æŒ‡ä»¤ã€æ£€æŸ¥å“åº”ã€è¯»å–çŠ¶æ€
  */
 //uint8_t Control_Motors_Complete(MotorControlParams *motors, uint8_t count, uint8_t *results)
 //{
-//    // 1. ¿ìËÙ·¢ËÍËùÓĞµç»úÖ¸Áî
+//    // 1. å¿«é€Ÿå‘é€æ‰€æœ‰ç”µæœºæŒ‡ä»¤
 //    Quick_Motors_Control(motors, count);
 //		printf("Master RX buffer len=%d, content: ", Master_RX_CNT);
 //		for (uint16_t i = 0; i < Master_RX_CNT; i++) {
@@ -1955,34 +1955,34 @@ uint8_t Modbus_Check_Response(uint8_t slave_addr, uint16_t start_reg, uint16_t *
 //    
 ////		delay_ms(500);
 //    
-//    // 3. ¼ì²éÃ¿¸öµç»úµÄÏìÓ¦
+//    // 3. æ£€æŸ¥æ¯ä¸ªç”µæœºçš„å“åº”
 //    uint8_t success_count = 0;
 //    for (uint8_t i = 0; i < count; i++) {
-//        //printf("¼ì²éµç»ú%d£¨µØÖ·0x%02X£©ÏìÓ¦...\r\n", i+1, motors[i].slave_address);
+//        //printf("æ£€æŸ¥ç”µæœº%dï¼ˆåœ°å€0x%02Xï¼‰å“åº”...\r\n", i+1, motors[i].slave_address);
 //        uint8_t ret = Modbus_Check_Response_FromBuffer(motors[i].slave_address, motors[i].contrl_reg, NULL);
 //        if (results != NULL) {
 //            results[i] = ret;
 //        }
 //        if (ret == 0) {
-//             printf("µç»ú0x%02X ÏìÓ¦³É¹¦\r\n", motors[i].slave_address);
+//             printf("ç”µæœº0x%02X å“åº”æˆåŠŸ\r\n", motors[i].slave_address);
 //            success_count++;
 //        } else {
-//            printf("µç»ú0x%02X ÏìÓ¦Î´ÕÒµ½\r\n", motors[i].slave_address);
+//            printf("ç”µæœº0x%02X å“åº”æœªæ‰¾åˆ°\r\n", motors[i].slave_address);
 //        }
 //    }
 //		
-//		 //ÇåÀí»º³åÇø
+//		 //æ¸…ç†ç¼“å†²åŒº
 //		__disable_irq();
 //		Master_RX_CNT = 0;
 //		__enable_irq();
 
-//    // »Ö¸´Ö÷Õ¾×´Ì¬
+//    // æ¢å¤ä¸»ç«™çŠ¶æ€
 //    master_state = MASTER_IDLE;
-//    // ·µ»Ø½á¹û£º¿É¸ù¾İĞèÒª¶¨Òå£¬ÀıÈç·µ»ØÊ§°Ü¸öÊı»òÑÚÂë
+//    // è¿”å›ç»“æœï¼šå¯æ ¹æ®éœ€è¦å®šä¹‰ï¼Œä¾‹å¦‚è¿”å›å¤±è´¥ä¸ªæ•°æˆ–æ©ç 
 //    if (success_count == count) {
-//        return 0; // È«²¿³É¹¦
+//        return 0; // å…¨éƒ¨æˆåŠŸ
 //    } else {
-//        // ¿É×Ô¶¨Òå·µ»ØÊ§°Üµç»úµÄÑÚÂë£¬ÕâÀï¼òµ¥·µ»ØÊ§°Ü¸öÊı
+//        // å¯è‡ªå®šä¹‰è¿”å›å¤±è´¥ç”µæœºçš„æ©ç ï¼Œè¿™é‡Œç®€å•è¿”å›å¤±è´¥ä¸ªæ•°
 //        return count - success_count;
 //    }
 //}
@@ -1997,40 +1997,40 @@ uint8_t Control_Motors_Complete(MotorControlParams *motors, uint8_t count, uint8
         
         if (len == 0) continue;
 
-        // 1. ·¢ËÍÇ°£¬³¹µ×Çå¿ÕÉÏÒ»ÂÖµÄ½ÓÊÕ×´Ì¬
+        // 1. å‘é€å‰ï¼Œå½»åº•æ¸…ç©ºä¸Šä¸€è½®çš„æ¥æ”¶çŠ¶æ€
         __disable_irq();
         Master_RX_CNT = 0;
-        Master_FrameFlag = 0; // ±ØĞëÇåÁã£¬·ñÔòÖĞ¶ÏÀï´æ²»½øĞÂÊı¾İ
+        Master_FrameFlag = 0; // å¿…é¡»æ¸…é›¶ï¼Œå¦åˆ™ä¸­æ–­é‡Œå­˜ä¸è¿›æ–°æ•°æ®
         __enable_irq();
         
         master_state = MASTER_WAIT_RESP;
 
-        // 2. ·¢ËÍÖ¸Áî
+        // 2. å‘é€æŒ‡ä»¤
         RS485_MasterSendData(frame, len);
 
-        // 3. ±Õ»·µÈ´ıµ±Ç°µç»úµÄÏìÓ¦ (µÈ´ı¶¨Ê±Æ÷´¥·¢Ö¡½áÊø±êÖ¾£¬×î´ó³¬Ê±Ô¼30ms)
+        // 3. é—­ç¯ç­‰å¾…å½“å‰ç”µæœºçš„å“åº” (ç­‰å¾…å®šæ—¶å™¨è§¦å‘å¸§ç»“æŸæ ‡å¿—ï¼Œæœ€å¤§è¶…æ—¶çº¦30ms)
         uint8_t timeout = 0;
         while (Master_FrameFlag == 0 && timeout < 30) { 
             delay_ms(1);
             timeout++;
         }
 
-        // 4. ¼ì²éÏìÓ¦
+        // 4. æ£€æŸ¥å“åº”
         uint8_t ret = Modbus_Check_Response_FromBuffer(motors[i].slave_address, motors[i].contrl_reg, NULL);
         if (results != NULL) results[i] = ret;
 				
 //				 if (ret == 0) {
-//            printf("µç»ú0x%02X ÏìÓ¦³É¹¦\r\n", motors[i].slave_address);
+//            printf("ç”µæœº0x%02X å“åº”æˆåŠŸ\r\n", motors[i].slave_address);
 //            success_count++;
 //        } else {
-//            printf("µç»ú0x%02X ÏìÓ¦Î´ÕÒµ½\r\n", motors[i].slave_address);
+//            printf("ç”µæœº0x%02X å“åº”æœªæ‰¾åˆ°\r\n", motors[i].slave_address);
 //        }
         
         if (ret == 0) {
             success_count++;
         }
 
-        // 5. ×Ö½Ú¼ä°²È«ÑÓÊ±£¬ÈÃ×ÜÏßµçÆ½³¹µ×»Ö¸´Æ½¾²ºóÔÙ½øĞĞÏÂÒ»Ì¨µç»úµÄÍ¨Ñ¶
+        // 5. å­—èŠ‚é—´å®‰å…¨å»¶æ—¶ï¼Œè®©æ€»çº¿ç”µå¹³å½»åº•æ¢å¤å¹³é™åå†è¿›è¡Œä¸‹ä¸€å°ç”µæœºçš„é€šè®¯
         delay_ms(5);
     }
 
@@ -2038,29 +2038,29 @@ uint8_t Control_Motors_Complete(MotorControlParams *motors, uint8_t count, uint8
     return count - success_count;
 }
 /**
- * @brief Í¬²½¿ØÖÆ¶à¸öµç»ú£¨ÅúÁ¿·¢ËÍÖ¸Áî£¬Ö¸Áî¼äÑÓÊ±¼«¶Ì£¬ÊµÏÖÍ¬²½Æô¶¯£©
- * @param motors µç»ú¿ØÖÆ²ÎÊıÊı×é
- * @param count  µç»úÊıÁ¿
+ * @brief åŒæ­¥æ§åˆ¶å¤šä¸ªç”µæœºï¼ˆæ‰¹é‡å‘é€æŒ‡ä»¤ï¼ŒæŒ‡ä»¤é—´å»¶æ—¶æçŸ­ï¼Œå®ç°åŒæ­¥å¯åŠ¨ï¼‰
+ * @param motors ç”µæœºæ§åˆ¶å‚æ•°æ•°ç»„
+ * @param count  ç”µæœºæ•°é‡
  */
 void Sync_Motors_Control(MotorControlParams *motors, uint8_t count)
 {
     
-    // Çå¿ÕÖ÷Õ¾½ÓÊÕ»º³åÇø£¨²»µÈ´ıÏìÓ¦£¬ËùÒÔ¿ÉÒÔÇå¿Õ£©
+    // æ¸…ç©ºä¸»ç«™æ¥æ”¶ç¼“å†²åŒºï¼ˆä¸ç­‰å¾…å“åº”ï¼Œæ‰€ä»¥å¯ä»¥æ¸…ç©ºï¼‰
     __disable_irq();
     Master_RX_CNT = 0;
     Master_FrameFlag = 0;
     __enable_irq();
     
-    // ÉèÖÃÖ÷Õ¾×´Ì¬ÎªµÈ´ıÏìÓ¦
+    // è®¾ç½®ä¸»ç«™çŠ¶æ€ä¸ºç­‰å¾…å“åº”
     master_state = MASTER_WAIT_RESP;
     
-    // ÅúÁ¿·¢ËÍËùÓĞÖ¸Áî£¬Ö¸Áî¼ä½ö±£³Ö¼«¶ÌÑÓÊ±£¨±£Ö¤×ÜÏßÎÈ¶¨£©
+    // æ‰¹é‡å‘é€æ‰€æœ‰æŒ‡ä»¤ï¼ŒæŒ‡ä»¤é—´ä»…ä¿æŒæçŸ­å»¶æ—¶ï¼ˆä¿è¯æ€»çº¿ç¨³å®šï¼‰
     for (uint8_t i = 0; i < count; i++) {
         uint16_t cmds[2] = {motors[i].len_l, motors[i].len_h};
         uint8_t frame[256];
         uint8_t len = Build_Modbus_Frame(motors[i].slave_address, 0x10, motors[i].contrl_reg, 2, cmds, frame);
         if (len == 0) {
-            printf("´íÎó£º¹¹½¨µç»ú%dÖ¡Ê§°Ü£¬µØÖ·=0x%02X\r\n", i+1, motors[i].slave_address);
+            printf("é”™è¯¯ï¼šæ„å»ºç”µæœº%då¸§å¤±è´¥ï¼Œåœ°å€=0x%02X\r\n", i+1, motors[i].slave_address);
             continue;
         }
         
@@ -2068,23 +2068,23 @@ void Sync_Motors_Control(MotorControlParams *motors, uint8_t count)
         for (uint8_t j = 0; j < len; j++) printf("%02X ", frame[j]);
         printf("\r\n");
 				
-				// ½ûÓÃ´ÓÕ¾½ÓÊÕ£¬±ÜÃâ×ÜÏß³åÍ»
+				// ç¦ç”¨ä»ç«™æ¥æ”¶ï¼Œé¿å…æ€»çº¿å†²çª
 //				USART_ITConfig(USART2, USART_IT_RXNE, DISABLE);
         
-        // ·¢ËÍÖ¸Áî
+        // å‘é€æŒ‡ä»¤
         RS485_MasterSendData(frame, len);
 				
-				    // ÖØĞÂÆôÓÃ´ÓÕ¾½ÓÊÕ
+				    // é‡æ–°å¯ç”¨ä»ç«™æ¥æ”¶
 //				USART_ITConfig(USART2, USART_IT_RXNE, ENABLE);
         
-        // ¼«¶ÌÑÓÊ±£¨100us£©£¬È·±£×ÜÏß¿ÕÏĞ£¬Í¬Ê±±£³ÖÍ¬²½ĞÔ
+        // æçŸ­å»¶æ—¶ï¼ˆ100usï¼‰ï¼Œç¡®ä¿æ€»çº¿ç©ºé—²ï¼ŒåŒæ—¶ä¿æŒåŒæ­¥æ€§
         delay_ms(50);
     }
     
-    // ·¢ËÍÍê³Éºó£¬»Ö¸´Ö÷Õ¾×´Ì¬Îª¿ÕÏĞ£¨²»µÈ´ıÏìÓ¦£©
+    // å‘é€å®Œæˆåï¼Œæ¢å¤ä¸»ç«™çŠ¶æ€ä¸ºç©ºé—²ï¼ˆä¸ç­‰å¾…å“åº”ï¼‰
     master_state = MASTER_IDLE;
 
-    printf("ËùÓĞµç»úÖ¸ÁîÒÑÍ¬²½·¢³ö\r\n");
+    printf("æ‰€æœ‰ç”µæœºæŒ‡ä»¤å·²åŒæ­¥å‘å‡º\r\n");
 }
 
 uint8_t Modbus_Check_Response_FromBuffer(uint8_t slave_addr, uint16_t start_reg, uint16_t *result)
@@ -2093,23 +2093,23 @@ uint8_t Modbus_Check_Response_FromBuffer(uint8_t slave_addr, uint16_t start_reg,
     while (idx + 8 <= Master_RX_CNT) {
         uint8_t *buf = Master_RX_BUFF + idx;
 
-        // ¼ì²éµØÖ·
+        // æ£€æŸ¥åœ°å€
         if (buf[0] != slave_addr) {
             idx++;
             continue;
         }
-        // ¼ì²é¹¦ÄÜÂë£¨Ğ´¶à¸ö¼Ä´æÆ÷ÏìÓ¦Ó¦Îª 0x10£©
+        // æ£€æŸ¥åŠŸèƒ½ç ï¼ˆå†™å¤šä¸ªå¯„å­˜å™¨å“åº”åº”ä¸º 0x10ï¼‰
         if (buf[1] != 0x10) {
             idx++;
             continue;
         }
-        // ¼ì²éÆğÊ¼¼Ä´æÆ÷
+        // æ£€æŸ¥èµ·å§‹å¯„å­˜å™¨
         uint16_t resp_start = (buf[2] << 8) | buf[3];
         if (resp_start != start_reg) {
             idx++;
             continue;
         }
-        // ¼ì²é CRC
+        // æ£€æŸ¥ CRC
         uint16_t recv_crc = (buf[7] << 8) | buf[6];
         uint16_t calc_crc = Modbus_CRC16(buf, 6);
         if (recv_crc != calc_crc) {
@@ -2117,104 +2117,104 @@ uint8_t Modbus_Check_Response_FromBuffer(uint8_t slave_addr, uint16_t start_reg,
             continue;
         }
 
-        // ÕÒµ½Æ¥ÅäÖ¡£¬´Ó»º³åÇøÖĞÒÆ³ı¸ÃÖ¡£¨8×Ö½Ú£©
+        // æ‰¾åˆ°åŒ¹é…å¸§ï¼Œä»ç¼“å†²åŒºä¸­ç§»é™¤è¯¥å¸§ï¼ˆ8å­—èŠ‚ï¼‰
 				if (idx + 8 < Master_RX_CNT) {
 						memmove(Master_RX_BUFF, Master_RX_BUFF + idx + 8, Master_RX_CNT - idx - 8);
 				}
 				Master_RX_CNT -= (idx + 8);
 
         if (result) *result = 1;
-        return 0;   // ³É¹¦
+        return 0;   // æˆåŠŸ
     }
-    return 2;   // Î´ÕÒµ½
+    return 2;   // æœªæ‰¾åˆ°
 }
 
 /**
- * @brief ÉÏµç¸´Î»Ö¸¶¨µç»ú
- * @param slave_addr µç»ú´ÓÕ¾µØÖ·
- * @param reg_addr   ¸´Î»¼Ä´æÆ÷µØÖ·£¨ÀıÈç0x50£©
- * @param reset_value ¸´Î»Öµ£¨ÀıÈç8£©
- * @return 0:³É¹¦, ÆäËû:´íÎóÂë
+ * @brief ä¸Šç”µå¤ä½æŒ‡å®šç”µæœº
+ * @param slave_addr ç”µæœºä»ç«™åœ°å€
+ * @param reg_addr   å¤ä½å¯„å­˜å™¨åœ°å€ï¼ˆä¾‹å¦‚0x50ï¼‰
+ * @param reset_value å¤ä½å€¼ï¼ˆä¾‹å¦‚8ï¼‰
+ * @return 0:æˆåŠŸ, å…¶ä»–:é”™è¯¯ç 
  */
 uint8_t Motor_Reset(uint8_t slave_addr, uint16_t reg_addr, uint16_t reset_value)
 {
     uint8_t ret;
-    printf("ÕıÔÚ¸´Î»µç»ú µØÖ·0x%02X...\r\n", slave_addr);
-    // µ÷ÓÃ06¹¦ÄÜÂëĞ´µ¥¸ö¼Ä´æÆ÷
+    printf("æ­£åœ¨å¤ä½ç”µæœº åœ°å€0x%02X...\r\n", slave_addr);
+    // è°ƒç”¨06åŠŸèƒ½ç å†™å•ä¸ªå¯„å­˜å™¨
     ret = Modbus_06_WriteSingleReg(slave_addr, reg_addr, reset_value);
     if (ret == 0) {
-        printf("µç»ú µØÖ·0x%02X ¸´Î»³É¹¦\r\n", slave_addr);
+        printf("ç”µæœº åœ°å€0x%02X å¤ä½æˆåŠŸ\r\n", slave_addr);
     } else {
-        printf("µç»ú µØÖ·0x%02X ¸´Î»Ê§°Ü£¬´íÎóÂë %d\r\n", slave_addr, ret);
+        printf("ç”µæœº åœ°å€0x%02X å¤ä½å¤±è´¥ï¼Œé”™è¯¯ç  %d\r\n", slave_addr, ret);
     }
     return ret;
 }
 
 
 /**
- * @brief ¼ì²âÖ¸¶¨µç»úÊÇ·ñ¶Â×ª£¬Èô¶Â×ªÔò³¢ÊÔ»Ö¸´
- * @param slave_addr µç»ú´ÓÕ¾µØÖ·
- * @param current_threshold_ma ¶Â×ªµçÁ÷ãĞÖµ£¨mA£©
- * @return 1 ±íÊ¾·¢Éú¶Â×ª²¢Ö´ĞĞÁË»Ö¸´£¬0 ±íÊ¾Õı³£
+ * @brief æ£€æµ‹æŒ‡å®šç”µæœºæ˜¯å¦å µè½¬ï¼Œè‹¥å µè½¬åˆ™å°è¯•æ¢å¤
+ * @param slave_addr ç”µæœºä»ç«™åœ°å€
+ * @param current_threshold_ma å µè½¬ç”µæµé˜ˆå€¼ï¼ˆmAï¼‰
+ * @return 1 è¡¨ç¤ºå‘ç”Ÿå µè½¬å¹¶æ‰§è¡Œäº†æ¢å¤ï¼Œ0 è¡¨ç¤ºæ­£å¸¸
  */
 uint8_t Motor_CheckAndRecoverStall(uint8_t slave_addr, uint16_t current_threshold_ma)
 {
     uint16_t current_ma = 0;
     uint8_t ret;
 
-    // 1. ¶ÁÈ¡ÊµÊ±µçÁ÷
+    // 1. è¯»å–å®æ—¶ç”µæµ
     ret = Modbus_03_ReadHoldReg(slave_addr, REG_CURRENT, 1, &current_ma);
     if (ret != 0) {
-        printf("¶ÁÈ¡µç»ú0x%02XµçÁ÷Ê§°Ü£¬´íÎóÂë%d\n", slave_addr, ret);
+        printf("è¯»å–ç”µæœº0x%02Xç”µæµå¤±è´¥ï¼Œé”™è¯¯ç %d\n", slave_addr, ret);
         return 0;
     }
 
-    // 2. ÅĞ¶ÏÊÇ·ñ³¬¹ı¶Â×ªãĞÖµ
+    // 2. åˆ¤æ–­æ˜¯å¦è¶…è¿‡å µè½¬é˜ˆå€¼
     if (current_ma < current_threshold_ma) {
-        return 0;   // Õı³£
+        return 0;   // æ­£å¸¸
     }
 
-    // 3. ¶Â×ª·¢Éú£¬Ö´ĞĞ»Ö¸´Á÷³Ì
-    printf("µç»ú0x%02X¼ì²âµ½¶Â×ª£¬µçÁ÷=%d mA£¨ãĞÖµ=%d mA£©£¬¿ªÊ¼»Ö¸´\n", 
+    // 3. å µè½¬å‘ç”Ÿï¼Œæ‰§è¡Œæ¢å¤æµç¨‹
+    printf("ç”µæœº0x%02Xæ£€æµ‹åˆ°å µè½¬ï¼Œç”µæµ=%d mAï¼ˆé˜ˆå€¼=%d mAï¼‰ï¼Œå¼€å§‹æ¢å¤\n", 
            slave_addr, current_ma, current_threshold_ma);
 
-    // 3.1 Çå³ı±¨¾¯£¨Ğ´0x00A4ÈÎÒâÖµ£¬ÀıÈç0x0000£©
+    // 3.1 æ¸…é™¤æŠ¥è­¦ï¼ˆå†™0x00A4ä»»æ„å€¼ï¼Œä¾‹å¦‚0x0000ï¼‰
     ret = Modbus_06_WriteSingleReg(slave_addr, REG_CLEAR_ALARM, 0x0000);
     if (ret != 0) {
-        printf("Çå³ı±¨¾¯Ê§°Ü£¬´íÎóÂë%d\n", ret);
+        printf("æ¸…é™¤æŠ¥è­¦å¤±è´¥ï¼Œé”™è¯¯ç %d\n", ret);
     } else {
-        printf("±¨¾¯ÒÑÇå³ı\n");
+        printf("æŠ¥è­¦å·²æ¸…é™¤\n");
     }
 
-    // 3.2 ÖØĞÂÊ¹ÄÜµç»ú£¨Ğ´0x00D4 = 0x0000 Ê¹ÄÜ£©
-    //    ×¢Òâ£ºÈç¹ûµç»úÒò¹ÊÕÏ´¦ÓÚÍÑ»ú×´Ì¬£¬¿ÉÏÈĞ´1ÍÑ»úÔÙĞ´0Ê¹ÄÜ£¬
-    //    µ«Í¨³£Çå³ı±¨¾¯ºóÖ±½ÓÊ¹ÄÜ¼´¿É¡£
+    // 3.2 é‡æ–°ä½¿èƒ½ç”µæœºï¼ˆå†™0x00D4 = 0x0000 ä½¿èƒ½ï¼‰
+    //    æ³¨æ„ï¼šå¦‚æœç”µæœºå› æ•…éšœå¤„äºè„±æœºçŠ¶æ€ï¼Œå¯å…ˆå†™1è„±æœºå†å†™0ä½¿èƒ½ï¼Œ
+    //    ä½†é€šå¸¸æ¸…é™¤æŠ¥è­¦åç›´æ¥ä½¿èƒ½å³å¯ã€‚
     ret = Modbus_06_WriteSingleReg(slave_addr, REG_ENABLE, 0x0000);
     if (ret != 0) {
-        printf("ÖØĞÂÊ¹ÄÜµç»úÊ§°Ü£¬´íÎóÂë%d\n", ret);
+        printf("é‡æ–°ä½¿èƒ½ç”µæœºå¤±è´¥ï¼Œé”™è¯¯ç %d\n", ret);
     } else {
-        printf("µç»úÒÑÖØĞÂÊ¹ÄÜ\n");
+        printf("ç”µæœºå·²é‡æ–°ä½¿èƒ½\n");
     }
 
-    // 3.3 ¿ÉÑ¡£ºµÈ´ıÇı¶¯Æ÷ÎÈ¶¨
+    // 3.3 å¯é€‰ï¼šç­‰å¾…é©±åŠ¨å™¨ç¨³å®š
     delay_ms(100);
 
-    // 4. ÔÙ´Î¶ÁÈ¡µçÁ÷È·ÈÏÊÇ·ñ»Ö¸´Õı³££¨¿ÉÑ¡£©
+    // 4. å†æ¬¡è¯»å–ç”µæµç¡®è®¤æ˜¯å¦æ¢å¤æ­£å¸¸ï¼ˆå¯é€‰ï¼‰
     ret = Modbus_03_ReadHoldReg(slave_addr, REG_CURRENT, 1, &current_ma);
     if (ret == 0 && current_ma < current_threshold_ma) {
-        printf("µç»ú0x%02X»Ö¸´³É¹¦£¬µ±Ç°µçÁ÷=%d mA\n", slave_addr, current_ma);
+        printf("ç”µæœº0x%02Xæ¢å¤æˆåŠŸï¼Œå½“å‰ç”µæµ=%d mA\n", slave_addr, current_ma);
     } else {
-        printf("µç»ú0x%02X¿ÉÄÜÎ´ÍêÈ«»Ö¸´£¬µçÁ÷=%d mA\n", slave_addr, current_ma);
+        printf("ç”µæœº0x%02Xå¯èƒ½æœªå®Œå…¨æ¢å¤ï¼Œç”µæµ=%d mA\n", slave_addr, current_ma);
     }
 
     return 1;
 }
 
-// ========================== ¸¨Öúº¯Êı ==========================
+// ========================== è¾…åŠ©å‡½æ•° ==========================
 /**
- * @brief ¸ù¾İ´ÓÕ¾µØÖ·»ñÈ¡¶ÔÓ¦µÄ¸´Î»º¯ÊıÖ¸Õë
- * @param slave_addr ´ÓÕ¾µØÖ·
- * @return º¯ÊıÖ¸Õë£¬ÈôÎ´Æ¥ÅäÔò·µ»Ø NULL
+ * @brief æ ¹æ®ä»ç«™åœ°å€è·å–å¯¹åº”çš„å¤ä½å‡½æ•°æŒ‡é’ˆ
+ * @param slave_addr ä»ç«™åœ°å€
+ * @return å‡½æ•°æŒ‡é’ˆï¼Œè‹¥æœªåŒ¹é…åˆ™è¿”å› NULL
  */
 static uint8_t (*GetResetFunction(uint8_t slave_addr))(void)
 {
@@ -2233,42 +2233,42 @@ static uint8_t (*GetResetFunction(uint8_t slave_addr))(void)
     }
 }
 
-// ========================== Ö÷ÈÎÎñº¯Êı ==========================
+// ========================== ä¸»ä»»åŠ¡å‡½æ•° ==========================
 /**
- * @brief ·Ç×èÈû¶Â×ª¼à¿ØÈÎÎñ£¨¼ÆÊıÂÖÑ¯·½Ê½£©
- * @note  ÔÚÖ÷Ñ­»·ÖĞÖÜÆÚĞÔµ÷ÓÃ£¬Ã¿´Îµ÷ÓÃ´¦ÀíÒ»¸öµç»ú¡£
- *        ´ïµ½¼ÆÊıãĞÖµºóÆô¶¯Ò»ÂÖÂÖÑ¯£¬¼ì²âµ½¶Â×ªÔò°´Ë³ĞòÖ´ĞĞËùÓĞ¸´Î»º¯Êı¡£
+ * @brief éé˜»å¡å µè½¬ç›‘æ§ä»»åŠ¡ï¼ˆè®¡æ•°è½®è¯¢æ–¹å¼ï¼‰
+ * @note  åœ¨ä¸»å¾ªç¯ä¸­å‘¨æœŸæ€§è°ƒç”¨ï¼Œæ¯æ¬¡è°ƒç”¨å¤„ç†ä¸€ä¸ªç”µæœºã€‚
+ *        è¾¾åˆ°è®¡æ•°é˜ˆå€¼åå¯åŠ¨ä¸€è½®è½®è¯¢ï¼Œæ£€æµ‹åˆ°å µè½¬åˆ™æŒ‰é¡ºåºæ‰§è¡Œæ‰€æœ‰å¤ä½å‡½æ•°ã€‚
  */
 
 volatile uint8_t stall_slave_addr = 0;
 //void MotorStallMonitorTask(void)
 //{
-//    // ---------- 1. Æô¶¯ÂÖÑ¯£¨»ùÓÚ¼ÆÊı£© ----------
+//    // ---------- 1. å¯åŠ¨è½®è¯¢ï¼ˆåŸºäºè®¡æ•°ï¼‰ ----------
 //    if (!stall_poll_active) {
 //        stall_poll_counter++;
 //        if (stall_poll_counter >= STALL_POLL_THRESHOLD &&
 //        master_state == MASTER_IDLE && !Sequence_IsBusy()) {
-//            stall_poll_counter = 0;                // ¸´Î»¼ÆÊı
-//            stall_poll_active = 1;                 // ½øÈëÂÖÑ¯×´Ì¬
-//            stall_motor_index = 0;                 // ´ÓµÚÒ»¸öµç»ú¿ªÊ¼
-//            // ×¢Òâ£º²»ÔÚ´Ë´¦Çå³ı stall_triggered£¬ÓÉÍâ²¿¿ØÖÆ
-//            // printf("Æô¶¯¶Â×ªÂÖÑ¯\n");
+//            stall_poll_counter = 0;                // å¤ä½è®¡æ•°
+//            stall_poll_active = 1;                 // è¿›å…¥è½®è¯¢çŠ¶æ€
+//            stall_motor_index = 0;                 // ä»ç¬¬ä¸€ä¸ªç”µæœºå¼€å§‹
+//            // æ³¨æ„ï¼šä¸åœ¨æ­¤å¤„æ¸…é™¤ stall_triggeredï¼Œç”±å¤–éƒ¨æ§åˆ¶
+//            // printf("å¯åŠ¨å µè½¬è½®è¯¢\n");
 //        } else {
-//            return;   // Î´´ïµ½ãĞÖµ£¬±¾´Î²»Ö´ĞĞ
+//            return;   // æœªè¾¾åˆ°é˜ˆå€¼ï¼Œæœ¬æ¬¡ä¸æ‰§è¡Œ
 //        }
 //    }
 
-//    // Èç¹ûÒÑ¾­´¥·¢¹ı¶Â×ªÇÒÎ´»Ö¸´£¬Ìø¹ı¼ì²â£¨±ÜÃâÖØ¸´Ö´ĞĞ¸´Î»£©
+//    // å¦‚æœå·²ç»è§¦å‘è¿‡å µè½¬ä¸”æœªæ¢å¤ï¼Œè·³è¿‡æ£€æµ‹ï¼ˆé¿å…é‡å¤æ‰§è¡Œå¤ä½ï¼‰
 //    if (stall_triggered) {
-//        // ÈôĞè×Ô¶¯»Ö¸´£¬¿ÉÔÚ´ËÌí¼ÓÌõ¼şÇå³ı stall_triggered£¬µ«½¨ÒéÓÉÍâ²¿µ÷ÓÃ ClearStallTrigger()
+//        // è‹¥éœ€è‡ªåŠ¨æ¢å¤ï¼Œå¯åœ¨æ­¤æ·»åŠ æ¡ä»¶æ¸…é™¤ stall_triggeredï¼Œä½†å»ºè®®ç”±å¤–éƒ¨è°ƒç”¨ ClearStallTrigger()
 //        return;
 //    }
 
-//    // ---------- 2. ÂÖÑ¯Ö´ĞĞ£º¼ì²âµ±Ç°Ë÷Òı¶ÔÓ¦µÄµç»ú ----------
+//    // ---------- 2. è½®è¯¢æ‰§è¡Œï¼šæ£€æµ‹å½“å‰ç´¢å¼•å¯¹åº”çš„ç”µæœº ----------
 //    if (stall_motor_index >= MOTORCOUNT) {
-//        // ±¾ÂÖËùÓĞµç»ú¼ì²âÍê±Ï£¬ÇÒÎ´´¥·¢¶Â×ª£¬½áÊøÂÖÑ¯
+//        // æœ¬è½®æ‰€æœ‰ç”µæœºæ£€æµ‹å®Œæ¯•ï¼Œä¸”æœªè§¦å‘å µè½¬ï¼Œç»“æŸè½®è¯¢
 //        stall_poll_active = 0;
-//        // printf("±¾ÂÖ¶Â×ª¼ì²â½áÊø£¬Î´·¢ÏÖ¶Â×ª\n");
+//        // printf("æœ¬è½®å µè½¬æ£€æµ‹ç»“æŸï¼Œæœªå‘ç°å µè½¬\n");
 //        return;
 //    }
 
@@ -2276,28 +2276,28 @@ volatile uint8_t stall_slave_addr = 0;
 //    uint16_t current_ma = 0;
 //    uint8_t ret;
 
-//    // ¶ÁÈ¡ÊµÊ±µçÁ÷
+//    // è¯»å–å®æ—¶ç”µæµ
 //		MasterBusy_Acquire();
 //    ret = Modbus_03_ReadHoldReg(slave, REG_CURRENT, 1, &current_ma);
 //		MasterBusy_Release();
 //		printf("ret=%d, current=%d mA\n", ret, current_ma);
 //    if (ret != 0) {
-//        printf("¶ÁÈ¡µç»ú0x%02XµçÁ÷Ê§°Ü£¬´íÎóÂë%d\r\n", slave, ret);
-//        // ¶ÁÈ¡Ê§°ÜÔòÌø¹ı¸Ãµç»ú£¬¼ÌĞøÏÂÒ»¸ö
+//        printf("è¯»å–ç”µæœº0x%02Xç”µæµå¤±è´¥ï¼Œé”™è¯¯ç %d\r\n", slave, ret);
+//        // è¯»å–å¤±è´¥åˆ™è·³è¿‡è¯¥ç”µæœºï¼Œç»§ç»­ä¸‹ä¸€ä¸ª
 //        stall_motor_index++;
 //        return;
 //    }
 //		
 //		if (current_ma >= STALL_CURRENT_THRESHOLD_MA) {
-//    // ¼ÇÂ¼¶Â×ªµç»úºÍµ±Ç°×´Ì¬
+//    // è®°å½•å µè½¬ç”µæœºå’Œå½“å‰çŠ¶æ€
 //    stall_triggered = 1;
 //    stall_slave_addr = slave;
-//    stall_poll_active = 0;  // ½áÊø±¾ÂÖÂÖÑ¯
-//    // ²»ÔÚÕâÀïÖ´ĞĞ Battery_22 µÈº¯Êı£¬¶øÊÇ·µ»Ø
+//    stall_poll_active = 0;  // ç»“æŸæœ¬è½®è½®è¯¢
+//    // ä¸åœ¨è¿™é‡Œæ‰§è¡Œ Battery_22 ç­‰å‡½æ•°ï¼Œè€Œæ˜¯è¿”å›
 //    return;
 //		}
 
-//    // µ±Ç°µç»úÕı³££¬ÒÆ¶¯µ½ÏÂÒ»¸ö
+//    // å½“å‰ç”µæœºæ­£å¸¸ï¼Œç§»åŠ¨åˆ°ä¸‹ä¸€ä¸ª
 //    stall_motor_index++;
 //}
 
@@ -2305,20 +2305,20 @@ volatile uint8_t stall_slave_addr = 0;
 
 void MotorStallMonitorTask(void)
 {
-    // ---------- ¼ÆÊı¿ØÖÆ£ºÃ¿200´ÎÖ÷Ñ­»·Ö´ĞĞÒ»´Î¼ì²â ----------
+    // ---------- è®¡æ•°æ§åˆ¶ï¼šæ¯200æ¬¡ä¸»å¾ªç¯æ‰§è¡Œä¸€æ¬¡æ£€æµ‹ ----------
     static uint16_t stall_poll_counter = 0;
     stall_poll_counter++;
     if (stall_poll_counter < STALL_POLL_THRESHOLD) {  // STALL_POLL_THRESHOLD = 200
-        return;  // Î´´ïµ½¼ÆÊıãĞÖµ£¬±¾´Î²»Ö´ĞĞ
+        return;  // æœªè¾¾åˆ°è®¡æ•°é˜ˆå€¼ï¼Œæœ¬æ¬¡ä¸æ‰§è¡Œ
     }
-    stall_poll_counter = 0;  // ¸´Î»¼ÆÊı  
+    stall_poll_counter = 0;  // å¤ä½è®¡æ•°  
   
-		// ½öÔÚĞòÁĞÖ´ĞĞÊ±¼ì²â
+		// ä»…åœ¨åºåˆ—æ‰§è¡Œæ—¶æ£€æµ‹
     if (!Sequence_IsBusy()) {
         return;
     }
 
-    // Èç¹ûÒÑ¾­´¥·¢¹ı¶Â×ªÇÒÎ´»Ö¸´£¬Ìø¹ı¼ì²â
+    // å¦‚æœå·²ç»è§¦å‘è¿‡å µè½¬ä¸”æœªæ¢å¤ï¼Œè·³è¿‡æ£€æµ‹
     if (stall_triggered) {
         return;
     }
@@ -2326,56 +2326,56 @@ void MotorStallMonitorTask(void)
     uint8_t current_seq = Sequence_GetCurrentId();
     uint8_t current_step = Sequence_GetCurrentStep();
 
-    // »ñÈ¡µ±Ç°²½ÖèµÄµç»úÁĞ±í
+    // è·å–å½“å‰æ­¥éª¤çš„ç”µæœºåˆ—è¡¨
     const uint8_t *motor_list = GetMotorListForCurrentStep();
     if (motor_list == NULL) {
-        return;   // ¸Ã²½ÖèÎŞĞè¼ì²â
+        return;   // è¯¥æ­¥éª¤æ— éœ€æ£€æµ‹
     }
 
-    // ±éÀú¸Ã²½ÖèµÄËùÓĞµç»ú
+    // éå†è¯¥æ­¥éª¤çš„æ‰€æœ‰ç”µæœº
     while (*motor_list != 0) {
         uint8_t slave = *motor_list++;
         uint16_t current_ma = 0;
         uint8_t ret;
 
-        // ¶ÁÈ¡µçÁ÷£¨×ÜÏß»¥³â£©
+        // è¯»å–ç”µæµï¼ˆæ€»çº¿äº’æ–¥ï¼‰
         MasterBusy_Acquire();
         ret = Modbus_03_ReadHoldReg(slave, REG_CURRENT, 1, &current_ma);
         MasterBusy_Release();
 
-        printf("ĞòÁĞ%d ²½Öè%d µç»ú0x%02X µçÁ÷=%d mA\n", current_seq, current_step, slave, current_ma);
+        printf("åºåˆ—%d æ­¥éª¤%d ç”µæœº0x%02X ç”µæµ=%d mA\n", current_seq, current_step, slave, current_ma);
         if (ret != 0) {
-            printf("¶ÁÈ¡µç»ú0x%02XµçÁ÷Ê§°Ü£¬´íÎóÂë%d\n", slave, ret);
-            continue;   // Ìø¹ı¸Ãµç»ú
+            printf("è¯»å–ç”µæœº0x%02Xç”µæµå¤±è´¥ï¼Œé”™è¯¯ç %d\n", slave, ret);
+            continue;   // è·³è¿‡è¯¥ç”µæœº
         }
 
-        // ---------- ÌØÊâ´¦Àí£ºĞòÁĞ8/9£¨¿ª»ú/¹Ø»ú£©£¬µç»ú0x02µçÁ÷Òì³£ ----------
+        // ---------- ç‰¹æ®Šå¤„ç†ï¼šåºåˆ—8/9ï¼ˆå¼€æœº/å…³æœºï¼‰ï¼Œç”µæœº0x02ç”µæµå¼‚å¸¸ ----------
         if ((current_seq == 8 || current_seq == 9) && slave == 0x02) {
             if (current_ma < 100 || current_ma > 1000) {
-                printf("ÌØÊâĞòÁĞ0x%02X ²½Öè%d£ºµç»ú0x02µçÁ÷Òì³£ %d mA£¬·¢ËÍ¼±Í£\n", current_seq, current_step, current_ma);
-                uint8_t stop_ret = Modbus_06_WriteSingleReg(0x02, 0x00C8, 0x0100); // ¼±Í£
+                printf("ç‰¹æ®Šåºåˆ—0x%02X æ­¥éª¤%dï¼šç”µæœº0x02ç”µæµå¼‚å¸¸ %d mAï¼Œå‘é€æ€¥åœ\n", current_seq, current_step, current_ma);
+                uint8_t stop_ret = Modbus_06_WriteSingleReg(0x02, 0x00C8, 0x0100); // æ€¥åœ
                 if (stop_ret != 0) {
-                    printf("¼±Í£Ö¸Áî·¢ËÍÊ§°Ü£¬´íÎóÂë %d\n", stop_ret);
+                    printf("æ€¥åœæŒ‡ä»¤å‘é€å¤±è´¥ï¼Œé”™è¯¯ç  %d\n", stop_ret);
                 } else {
-                    printf("¼±Í£Ö¸Áî·¢ËÍ³É¹¦\n");
+                    printf("æ€¥åœæŒ‡ä»¤å‘é€æˆåŠŸ\n");
                 }
-                // ½öÔÚ²½Öè7£¨Ë÷Òı7£©Ê±×èÈûÑÓÊ±2Ãë
+                // ä»…åœ¨æ­¥éª¤7ï¼ˆç´¢å¼•7ï¼‰æ—¶é˜»å¡å»¶æ—¶2ç§’
                 if (current_step == 7) {
-                    printf("²½Öè7£º±£³Ö2Ãë\n");
+                    printf("æ­¥éª¤7ï¼šä¿æŒ2ç§’\n");
                     delay_ms(2000);
-                    printf("±£³Ö2Ãë½áÊø\n");
+                    printf("ä¿æŒ2ç§’ç»“æŸ\n");
                 }
-                // ¼ÌĞø¼ì²âÏÂÒ»¸öµç»ú
+                // ç»§ç»­æ£€æµ‹ä¸‹ä¸€ä¸ªç”µæœº
                 continue;
             }
         }
 
-        // ---------- Í¨ÓÃ¶Â×ª¼ì²â ----------
+        // ---------- é€šç”¨å µè½¬æ£€æµ‹ ----------
         if (current_ma >= STALL_CURRENT_THRESHOLD_MA) {
             stall_triggered = 1;
             stall_slave_addr = slave;
-            printf("µç»ú0x%02X¶Â×ª£¬µçÁ÷=%d mA\n", slave, current_ma);
-            // ·¢ÏÖ¶Â×ª£¬Í£Ö¹±¾ÂÖ¼ì²â£¨ÓÉÖ÷Ñ­»·´¦Àí¸´Î»£©
+            printf("ç”µæœº0x%02Xå µè½¬ï¼Œç”µæµ=%d mA\n", slave, current_ma);
+            // å‘ç°å µè½¬ï¼Œåœæ­¢æœ¬è½®æ£€æµ‹ï¼ˆç”±ä¸»å¾ªç¯å¤„ç†å¤ä½ï¼‰
             return;
         }
     }
@@ -2383,29 +2383,29 @@ void MotorStallMonitorTask(void)
 
 void AlarmPoll_Init(void)
 {
-    last_alarm_poll_time = GetTick() - ALARM_POLL_INTERVAL_MS - 100; // È·±£Á¢¼´´¥·¢
+    last_alarm_poll_time = GetTick() - ALARM_POLL_INTERVAL_MS - 100; // ç¡®ä¿ç«‹å³è§¦å‘
 }
 
 /**
- * @brief ¶ÁÈ¡µç»úµ±Ç°Î»ÖÃ£¨32Î»£©
- * @param slave_addr ´ÓÕ¾µØÖ·
- * @param pos Êä³öÎ»ÖÃÖ¸Õë
- * @return 0³É¹¦£¬·Ç0Ê§°Ü
+ * @brief è¯»å–ç”µæœºå½“å‰ä½ç½®ï¼ˆ32ä½ï¼‰
+ * @param slave_addr ä»ç«™åœ°å€
+ * @param pos è¾“å‡ºä½ç½®æŒ‡é’ˆ
+ * @return 0æˆåŠŸï¼Œé0å¤±è´¥
  */
 uint8_t ReadMotorPosition(uint8_t slave_addr, int32_t *pos)
 {
     uint16_t regs[2];
     uint8_t ret = Modbus_03_ReadHoldReg(slave_addr, 0x0004, 2, regs);
     if (ret == 0) {
-        *pos = (int32_t)((regs[1] << 16) | regs[0]);  // µÍ16Î»ÔÚÇ°£¬¸ß16Î»ÔÚºó
+        *pos = (int32_t)((regs[1] << 16) | regs[0]);  // ä½16ä½åœ¨å‰ï¼Œé«˜16ä½åœ¨å
     }
     return ret;
 }
 
 /**
- * @brief ·¢ËÍÍ£Ö¹Ö¸Áî¸ø¶à¸öµç»ú
- * @param addrs ´ÓÕ¾µØÖ·Êı×é
- * @param count µç»úÊıÁ¿
+ * @brief å‘é€åœæ­¢æŒ‡ä»¤ç»™å¤šä¸ªç”µæœº
+ * @param addrs ä»ç«™åœ°å€æ•°ç»„
+ * @param count ç”µæœºæ•°é‡
  */
 void StopMotors(uint8_t *addrs, uint8_t count)
 {
@@ -2415,13 +2415,13 @@ void StopMotors(uint8_t *addrs, uint8_t count)
 }
 
 /**
- * @brief µÈ´ıÖ¸¶¨Ê±¼ä£¬ÆÚ¼ä³ÖĞø¼à²âµç»úÎ»ÖÃ£¬ÈôÁ¬Ğø¶à´Î²»±äÔòÅĞ¶¨¶Â×ª
- * @param addrs     µç»ú´ÓÕ¾µØÖ·ÁĞ±í
- * @param count     µç»úÊıÁ¿
- * @param timeout_ms  µÈ´ı×ÜÊ±¼ä£¨ºÁÃë£©
- * @param check_interval_ms  ¼ì²é¼ä¸ô£¨ºÁÃë£©
- * @param stall_threshold  Á¬ĞøÎ»ÖÃ²»±ä´ÎÊıãĞÖµ£¨Ä¬ÈÏ3´Î£©
- * @return 0³É¹¦£¬1¼ì²âµ½¶Â×ª
+ * @brief ç­‰å¾…æŒ‡å®šæ—¶é—´ï¼ŒæœŸé—´æŒç»­ç›‘æµ‹ç”µæœºä½ç½®ï¼Œè‹¥è¿ç»­å¤šæ¬¡ä¸å˜åˆ™åˆ¤å®šå µè½¬
+ * @param addrs     ç”µæœºä»ç«™åœ°å€åˆ—è¡¨
+ * @param count     ç”µæœºæ•°é‡
+ * @param timeout_ms  ç­‰å¾…æ€»æ—¶é—´ï¼ˆæ¯«ç§’ï¼‰
+ * @param check_interval_ms  æ£€æŸ¥é—´éš”ï¼ˆæ¯«ç§’ï¼‰
+ * @param stall_threshold  è¿ç»­ä½ç½®ä¸å˜æ¬¡æ•°é˜ˆå€¼ï¼ˆé»˜è®¤3æ¬¡ï¼‰
+ * @return 0æˆåŠŸï¼Œ1æ£€æµ‹åˆ°å µè½¬
  */
 uint8_t WaitWithPositionCheck(uint8_t *addrs, uint8_t count, 
                               uint32_t timeout_ms, 
@@ -2435,12 +2435,12 @@ uint8_t WaitWithPositionCheck(uint8_t *addrs, uint8_t count,
     uint8_t first_read = 1;
 
     while ((GetTick() - start) < timeout_ms) {
-        // ¶ÁÈ¡ËùÓĞµç»úÎ»ÖÃ
+        // è¯»å–æ‰€æœ‰ç”µæœºä½ç½®
         int32_t curr_pos[8];
         uint8_t read_fail = 0;
         for (uint8_t i = 0; i < count; i++) {
             if (ReadMotorPosition(addrs[i], &curr_pos[i]) != 0) {
-                printf("¶ÁÈ¡µç»ú0x%02XÎ»ÖÃÊ§°Ü\n", addrs[i]);
+                printf("è¯»å–ç”µæœº0x%02Xä½ç½®å¤±è´¥\n", addrs[i]);
                 read_fail = 1;
                 break;
             }
@@ -2450,7 +2450,7 @@ uint8_t WaitWithPositionCheck(uint8_t *addrs, uint8_t count,
             continue;
         }
 
-        // ¶Â×ª¼ì²â
+        // å µè½¬æ£€æµ‹
         if (first_read) {
             for (uint8_t i = 0; i < count; i++) {
                 last_pos[i] = curr_pos[i];
@@ -2463,7 +2463,7 @@ uint8_t WaitWithPositionCheck(uint8_t *addrs, uint8_t count,
                 if (curr_pos[i] == last_pos[i]) {
                     same_cnt[i]++;
                     if (same_cnt[i] >= stall_threshold) {
-                        printf("µç»ú0x%02XÎ»ÖÃÍ£ÖÍ£¨Á¬Ğø%d´Î²»±ä£©£¬ÅĞ¶¨¶Â×ª£¡\n", 
+                        printf("ç”µæœº0x%02Xä½ç½®åœæ»ï¼ˆè¿ç»­%dæ¬¡ä¸å˜ï¼‰ï¼Œåˆ¤å®šå µè½¬ï¼\n", 
                                addrs[i], stall_threshold);
                         stall_detected = 1;
                     }
@@ -2474,7 +2474,7 @@ uint8_t WaitWithPositionCheck(uint8_t *addrs, uint8_t count,
             }
             if (stall_detected) {
                 StopMotors(addrs, count);
-                return 1;   // ¶Â×ª
+                return 1;   // å µè½¬
             }
         }
 
@@ -2483,28 +2483,28 @@ uint8_t WaitWithPositionCheck(uint8_t *addrs, uint8_t count,
         }
     }
 
-    // µÈ´ı½áÊø£¬¼ì²éµ½Î»Çé¿ö
+    // ç­‰å¾…ç»“æŸï¼Œæ£€æŸ¥åˆ°ä½æƒ…å†µ
 		if (target_pos != NULL) 
 		{
 						int32_t curr_pos[8];
 						uint8_t all_in_pos = 1;
 						for (uint8_t i = 0; i < count; i++) {
 								if (ReadMotorPosition(addrs[i], &curr_pos[i]) != 0) {
-										printf("¶ÁÈ¡µç»ú0x%02XÎ»ÖÃÊ§°Ü\n", addrs[i]);
+										printf("è¯»å–ç”µæœº0x%02Xä½ç½®å¤±è´¥\n", addrs[i]);
 										return 2;
 								}
 								int32_t diff = curr_pos[i] - target_pos[i];
 								if (diff < 0) diff = -diff;
 								if (diff > 200) {
-										printf("µç»ú0x%02XÎ´µ½Î»£¬µ±Ç°Î»ÖÃ=%ld, Ä¿±ê=%ld, Æ«²î=%ld\n", 
+										printf("ç”µæœº0x%02Xæœªåˆ°ä½ï¼Œå½“å‰ä½ç½®=%ld, ç›®æ ‡=%ld, åå·®=%ld\n", 
 													 addrs[i], curr_pos[i], target_pos[i], curr_pos[i] - target_pos[i]);
 										all_in_pos = 0;
 								}
 						}
 						if (!all_in_pos) {
-								return 2; // µ½Î»Ê§°Ü
+								return 2; // åˆ°ä½å¤±è´¥
 						}
 		}
 
-    return 0;   // ³É¹¦
+    return 0;   // æˆåŠŸ
 }

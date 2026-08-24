@@ -1,48 +1,48 @@
 #include "battery_swap.h"
-#include "w25qxx.h"      // °üº¬SPI Flash¶ÁĞ´º¯Êı
+#include "w25qxx.h"      // åŒ…å«SPI Flashè¯»å†™å‡½æ•°
 #include "project.h"
-#include <stdint.h>   // Ìá¹©uint8_t/uint16_tµÈ¹Ì¶¨¿í¶ÈÕûÊıÀàĞÍ
-#include <string.h>   // Ìá¹©memsetº¯ÊıÉùÃ÷
+#include <stdint.h>   // æä¾›uint8_t/uint16_tç­‰å›ºå®šå®½åº¦æ•´æ•°ç±»å‹
+#include <string.h>   // æä¾›memsetå‡½æ•°å£°æ˜
 
 #ifndef FLASH_SIZE
 #define FLASH_SIZE  (128UL * 1024UL * 1024UL)   // 128Mbit = 16MByte
 #endif
-/* µ±Ç°×´Ì¬»º´æ */
+/* å½“å‰çŠ¶æ€ç¼“å­˜ */
 static Swapstate g_swap_state;
-static uint8_t need_save = 0;   // ±£´æ±êÖ¾
+static uint8_t need_save = 0;   // ä¿å­˜æ ‡å¿—
 
-/* ³õÊ¼»¯£º¶ÁÈ¡Flash£¬ÈôÎŞĞ§ÔòÉèÎªÄ¬ÈÏÖµ£¨1ºÅ²Ö¿Õ£© */
+/* åˆå§‹åŒ–ï¼šè¯»å–Flashï¼Œè‹¥æ— æ•ˆåˆ™è®¾ä¸ºé»˜è®¤å€¼ï¼ˆ1å·ä»“ç©ºï¼‰ */
 void SwapState_Init(void)
 {
 		W25QXX_Read((u8*)&g_swap_state, SWAP_STATE_ADDR, sizeof(SwapState));
 	
-    // ¼ì²éÄ§ÊıºÍ·¶Î§
+    // æ£€æŸ¥é­”æ•°å’ŒèŒƒå›´
     if (g_swap_state.empty_bay < 1 || g_swap_state.empty_bay > 3) {
-        // ÎŞĞ§£¬ÉèÎªÄ¬ÈÏÖµ£¨³õÊ¼¿Õ²ÖÎª1£©
+        // æ— æ•ˆï¼Œè®¾ä¸ºé»˜è®¤å€¼ï¼ˆåˆå§‹ç©ºä»“ä¸º1ï¼‰
         g_swap_state.empty_bay = 1;
 //        g_swap_state.magic = 0x5A;
-//        SwapState_Save();   // ±£´æµ½Flash
+//        SwapState_Save();   // ä¿å­˜åˆ°Flash
         printf("Swap state invalid, set default empty_bay=1\n");
     } else {
         printf("Swap state loaded from Flash: empty_bay=%d\n", g_swap_state.empty_bay);
     }
 }
 
-/* ±£´æ×´Ì¬µ½Flash£¨×Ô¶¯²Á³ıËùÔÚÉÈÇø£© */
+/* ä¿å­˜çŠ¶æ€åˆ°Flashï¼ˆè‡ªåŠ¨æ“¦é™¤æ‰€åœ¨æ‰‡åŒºï¼‰ */
 void SwapState_Save(void)
 {
-    printf("¿ªÊ¼Ğ´ Flash µØÖ· 0x%X\n", SWAP_STATE_ADDR);
+    printf("å¼€å§‹å†™ Flash åœ°å€ 0x%X\n", SWAP_STATE_ADDR);
     W25QXX_Write((u8*)&g_swap_state, SWAP_STATE_ADDR, sizeof(SwapState));
     printf("Swap state saved: empty_bay=%d\n", g_swap_state.empty_bay);
 }
 
-/* »ñÈ¡µ±Ç°¿Õ²ÖºÅ */
+/* è·å–å½“å‰ç©ºä»“å· */
 uint8_t SwapState_GetEmptyBay(void)
 {
     return g_swap_state.empty_bay;
 }
 
-/* ÉèÖÃ¿Õ²ÖºÅ²¢±£´æ */
+/* è®¾ç½®ç©ºä»“å·å¹¶ä¿å­˜ */
 void SwapState_SetEmptyBay(uint8_t bay)
 {
     if (bay < 1 || bay > 3) return;
@@ -50,50 +50,50 @@ void SwapState_SetEmptyBay(uint8_t bay)
     SwapState_Save();
 }
 
-/* Ö´ĞĞ»»µç²Ù×÷£¨ÓÉÍâ²¿´¥·¢£© */
+/* æ‰§è¡Œæ¢ç”µæ“ä½œï¼ˆç”±å¤–éƒ¨è§¦å‘ï¼‰ */
 void BatterySwap_Perform(void)
 {
     uint8_t empty_bay = g_swap_state.empty_bay;
-    uint8_t next_bay = (empty_bay % 3) + 1;  // ÏÂÒ»¸ö²ÖºÅ£¨Ñ­»·£©
+    uint8_t next_bay = (empty_bay % 3) + 1;  // ä¸‹ä¸€ä¸ªä»“å·ï¼ˆå¾ªç¯ï¼‰
 
     printf("=== Battery Swap Start ===\n");
     printf("Current empty bay: %d, next bay to take: %d\n", empty_bay, next_bay);
 
-    // 1. ´ÓÎŞÈË»úÈ¡ÏÂµç³Ø£¨¼ÙÉèÎŞÈË»úµ±Ç°µç³ØÀ´×ÔÉÏÒ»¸ö²Ö£©
-    //    ÕâÀïµ÷ÓÃµ×²ãµç»ú¿ØÖÆº¯Êı£¬ÀıÈç£ºTakeBatteryFromUAV();
-    // 2. ½«È¡ÏÂµÄµç³Ø·ÅÈë¿Õ²Ö£¨empty_bay£©
-    //    ÀıÈç£ºPutBatteryToBay(empty_bay);
-    // 3. ´ÓÏÂÒ»¸ö²Ö£¨next_bay£©È¡³öµç³Ø×°ÈëÎŞÈË»ú
-    //    ÀıÈç£ºTakeBatteryFromBay(next_bay);
-    //    ÀıÈç£ºLoadBatteryToUAV();
+    // 1. ä»æ— äººæœºå–ä¸‹ç”µæ± ï¼ˆå‡è®¾æ— äººæœºå½“å‰ç”µæ± æ¥è‡ªä¸Šä¸€ä¸ªä»“ï¼‰
+    //    è¿™é‡Œè°ƒç”¨åº•å±‚ç”µæœºæ§åˆ¶å‡½æ•°ï¼Œä¾‹å¦‚ï¼šTakeBatteryFromUAV();
+    // 2. å°†å–ä¸‹çš„ç”µæ± æ”¾å…¥ç©ºä»“ï¼ˆempty_bayï¼‰
+    //    ä¾‹å¦‚ï¼šPutBatteryToBay(empty_bay);
+    // 3. ä»ä¸‹ä¸€ä¸ªä»“ï¼ˆnext_bayï¼‰å–å‡ºç”µæ± è£…å…¥æ— äººæœº
+    //    ä¾‹å¦‚ï¼šTakeBatteryFromBay(next_bay);
+    //    ä¾‹å¦‚ï¼šLoadBatteryToUAV();
 
-    // Ä£Äâ²Ù×÷£¨Êµ¼ÊÓ¦µ÷ÓÃÕæÊµµç»ú¿ØÖÆ£©
+    // æ¨¡æ‹Ÿæ“ä½œï¼ˆå®é™…åº”è°ƒç”¨çœŸå®ç”µæœºæ§åˆ¶ï¼‰
     printf("Step 1: Take battery from UAV\n");
     printf("Step 2: Put battery to bay %d\n", empty_bay);
     printf("Step 3: Take battery from bay %d and load to UAV\n", next_bay);
 
-    // ¸üĞÂ¿Õ²ÖºÅ£ºĞÂµÄ¿Õ²Ö¾ÍÊÇ¸Õ¸ÕÈ¡³öµÄ²Ö£¨next_bay£©£¬ÒòÎª¸Ã²Öµç³ØÒÑ±»È¡³ö
+    // æ›´æ–°ç©ºä»“å·ï¼šæ–°çš„ç©ºä»“å°±æ˜¯åˆšåˆšå–å‡ºçš„ä»“ï¼ˆnext_bayï¼‰ï¼Œå› ä¸ºè¯¥ä»“ç”µæ± å·²è¢«å–å‡º
     g_swap_state.empty_bay = next_bay;
     SwapState_Save();
 
     printf("=== Swap completed, new empty bay: %d ===\n", next_bay);
 }
 
-// ÓÃÓÚĞòÁĞ²½Öè±í£¬¸üĞÂ¿Õ²ÖºÅ²¢±£´æµ½Flash
+// ç”¨äºåºåˆ—æ­¥éª¤è¡¨ï¼Œæ›´æ–°ç©ºä»“å·å¹¶ä¿å­˜åˆ°Flash
 uint8_t UpdateEmptyBay(void)
 {
     uint8_t current = SwapState_GetEmptyBay();
     uint8_t next = (current % 3) + 1;
     g_swap_state.empty_bay = next;
     need_save = 1;
-		// Í¬²½¸üĞÂ×´Ì¬¼Ä´æÆ÷ 0x19£¬¹©Íø¹Ø²éÑ¯
+		// åŒæ­¥æ›´æ–°çŠ¶æ€å¯„å­˜å™¨ 0x19ï¼Œä¾›ç½‘å…³æŸ¥è¯¢
     StatusRegs_Update(REG_RESERVED2, next);
-    printf("»»µçÍê³É£¬¿Õ²ÖºÅ¸üĞÂÎª %d (´ı±£´æ)\n", next);
-		master_state = MASTER_IDLE;   // »Ö¸´Ö÷Õ¾×´Ì¬
+    printf("æ¢ç”µå®Œæˆï¼Œç©ºä»“å·æ›´æ–°ä¸º %d (å¾…ä¿å­˜)\n", next);
+		master_state = MASTER_IDLE;   // æ¢å¤ä¸»ç«™çŠ¶æ€
     return 0;
 }
 
-// Ö÷Ñ­»·ÖĞµ÷ÓÃ£¬³¢ÊÔ±£´æ
+// ä¸»å¾ªç¯ä¸­è°ƒç”¨ï¼Œå°è¯•ä¿å­˜
 void SwapState_TrySave(void)
 {
 		static uint32_t last_print = 0;
@@ -103,9 +103,9 @@ void SwapState_TrySave(void)
 //               need_save, master_state, Sequence_IsBusy());
     }
     if (need_save && master_state == MASTER_IDLE && !Sequence_IsBusy()) {
-        printf("¿ªÊ¼±£´æ Flash...\n");
+        printf("å¼€å§‹ä¿å­˜ Flash...\n");
         SwapState_Save();
         need_save = 0;
-        printf("Flash ±£´æÍê³É\n");
+        printf("Flash ä¿å­˜å®Œæˆ\n");
     }
 }

@@ -4,13 +4,13 @@
 #include <stdint.h>
 
 
-/* Íø¹ØĞ­Òé¼Ä´æÆ÷µØÖ··¶Î§ */
-#define STATUS_REG_START    0x0000   // ×´Ì¬¼Ä´æÆ÷ÆğÊ¼µØÖ·
-#define STATUS_REG_END      0x0027   // ×´Ì¬¼Ä´æÆ÷½áÊøµØÖ·£¨¹²40¸ö£©
-#define CMD_REG_START       0x0030   // ÃüÁî¼Ä´æÆ÷ÆğÊ¼µØÖ·
-#define CMD_REG_END         0x0048   // ÃüÁî¼Ä´æÆ÷½áÊøµØÖ·
+/* ç½‘å…³åè®®å¯„å­˜å™¨åœ°å€èŒƒå›´ */
+#define STATUS_REG_START    0x0000   // çŠ¶æ€å¯„å­˜å™¨èµ·å§‹åœ°å€
+#define STATUS_REG_END      0x0027   // çŠ¶æ€å¯„å­˜å™¨ç»“æŸåœ°å€ï¼ˆå…±40ä¸ªï¼‰
+#define CMD_REG_START       0x0030   // å‘½ä»¤å¯„å­˜å™¨èµ·å§‹åœ°å€
+#define CMD_REG_END         0x0048   // å‘½ä»¤å¯„å­˜å™¨ç»“æŸåœ°å€
 
-/* ÌØÊâÃüÁî¼Ä´æÆ÷µØÖ· */
+/* ç‰¹æ®Šå‘½ä»¤å¯„å­˜å™¨åœ°å€ */
 #define CMD_TAKEOFF         0x0038
 #define CMD_LANDING         0x0039
 #define CMD_CLOSE_CENTER    0x0032
@@ -29,41 +29,41 @@
 #define SBAUD485    9600
 #endif
 
-/* ½ÓÊÕ»º³åÇø´óĞ¡ */
+/* æ¥æ”¶ç¼“å†²åŒºå¤§å° */
 #define S_RX_BUF_SIZE   256
 #define S_TX_BUF_SIZE   256
-#define TMR_COUNT	4		/* Èí¼ş¶¨Ê±Æ÷µÄ¸öÊı £¨¶¨Ê±Æ÷ID·¶Î§ 0 - 3) */
+#define TMR_COUNT	4		/* è½¯ä»¶å®šæ—¶å™¨çš„ä¸ªæ•° ï¼ˆå®šæ—¶å™¨IDèŒƒå›´ 0 - 3) */
 #define SLAVE_REG_P01		0x0301
 #define SLAVE_REG_P02		0x0302
 
-static uint32_t remote_off_time = 0;        // Ô¤¶¨Ö´ĞĞÊ±¼ä£¨ºÁÃë£©
-static uint8_t remote_off_pending = 0;      // ÊÇ·ñÓĞ´ıÖ´ĞĞµÄÈÎÎñ
+static uint32_t remote_off_time = 0;        // é¢„å®šæ‰§è¡Œæ—¶é—´ï¼ˆæ¯«ç§’ï¼‰
+static uint8_t remote_off_pending = 0;      // æ˜¯å¦æœ‰å¾…æ‰§è¡Œçš„ä»»åŠ¡
 
-/* ´ÓÕ¾È«¾Ö±äÁ¿ */
+/* ä»ç«™å…¨å±€å˜é‡ */
 typedef struct {
     uint8_t RxBuf[S_RX_BUF_SIZE];
     uint8_t TxBuf[S_TX_BUF_SIZE];
     volatile uint16_t RxCount;
-    uint8_t RspCode;        // ´íÎóÂë
+    uint8_t RspCode;        // é”™è¯¯ç 
 } MODS_T;
 
-/* ¶¨Ê±Æ÷½á¹¹Ìå£¬³ÉÔ±±äÁ¿±ØĞëÊÇ volatile, ·ñÔòC±àÒëÆ÷ÓÅ»¯Ê±¿ÉÄÜÓĞÎÊÌâ */
+/* å®šæ—¶å™¨ç»“æ„ä½“ï¼Œæˆå‘˜å˜é‡å¿…é¡»æ˜¯ volatile, å¦åˆ™Cç¼–è¯‘å™¨ä¼˜åŒ–æ—¶å¯èƒ½æœ‰é—®é¢˜ */
 typedef enum
 {
-	TMR_ONCE_MODE = 0,		/* Ò»´Î¹¤×÷Ä£Ê½ */
-	TMR_AUTO_MODE = 1		/* ×Ô¶¯¶¨Ê±¹¤×÷Ä£Ê½ */
+	TMR_ONCE_MODE = 0,		/* ä¸€æ¬¡å·¥ä½œæ¨¡å¼ */
+	TMR_AUTO_MODE = 1		/* è‡ªåŠ¨å®šæ—¶å·¥ä½œæ¨¡å¼ */
 }TMR_MODE_E;
 
 typedef struct
 {
-	/* 03H 06H ¶ÁĞ´±£³Ö¼Ä´æÆ÷ */
+	/* 03H 06H è¯»å†™ä¿æŒå¯„å­˜å™¨ */
 	uint16_t P01;
 	uint16_t P02;
 
-	/* 04H ¶ÁÈ¡Ä£ÄâÁ¿¼Ä´æÆ÷ */
+	/* 04H è¯»å–æ¨¡æ‹Ÿé‡å¯„å­˜å™¨ */
 	uint16_t A01;
 
-	/* 01H 05H ¶ÁĞ´µ¥¸öÇ¿ÖÆÏßÈ¦ */
+	/* 01H 05H è¯»å†™å•ä¸ªå¼ºåˆ¶çº¿åœˆ */
 	uint16_t D01;
 	uint16_t D02;
 	uint16_t D03;
@@ -72,7 +72,7 @@ typedef struct
 }VAR_T;
 
 extern MODS_T g_tModS;
-extern volatile uint8_t g_mods_timeout;  // Ö¡³¬Ê±±êÖ¾
+extern volatile uint8_t g_mods_timeout;  // å¸§è¶…æ—¶æ ‡å¿—
 uint16_t BEBufToUint16(uint8_t *_pBuf);
 uint16_t LEBufToUint16(uint8_t *_pBuf);
 void bsp_InitTimer(void);

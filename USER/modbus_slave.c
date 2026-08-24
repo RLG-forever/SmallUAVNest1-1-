@@ -1,67 +1,67 @@
 #include "project.h"
 #include <string.h>
 
-// Íâ²¿ÒÑÓĞµÄModbusÖ÷Õ¾Ğ´º¯Êı
+// å¤–éƒ¨å·²æœ‰çš„Modbusä¸»ç«™å†™å‡½æ•°
 extern uint8_t Modbus_06_WriteSingleReg(uint8_t slave_addr, uint16_t reg_addr, uint16_t reg_data);
 extern uint16_t status_cache[STATUS_REG_COUNT]; 
-// ´ÓÕ¾²ÎÊı
-#define SLAVE_ADDR      0x22        // ±¾»úµØÖ·
-#define BUF_SIZE        256          // ½ÓÊÕ»º³åÇø´óĞ¡
+// ä»ç«™å‚æ•°
+#define SLAVE_ADDR      0x22        // æœ¬æœºåœ°å€
+#define BUF_SIZE        256          // æ¥æ”¶ç¼“å†²åŒºå¤§å°
 #define USE_TIM2
 
-// ÒıÓÃ RS485 Ä£¿éÖĞ¶¨ÒåµÄÈ«¾Ö½ÓÊÕ»º³åÇø¼°±êÖ¾
-extern uint8_t RS485_RX_BUFF[];        // RS485 ½ÓÊÕ»º³åÇø£¨ÔÚ rs485.c »ò main.c ÖĞ¶¨Òå£©
-extern volatile u16 RS485_RX_CNT; // µ±Ç°½ÓÊÕ×Ö½ÚÊı
-extern volatile u16 RS485_FrameFlag; // Ö¡½áÊø±êÖ¾£¨ÓÉ TIM3 ÖĞ¶ÏÖÃÎ»£©
+// å¼•ç”¨ RS485 æ¨¡å—ä¸­å®šä¹‰çš„å…¨å±€æ¥æ”¶ç¼“å†²åŒºåŠæ ‡å¿—
+extern uint8_t RS485_RX_BUFF[];        // RS485 æ¥æ”¶ç¼“å†²åŒºï¼ˆåœ¨ rs485.c æˆ– main.c ä¸­å®šä¹‰ï¼‰
+extern volatile u16 RS485_RX_CNT; // å½“å‰æ¥æ”¶å­—èŠ‚æ•°
+extern volatile u16 RS485_FrameFlag; // å¸§ç»“æŸæ ‡å¿—ï¼ˆç”± TIM3 ä¸­æ–­ç½®ä½ï¼‰
 volatile uint8_t g_mods_timeout = 0;
 VAR_T g_tVar;
 MODS_T g_tModS;
 
-///* ¶¨Ê±Æ÷½á¹¹Ìå£¬³ÉÔ±±äÁ¿±ØĞëÊÇ volatile, ·ñÔòC±àÒëÆ÷ÓÅ»¯Ê±¿ÉÄÜÓĞÎÊÌâ */
+///* å®šæ—¶å™¨ç»“æ„ä½“ï¼Œæˆå‘˜å˜é‡å¿…é¡»æ˜¯ volatile, å¦åˆ™Cç¼–è¯‘å™¨ä¼˜åŒ–æ—¶å¯èƒ½æœ‰é—®é¢˜ */
 //typedef struct
 //{
-//	volatile uint8_t Mode;		/* ¼ÆÊıÆ÷Ä£Ê½£¬1´ÎĞÔ */
-//	volatile uint8_t Flag;		/* ¶¨Ê±µ½´ï±êÖ¾  */
-//	volatile uint32_t Count;	/* ¼ÆÊıÆ÷ */
-//	volatile uint32_t PreLoad;	/* ¼ÆÊıÆ÷Ô¤×°Öµ */
+//	volatile uint8_t Mode;		/* è®¡æ•°å™¨æ¨¡å¼ï¼Œ1æ¬¡æ€§ */
+//	volatile uint8_t Flag;		/* å®šæ—¶åˆ°è¾¾æ ‡å¿—  */
+//	volatile uint32_t Count;	/* è®¡æ•°å™¨ */
+//	volatile uint32_t PreLoad;	/* è®¡æ•°å™¨é¢„è£…å€¼ */
 //}SOFT_TMR;
 static SOFT_TMR s_tTmr[TMR_COUNT];
 static uint8_t MODS_WriteRegValue(uint16_t reg_addr, uint16_t reg_value);
 
-// Ö¡³¬Ê±Ê±¼ä£¨ºÁÃë£©£¬ÓÃÓÚÅĞ¶ÏÒ»Ö¡½áÊø
+// å¸§è¶…æ—¶æ—¶é—´ï¼ˆæ¯«ç§’ï¼‰ï¼Œç”¨äºåˆ¤æ–­ä¸€å¸§ç»“æŸ
 #define FRAME_TIMEOUT_MS   4
 
-// ÃüÁîÓ³Éä±í£ºÍø¹ØĞ´ÈëµÄ¼Ä´æÆ÷µØÖ· -> Êµ¼Êµç»úµØÖ·ºÍ¼Ä´æÆ÷
+// å‘½ä»¤æ˜ å°„è¡¨ï¼šç½‘å…³å†™å…¥çš„å¯„å­˜å™¨åœ°å€ -> å®é™…ç”µæœºåœ°å€å’Œå¯„å­˜å™¨
 typedef struct {
-    uint16_t gateway_reg;   // Íø¹ØĞ´ÈëµÄ¼Ä´æÆ÷µØÖ·£¨0x30~0x48£©
-    uint8_t motor_addr;     // Ä¿±êµç»ú´ÓÕ¾µØÖ·
-    uint16_t motor_reg;     // Ä¿±êµç»ú¼Ä´æÆ÷µØÖ·
+    uint16_t gateway_reg;   // ç½‘å…³å†™å…¥çš„å¯„å­˜å™¨åœ°å€ï¼ˆ0x30~0x48ï¼‰
+    uint8_t motor_addr;     // ç›®æ ‡ç”µæœºä»ç«™åœ°å€
+    uint16_t motor_reg;     // ç›®æ ‡ç”µæœºå¯„å­˜å™¨åœ°å€
 } CommandMap;
 
-// ¸ù¾İÊµ¼Ê¿ØÖÆĞ­ÒéÌîĞ´Ó³Éä
+// æ ¹æ®å®é™…æ§åˆ¶åè®®å¡«å†™æ˜ å°„
 static const CommandMap cmd_map[] = {
-    {0x30, 0x11, 0x01},   // ´ò¿ª²ÕÃÅ
-    {0x31, 0x11, 0x02},   // ¹Ø±Õ²ÕÃÅ
-    {0x32, 0x15, 0x01},   // ¾ÓÖĞ¸Ë¾ÓÖĞ
-    {0x33, 0x15, 0x02},   // ¾ÓÖĞ¸ËÊÍ·Å
-    {0x34, 0x12, 0x05},   // Éı½µÉÏÉı
-    {0x35, 0x12, 0x06},   // Éı½µÏÂ½µ
-		{0x38, 0x12, 0x06},   // Ò»¼üÆğ·É£¨»»ĞÂµç³Ø¡¢Éı½µ¡¢¿ª²ÕÃÅ¡¢Æğ·Éºó¹Ø²ÕÃÅ£©
-		{0x40, 0x12, 0x06},   // ·É»ú½µÂäÍê³É£¨¿ª²ÕÃÅ¡¢Éı½µ¡¢È¡ÏÂ¾Éµç³Ø£©
-		{0x45, 0x13, 0x06},   // ·É»ú½µÂäÍê³É£¨¿ª²ÕÃÅ¡¢Éı½µ¡¢È¡ÏÂ¾Éµç³Ø£©
-		{0x41, 0x12, 0x06},   // Éı½µÏÂ½µ
+    {0x30, 0x11, 0x01},   // æ‰“å¼€èˆ±é—¨
+    {0x31, 0x11, 0x02},   // å…³é—­èˆ±é—¨
+    {0x32, 0x15, 0x01},   // å±…ä¸­æ†å±…ä¸­
+    {0x33, 0x15, 0x02},   // å±…ä¸­æ†é‡Šæ”¾
+    {0x34, 0x12, 0x05},   // å‡é™ä¸Šå‡
+    {0x35, 0x12, 0x06},   // å‡é™ä¸‹é™
+		{0x38, 0x12, 0x06},   // ä¸€é”®èµ·é£ï¼ˆæ¢æ–°ç”µæ± ã€å‡é™ã€å¼€èˆ±é—¨ã€èµ·é£åå…³èˆ±é—¨ï¼‰
+		{0x40, 0x12, 0x06},   // é£æœºé™è½å®Œæˆï¼ˆå¼€èˆ±é—¨ã€å‡é™ã€å–ä¸‹æ—§ç”µæ± ï¼‰
+		{0x45, 0x13, 0x06},   // é£æœºé™è½å®Œæˆï¼ˆå¼€èˆ±é—¨ã€å‡é™ã€å–ä¸‹æ—§ç”µæ± ï¼‰
+		{0x41, 0x12, 0x06},   // å‡é™ä¸‹é™
 };
 #define CMD_MAP_COUNT (sizeof(cmd_map) / sizeof(cmd_map[0]))
 
-// µÈ´ıÖ÷Õ¾×ÜÏß¿ÕÏĞ£¬³¬Ê±·µ»Ø0£¨Ê§°Ü£©£¬³É¹¦·µ»Ø1
+// ç­‰å¾…ä¸»ç«™æ€»çº¿ç©ºé—²ï¼Œè¶…æ—¶è¿”å›0ï¼ˆå¤±è´¥ï¼‰ï¼ŒæˆåŠŸè¿”å›1
 static uint8_t WaitMasterIdle(uint32_t timeout_ms)
 {
     uint32_t start = GetTick();
     while (MasterPolling_IsBusy()) {
         if (GetTick() - start >= timeout_ms) {
-            return 0;   // ³¬Ê±
+            return 0;   // è¶…æ—¶
         }
-        // ¶ÌÔİÑÓÊ±±ÜÃâËÀÑ­»·
+        // çŸ­æš‚å»¶æ—¶é¿å…æ­»å¾ªç¯
         for (volatile int i = 0; i < 1000; i++);
     }
     return 1;
@@ -69,11 +69,11 @@ static uint8_t WaitMasterIdle(uint32_t timeout_ms)
 
 
 /**
- * @brief Éú³É²¢·¢ËÍÏìÓ¦Ö¡
- * @param slave_addr  ´ÓÕ¾µØÖ·£¨ÏìÓ¦ÖĞÓ¦·µ»ØÏàÍ¬£©
- * @param func_code   ¹¦ÄÜÂë£¨0x03 »ò 0x06£©
- * @param data        Êı¾İÓòÖ¸Õë£¨¶ÔÓÚ03£¬ÊÇ¼Ä´æÆ÷Êı¾İ£»¶ÔÓÚ06£¬Í¨³£²»ĞèÒª¶îÍâÊı¾İ£©
- * @param data_len    Êı¾İ³¤¶È£¨×Ö½ÚÊı£©
+ * @brief ç”Ÿæˆå¹¶å‘é€å“åº”å¸§
+ * @param slave_addr  ä»ç«™åœ°å€ï¼ˆå“åº”ä¸­åº”è¿”å›ç›¸åŒï¼‰
+ * @param func_code   åŠŸèƒ½ç ï¼ˆ0x03 æˆ– 0x06ï¼‰
+ * @param data        æ•°æ®åŸŸæŒ‡é’ˆï¼ˆå¯¹äº03ï¼Œæ˜¯å¯„å­˜å™¨æ•°æ®ï¼›å¯¹äº06ï¼Œé€šå¸¸ä¸éœ€è¦é¢å¤–æ•°æ®ï¼‰
+ * @param data_len    æ•°æ®é•¿åº¦ï¼ˆå­—èŠ‚æ•°ï¼‰
  */
 static void SendResponse(uint8_t slave_addr, uint8_t func_code, uint8_t *data, uint16_t data_len)
 {
@@ -83,29 +83,29 @@ static void SendResponse(uint8_t slave_addr, uint8_t func_code, uint8_t *data, u
     resp_buff[len++] = slave_addr;
     resp_buff[len++] = func_code;
 
-    // 03 ÏìÓ¦Ğè°üº¬×Ö½ÚÊı£»06 ÏìÓ¦Ö±½Ó·µ»ØÇëÇóµÄ¼Ä´æÆ÷µØÖ·+Êı¾İ£¨¹²4×Ö½Ú£©
+    // 03 å“åº”éœ€åŒ…å«å­—èŠ‚æ•°ï¼›06 å“åº”ç›´æ¥è¿”å›è¯·æ±‚çš„å¯„å­˜å™¨åœ°å€+æ•°æ®ï¼ˆå…±4å­—èŠ‚ï¼‰
     if (func_code == 0x03) {
-        resp_buff[len++] = data_len;   // ×Ö½ÚÊı
+        resp_buff[len++] = data_len;   // å­—èŠ‚æ•°
         memcpy(&resp_buff[len], data, data_len);
         len += data_len;
     } else if (func_code == 0x06) {
-        // 06 ÏìÓ¦Êı¾İÓò£º¼Ä´æÆ÷µØÖ·(2) + Ğ´ÈëÖµ(2) = 4×Ö½Ú
+        // 06 å“åº”æ•°æ®åŸŸï¼šå¯„å­˜å™¨åœ°å€(2) + å†™å…¥å€¼(2) = 4å­—èŠ‚
         memcpy(&resp_buff[len], data, 4);
         len += 4;
     }
 
-    // ¼ÆËã CRC
+    // è®¡ç®— CRC
     uint16_t crc = Modbus_CRC16(resp_buff, len);
     resp_buff[len++] = crc & 0xFF;
     resp_buff[len++] = (crc >> 8) & 0xFF;
 
-    // ·¢ËÍ
+    // å‘é€
     RS485_SlaveSendData(resp_buff, len);
 }
 
 
 
-/* ·¢ËÍ´ø CRC µÄÊı¾İ */
+/* å‘é€å¸¦ CRC çš„æ•°æ® */
 void SendWithCRC(uint8_t *buf, uint8_t len)
 {
     uint16_t crc = Modbus_CRC16(buf, len);
@@ -116,7 +116,7 @@ void SendWithCRC(uint8_t *buf, uint8_t len)
     RS485_SlaveSendData(tx_buf, len + 2);
 }
 
-/* ·¢ËÍ´íÎóÓ¦´ğ */
+/* å‘é€é”™è¯¯åº”ç­” */
 void SendAckErr(uint8_t err_code)
 {
     uint8_t buf[3];
@@ -126,14 +126,14 @@ void SendAckErr(uint8_t err_code)
     SendWithCRC(buf, 3);
 }
 
-/* ·¢ËÍÕıÈ·Ó¦´ğ£¨06/10 ¹¦ÄÜÂëÓÃ£© */
+/* å‘é€æ­£ç¡®åº”ç­”ï¼ˆ06/10 åŠŸèƒ½ç ç”¨ï¼‰ */
 void SendAckOk(void)
 {
-    SendWithCRC(g_tModS.RxBuf, 6);   // Ç°6×Ö½ÚÔ­Ñù·µ»Ø
+    SendWithCRC(g_tModS.RxBuf, 6);   // å‰6å­—èŠ‚åŸæ ·è¿”å›
 }
 
 
-/* Ö¡½ÓÊÕÍê³É£¬¿ªÊ¼½âÎö */
+/* å¸§æ¥æ”¶å®Œæˆï¼Œå¼€å§‹è§£æ */
 void MODS_Poll(void)
 {
     if (!g_mods_timeout) return;
@@ -144,20 +144,20 @@ void MODS_Poll(void)
         return;
     }
 
-    // CRC Ğ£Ñé
+    // CRC æ ¡éªŒ
     uint16_t crc = Modbus_CRC16(g_tModS.RxBuf, g_tModS.RxCount);
     if (crc != 0) {
         g_tModS.RxCount = 0;
         return;
     }
 
-    // µØÖ·¼ì²é
+    // åœ°å€æ£€æŸ¥
     if (g_tModS.RxBuf[0] != SADDR485) {
         g_tModS.RxCount = 0;
         return;
     }
 
-    uint8_t func = g_tModS.RxBuf[1];   // ¹Ø¼ü£º´ÓÕıÈ·µÄ»º³åÇø¶ÁÈ¡¹¦ÄÜÂë
+    uint8_t func = g_tModS.RxBuf[1];   // å…³é”®ï¼šä»æ­£ç¡®çš„ç¼“å†²åŒºè¯»å–åŠŸèƒ½ç 
     switch (func) {
         case 0x03: Handle03(); break;
         case 0x06: Handle06(); break;
@@ -165,13 +165,13 @@ void MODS_Poll(void)
         default:   SendAckErr(0x01); break;
     }
 
-    g_tModS.RxCount = 0;   // Çå¿Õ»º³åÇø£¬×¼±¸ÏÂÒ»Ö¡
+    g_tModS.RxCount = 0;   // æ¸…ç©ºç¼“å†²åŒºï¼Œå‡†å¤‡ä¸‹ä¸€å¸§
 }
 
-/* ½ÓÊÕÒ»¸ö×Ö½Ú£¨ÔÚ´®¿ÚÖĞ¶ÏÖĞµ÷ÓÃ£© */
+/* æ¥æ”¶ä¸€ä¸ªå­—èŠ‚ï¼ˆåœ¨ä¸²å£ä¸­æ–­ä¸­è°ƒç”¨ï¼‰ */
 void MODS_ReciveNew(uint8_t _byte)
 {
-     // Í£Ö¹²¢ÖØÆô¶¨Ê±Æ÷£¨Î¹¹·£©
+     // åœæ­¢å¹¶é‡å¯å®šæ—¶å™¨ï¼ˆå–‚ç‹—ï¼‰
     TIM_Cmd(TIM3, DISABLE);
 		TIM_ClearITPendingBit(TIM3, TIM_IT_Update);
     TIM_SetCounter(TIM3, 0);
@@ -179,13 +179,13 @@ void MODS_ReciveNew(uint8_t _byte)
     if (g_tModS.RxCount < sizeof(g_tModS.RxBuf)) {
         g_tModS.RxBuf[g_tModS.RxCount++] = _byte;
     } else {
-        g_tModS.RxCount = 0;   // Òç³ö¸´Î»
+        g_tModS.RxCount = 0;   // æº¢å‡ºå¤ä½
     }
 		TIM_ClearITPendingBit(TIM3, TIM_IT_Update);
 		TIM_Cmd(TIM3, ENABLE);
 }
 
-/* ¶ÁÈ¡±£³Ö¼Ä´æÆ÷£¨Íø¹Ø¶ÁÈ¡»ú³²×´Ì¬£© */
+/* è¯»å–ä¿æŒå¯„å­˜å™¨ï¼ˆç½‘å…³è¯»å–æœºå·¢çŠ¶æ€ï¼‰ */
 //void Handle03(void)
 //{
 ////		printf("Handle03 entered\r\n");  
@@ -196,9 +196,9 @@ void MODS_ReciveNew(uint8_t _byte)
 //        return;
 //    }
 
-//		// ×¼±¸ÏìÓ¦»º³åÇø
+//		// å‡†å¤‡å“åº”ç¼“å†²åŒº
 //    uint8_t resp[256];
-//    StatusRegs_GetBatch(start_reg, reg_count, resp);   // ÅúÁ¿»ñÈ¡£¬¿ìËÙ
+//    StatusRegs_GetBatch(start_reg, reg_count, resp);   // æ‰¹é‡è·å–ï¼Œå¿«é€Ÿ
 //    uint8_t tx_buf[256];
 //    tx_buf[0] = SADDR485;
 //    tx_buf[1] = 0x03;
@@ -208,7 +208,7 @@ void MODS_ReciveNew(uint8_t _byte)
 //	
 //}
 
-//²âÊÔ´úÂë
+//æµ‹è¯•ä»£ç 
 void Handle03(void)
 {
     uint16_t start_reg = BEBufToUint16(&g_tModS.RxBuf[2]);
@@ -218,19 +218,19 @@ void Handle03(void)
         return;
     }
 
-    // ×¼±¸ÏìÓ¦»º³åÇø
+    // å‡†å¤‡å“åº”ç¼“å†²åŒº
     uint8_t resp[256];
 
-    // Öğ¸ö¼Ä´æÆ÷Ìî³ä£¬Ö§³ÖÌØ¶¨µØÖ··µ»Ø¹Ì¶¨Öµ
+    // é€ä¸ªå¯„å­˜å™¨å¡«å……ï¼Œæ”¯æŒç‰¹å®šåœ°å€è¿”å›å›ºå®šå€¼
     for (uint16_t i = 0; i < reg_count; i++) {
         uint16_t reg_addr = start_reg + i;
         uint16_t val;
 
-        // ---------- ÁÙÊ±²âÊÔ£º¶Ô²ÕÃÅ×´Ì¬(0x11)ºÍ¾ÓÖĞ¸Ë×´Ì¬(0x15)Ç¿ÖÆ·µ»Ø2 ----------
+        // ---------- ä¸´æ—¶æµ‹è¯•ï¼šå¯¹èˆ±é—¨çŠ¶æ€(0x11)å’Œå±…ä¸­æ†çŠ¶æ€(0x15)å¼ºåˆ¶è¿”å›2 ----------
         if (reg_addr == REG_DOOR_STATE || reg_addr == REG_CENTER_ROD_STATE) {
             val = 2;
         } else {
-            // ´Ó×´Ì¬»º´æ¶ÁÈ¡
+            // ä»çŠ¶æ€ç¼“å­˜è¯»å–
             ENTER_CRITICAL();
             val = status_cache[reg_addr];
             EXIT_CRITICAL();
@@ -240,7 +240,7 @@ void Handle03(void)
         resp[i*2+1] = val & 0xFF;
     }
 
-    // ×é×°ÏìÓ¦Ö¡
+    // ç»„è£…å“åº”å¸§
     uint8_t tx_buf[256];
     tx_buf[0] = SADDR485;
     tx_buf[1] = 0x03;
@@ -251,39 +251,39 @@ void Handle03(void)
 
 
 static uint8_t wait_openfly = 0;
-/* Ğ´µ¥¸ö±£³Ö¼Ä´æÆ÷£¨Íø¹ØÏÂ·¢ÃüÁî£© */
+/* å†™å•ä¸ªä¿æŒå¯„å­˜å™¨ï¼ˆç½‘å…³ä¸‹å‘å‘½ä»¤ï¼‰ */
 void Handle06(void)
 {
     uint16_t reg_addr = BEBufToUint16(&g_tModS.RxBuf[2]);
     uint16_t reg_data = BEBufToUint16(&g_tModS.RxBuf[4]);
-    uint8_t ret = 1;   // Ä¬ÈÏÊ§°Ü£¨1±íÊ¾Ê§°Ü£©
+    uint8_t ret = 1;   // é»˜è®¤å¤±è´¥ï¼ˆ1è¡¨ç¤ºå¤±è´¥ï¼‰
 
-    // È¥ÖØ£º¼ÇÂ¼ÉÏ´ÎÖ´ĞĞµÄÃüÁî£¬ÈôÏàÍ¬ÔòºöÂÔ
+    // å»é‡ï¼šè®°å½•ä¸Šæ¬¡æ‰§è¡Œçš„å‘½ä»¤ï¼Œè‹¥ç›¸åŒåˆ™å¿½ç•¥
     static uint16_t last_reg_addr = 0xFFFF;
     static uint16_t last_reg_data = 0xFFFF;
-		static uint32_t last_reg_time = 0;      // ÉÏ´ÎÖ´ĞĞÊ±¼ä£¨ºÁÃë£©
-    uint8_t executed = 0;   // ±ê¼Çµ±Ç°ÃüÁîÊÇ·ñÊµ¼ÊÖ´ĞĞÁË²Ù×÷
+		static uint32_t last_reg_time = 0;      // ä¸Šæ¬¡æ‰§è¡Œæ—¶é—´ï¼ˆæ¯«ç§’ï¼‰
+    uint8_t executed = 0;   // æ ‡è®°å½“å‰å‘½ä»¤æ˜¯å¦å®é™…æ‰§è¡Œäº†æ“ä½œ
 
-//    // ÈôÓëÉÏ´ÎÃüÁîÍêÈ«ÏàÍ¬£¬ÔòºöÂÔÖ´ĞĞ£¬Ö±½Ó·µ»Ø³É¹¦£¨´Ë´¦³É¹¦ÏìÓ¦£¬²»¼ÆÈëret£©
+//    // è‹¥ä¸ä¸Šæ¬¡å‘½ä»¤å®Œå…¨ç›¸åŒï¼Œåˆ™å¿½ç•¥æ‰§è¡Œï¼Œç›´æ¥è¿”å›æˆåŠŸï¼ˆæ­¤å¤„æˆåŠŸå“åº”ï¼Œä¸è®¡å…¥retï¼‰
 //    if (reg_addr == last_reg_addr && reg_data == last_reg_data) {
-//        printf("ºöÂÔÖØ¸´ÃüÁî: addr=0x%04X, data=0x%04X\n", reg_addr, reg_data);
+//        printf("å¿½ç•¥é‡å¤å‘½ä»¤: addr=0x%04X, data=0x%04X\n", reg_addr, reg_data);
 //        SendAckOk();
 //        return;
 //    }
-	   // ¼ì²éÊÇ·ñÓëÉÏ´ÎÃüÁîÍêÈ«ÏàÍ¬£¬ÇÒÊ±¼ä²î < 5Ãë
+	   // æ£€æŸ¥æ˜¯å¦ä¸ä¸Šæ¬¡å‘½ä»¤å®Œå…¨ç›¸åŒï¼Œä¸”æ—¶é—´å·® < 5ç§’
     if (reg_addr == last_reg_addr && reg_data == last_reg_data) 
 		{
         uint32_t now = GetTick();
         if (now - last_reg_time < 5000) 
 				{
-            printf("ºöÂÔÖØ¸´ÃüÁî(5ÃëÄÚ): addr=0x%04X, data=0x%04X\n", reg_addr, reg_data);
+            printf("å¿½ç•¥é‡å¤å‘½ä»¤(5ç§’å†…): addr=0x%04X, data=0x%04X\n", reg_addr, reg_data);
             SendAckOk();
             return;
         }
-        // ³¬¹ı5Ãë£¬ÊÓÎªĞÂÃüÁî£¬¼ÌĞøÖ´ĞĞ£¨²»·µ»Ø£©
+        // è¶…è¿‡5ç§’ï¼Œè§†ä¸ºæ–°å‘½ä»¤ï¼Œç»§ç»­æ‰§è¡Œï¼ˆä¸è¿”å›ï¼‰
     }
 
-    // ÌØÊâÃüÁî´¦Àí
+    // ç‰¹æ®Šå‘½ä»¤å¤„ç†
     switch (reg_addr) {
         case 0x30: Sequence_Start(SEQ_ID_OPENDR); executed = 1; ret = 0; break;
         case 0x31: Sequence_Start(SEQ_ID_CLOSEDR); executed = 1; ret = 0; break;
@@ -306,29 +306,29 @@ void Handle06(void)
 				{
 						uint16_t uav_status = StatusRegs_Get(REG_RESERVED4);
 						if (uav_status == 0) {
-								// Ò£¿ØÆ÷Î´¿ª»ú£¬ÏÈ·¢ËÍ¿ª»úÖ¸Áî
+								// é¥æ§å™¨æœªå¼€æœºï¼Œå…ˆå‘é€å¼€æœºæŒ‡ä»¤
 								if (WaitMasterIdle(100)) {
 										MasterBusy_Acquire();
 										ret = Modbus_06_WriteSingleReg(0x14, 0x0001, 0x0001);
 										MasterBusy_Release();
-										// ÎŞÂÛ¿ª»úÖ¸Áî³É¹¦Óë·ñ£¬¶¼Æô¶¯Æğ·ÉĞòÁĞ£¨±£³ÖÔ­ÓĞĞĞÎª£©
+										// æ— è®ºå¼€æœºæŒ‡ä»¤æˆåŠŸä¸å¦ï¼Œéƒ½å¯åŠ¨èµ·é£åºåˆ—ï¼ˆä¿æŒåŸæœ‰è¡Œä¸ºï¼‰
 										Sequence_Start(SEQ_ID_TAKEOFF);
 										executed = 1;
 										ret = 0;
 								} else {
 										ret = 1;
-										printf("Ò£¿ØÆ÷¿ª»úÖ¸ÁîÊ§°Ü£º×ÜÏßÃ¦\n");
+										printf("é¥æ§å™¨å¼€æœºæŒ‡ä»¤å¤±è´¥ï¼šæ€»çº¿å¿™\n");
 										executed = 0;
 								}
 						} else if (uav_status == 1) {
-								// ÖµÎª1£º²»Æô¶¯Æğ·ÉĞòÁĞ£¬ÉèÖÃµÈ´ı¿ª»ú±êÖ¾
+								// å€¼ä¸º1ï¼šä¸å¯åŠ¨èµ·é£åºåˆ—ï¼Œè®¾ç½®ç­‰å¾…å¼€æœºæ ‡å¿—
 								wait_openfly = 1;
-								printf("ÉèÖÃµÈ´ıÎŞÈË»ú¿ª»ú±êÖ¾£¬²»Ö´ĞĞÆğ·ÉĞòÁĞ\n");
-								// ×¢Òâ£º´Ë´¦²»ÔÙµ÷ÓÃ Sequence_Start(SEQ_ID_TAKEOFF)
+								printf("è®¾ç½®ç­‰å¾…æ— äººæœºå¼€æœºæ ‡å¿—ï¼Œä¸æ‰§è¡Œèµ·é£åºåˆ—\n");
+								// æ³¨æ„ï¼šæ­¤å¤„ä¸å†è°ƒç”¨ Sequence_Start(SEQ_ID_TAKEOFF)
 								ret = 0;
 								executed = 1;
 						} else {
-								// ÖµÎª2»ò3£¬Ö±½ÓÆô¶¯Æğ·ÉĞòÁĞ
+								// å€¼ä¸º2æˆ–3ï¼Œç›´æ¥å¯åŠ¨èµ·é£åºåˆ—
 								Sequence_Start(SEQ_ID_TAKEOFF);
 								ret = 0;
 								executed = 1;
@@ -338,179 +338,179 @@ void Handle06(void)
 			
 				case 0x40:
 				{
-						// ÏÈÅĞ¶ÏĞòÁĞÊÇ·ñ¿ÕÏĞ£¬È·±£ÄÜÆô¶¯
+						// å…ˆåˆ¤æ–­åºåˆ—æ˜¯å¦ç©ºé—²ï¼Œç¡®ä¿èƒ½å¯åŠ¨
 						if (!Sequence_IsBusy()) {
 								Sequence_Start(SEQ_ID_LANDING);
-								// Æô¶¯³É¹¦£¨´ËÊ±busyÓ¦Îª1£©£¬ÉèÖÃ°ëĞ¡Ê±ºóÒ£¿ØÆ÷¹Ø»ú
+								// å¯åŠ¨æˆåŠŸï¼ˆæ­¤æ—¶busyåº”ä¸º1ï¼‰ï¼Œè®¾ç½®åŠå°æ—¶åé¥æ§å™¨å…³æœº
 								remote_off_pending = 1;
 								remote_off_time = GetTick() + 30UL * 60UL * 1000UL;
-								printf("½µÂäĞòÁĞÒÑÆô¶¯£¬°ëĞ¡Ê±ºó½«×Ô¶¯·¢ËÍÒ£¿ØÆ÷¹Ø»úÖ¸Áî\n");
+								printf("é™è½åºåˆ—å·²å¯åŠ¨ï¼ŒåŠå°æ—¶åå°†è‡ªåŠ¨å‘é€é¥æ§å™¨å…³æœºæŒ‡ä»¤\n");
 						} else {
-								printf("½µÂäĞòÁĞÆô¶¯Ê§°Ü£¬ÒÑÓĞĞòÁĞÔÚÖ´ĞĞÖĞ\n");
+								printf("é™è½åºåˆ—å¯åŠ¨å¤±è´¥ï¼Œå·²æœ‰åºåˆ—åœ¨æ‰§è¡Œä¸­\n");
 						}
 						executed = 1;
 						ret = 0;
 						break;
 				}
 
-        // ¿ØÖÆbms³äµç¿Õ¿ª¿ª»ú£¨0x48£©
+        // æ§åˆ¶bmså……ç”µç©ºå¼€å¼€æœºï¼ˆ0x48ï¼‰
         case 0x48:
             if (WaitMasterIdle(100)) {
                 MasterBusy_Acquire();
                 ret = Modbus_06_WriteSingleReg(MOTOR15_SLAVE_ADDR, 0x00, 0x01);
                 MasterBusy_Release();
                 if (ret == 0) {
-                    printf("µç»ú0x13 ¿ª»úÖ¸Áî·¢ËÍ³É¹¦\n");
+                    printf("ç”µæœº0x13 å¼€æœºæŒ‡ä»¤å‘é€æˆåŠŸ\n");
 										executed = 1;
                 } else {
-                    printf("µç»ú0x13 ¿ª»úÖ¸Áî·¢ËÍÊ§°Ü£¬´íÎóÂë: %d\n", ret);
+                    printf("ç”µæœº0x13 å¼€æœºæŒ‡ä»¤å‘é€å¤±è´¥ï¼Œé”™è¯¯ç : %d\n", ret);
 										executed = 0;
                 }
                 
-                // ×¢Òâ£ºret ÒÑ¾­ÊÇ Modbus_06_WriteSingleReg µÄ·µ»ØÖµ£¨0³É¹¦£¬·Ç0Ê§°Ü£©£¬ÎŞĞèÔÙ¸Ä
+                // æ³¨æ„ï¼šret å·²ç»æ˜¯ Modbus_06_WriteSingleReg çš„è¿”å›å€¼ï¼ˆ0æˆåŠŸï¼Œé0å¤±è´¥ï¼‰ï¼Œæ— éœ€å†æ”¹
             } else {
-                ret = 1;   // ×ÜÏßÃ¦£¬ÊÓÎªÊ§°Ü
-                printf("µç»ú0x13 ¿ª»úÖ¸ÁîÊ§°Ü£º×ÜÏßÃ¦\n");
-                // ×ÜÏßÃ¦Î´Ö´ĞĞ£¬²»ÖÃ executed
+                ret = 1;   // æ€»çº¿å¿™ï¼Œè§†ä¸ºå¤±è´¥
+                printf("ç”µæœº0x13 å¼€æœºæŒ‡ä»¤å¤±è´¥ï¼šæ€»çº¿å¿™\n");
+                // æ€»çº¿å¿™æœªæ‰§è¡Œï¼Œä¸ç½® executed
             }
             break;
 
-        // ¿ØÖÆbms³äµç¿Õ¿ª¹Ø»ú£¨0x49£©
+        // æ§åˆ¶bmså……ç”µç©ºå¼€å…³æœºï¼ˆ0x49ï¼‰
         case 0x49:
             if (WaitMasterIdle(100)) {
                 MasterBusy_Acquire();
                 ret = Modbus_06_WriteSingleReg(MOTOR15_SLAVE_ADDR, 0x00, 0x00);
                 MasterBusy_Release();
                 if (ret == 0) {
-                    printf("µç»ú0x13 ¹Ø»úÖ¸Áî·¢ËÍ³É¹¦\n");
+                    printf("ç”µæœº0x13 å…³æœºæŒ‡ä»¤å‘é€æˆåŠŸ\n");
 										executed = 1;
                 } else {
-                    printf("µç»ú0x13 ¹Ø»úÖ¸Áî·¢ËÍÊ§°Ü£¬´íÎóÂë: %d\n", ret);
+                    printf("ç”µæœº0x13 å…³æœºæŒ‡ä»¤å‘é€å¤±è´¥ï¼Œé”™è¯¯ç : %d\n", ret);
 										executed = 0;	
                 }
                 
             } else {
                 ret = 1;
-                printf("µç»ú0x13 ¹Ø»úÖ¸ÁîÊ§°Ü£º×ÜÏßÃ¦\n");
+                printf("ç”µæœº0x13 å…³æœºæŒ‡ä»¤å¤±è´¥ï¼šæ€»çº¿å¿™\n");
             }
             break;
 
-        // ĞÂÔö£º0x52 ºÍ 0x53 ¿ØÖÆ¶æ»ú0x14µÄ¼Ä´æÆ÷0x01
-        case 0x52:   // Ğ´1
+        // æ–°å¢ï¼š0x52 å’Œ 0x53 æ§åˆ¶èˆµæœº0x14çš„å¯„å­˜å™¨0x01
+        case 0x52:   // å†™1
             if (WaitMasterIdle(100)) {
                 MasterBusy_Acquire();
                 ret = Modbus_06_WriteSingleReg(0x14, 0x0001, 0x0001);
                 MasterBusy_Release();
                 if (ret == 0) {
-                    printf("µç»ú0x14 ¼Ä´æÆ÷0x01 Ğ´1³É¹¦\n");
+                    printf("ç”µæœº0x14 å¯„å­˜å™¨0x01 å†™1æˆåŠŸ\n");
 										executed = 1;
                 } else {
-                    printf("µç»ú0x14 ¼Ä´æÆ÷0x01 Ğ´1Ê§°Ü£¬´íÎóÂë: %d\n", ret);
+                    printf("ç”µæœº0x14 å¯„å­˜å™¨0x01 å†™1å¤±è´¥ï¼Œé”™è¯¯ç : %d\n", ret);
 										executed = 0;	
                 }
                 
             } else {
                 ret = 1;
-                printf("µç»ú0x14 Ğ´1Ê§°Ü£º×ÜÏßÃ¦\n");
+                printf("ç”µæœº0x14 å†™1å¤±è´¥ï¼šæ€»çº¿å¿™\n");
             }
             break;
 
-        case 0x53:   // Ğ´2
+        case 0x53:   // å†™2
             if (WaitMasterIdle(100)) {
                 MasterBusy_Acquire();
                 ret = Modbus_06_WriteSingleReg(0x14, 0x0001, 0x0002);
                 MasterBusy_Release();
                 if (ret == 0) {
-                    printf("µç»ú0x14 ¼Ä´æÆ÷0x01 Ğ´2³É¹¦\n");
+                    printf("ç”µæœº0x14 å¯„å­˜å™¨0x01 å†™2æˆåŠŸ\n");
 										executed = 1;
                 } else {
-                    printf("µç»ú0x14 ¼Ä´æÆ÷0x01 Ğ´2Ê§°Ü£¬´íÎóÂë: %d\n", ret);
+                    printf("ç”µæœº0x14 å¯„å­˜å™¨0x01 å†™2å¤±è´¥ï¼Œé”™è¯¯ç : %d\n", ret);
 										executed = 0;
                 }
                 
             } else {
                 ret = 1;
-                printf("µç»ú0x14 Ğ´2Ê§°Ü£º×ÜÏßÃ¦\n");
+                printf("ç”µæœº0x14 å†™2å¤±è´¥ï¼šæ€»çº¿å¿™\n");
             }
             break;
 
-        // ÉèÖÃ¿Õµ÷ÖÆÀäÍ£Ö¹ÎÂ¶È£¨0x54£©
+        // è®¾ç½®ç©ºè°ƒåˆ¶å†·åœæ­¢æ¸©åº¦ï¼ˆ0x54ï¼‰
         case 0x54:
             if (WaitMasterIdle(100)) {
                 MasterBusy_Acquire();
                 ret = Modbus_06_WriteSingleReg(MOTOR13_SLAVE_ADDR, 0x00, reg_data);
                 MasterBusy_Release();
                 if (ret == 0) {
-                    printf("ÉèÖÃ¿Õµ÷ÖÆÀäÍ£Ö¹ÎÂ¶È³É¹¦: %.1f¡æ\n", reg_data / 10.0f);
+                    printf("è®¾ç½®ç©ºè°ƒåˆ¶å†·åœæ­¢æ¸©åº¦æˆåŠŸ: %.1fâ„ƒ\n", reg_data / 10.0f);
 										executed = 1;
                 } else {
-                    printf("ÉèÖÃ¿Õµ÷ÖÆÀäÍ£Ö¹ÎÂ¶ÈÊ§°Ü£¬´íÎóÂë: %d\n", ret);
+                    printf("è®¾ç½®ç©ºè°ƒåˆ¶å†·åœæ­¢æ¸©åº¦å¤±è´¥ï¼Œé”™è¯¯ç : %d\n", ret);
 										executed = 0;
                 }
                 
             } else {
                 ret = 1;
-                printf("ÉèÖÃ¿Õµ÷ÖÆÀäÍ£Ö¹ÎÂ¶ÈÊ§°Ü£º×ÜÏßÃ¦\n");
+                printf("è®¾ç½®ç©ºè°ƒåˆ¶å†·åœæ­¢æ¸©åº¦å¤±è´¥ï¼šæ€»çº¿å¿™\n");
             }
             break;
 
-        // ÉèÖÃ¿Õµ÷ÖÆÈÈÍ£Ö¹ÎÂ¶È£¨0x55£©
+        // è®¾ç½®ç©ºè°ƒåˆ¶çƒ­åœæ­¢æ¸©åº¦ï¼ˆ0x55ï¼‰
         case 0x55:
             if (WaitMasterIdle(100)) {
                 MasterBusy_Acquire();
                 ret = Modbus_06_WriteSingleReg(MOTOR13_SLAVE_ADDR, 0x02, reg_data);
                 MasterBusy_Release();
                 if (ret == 0) {
-                    printf("ÉèÖÃ¿Õµ÷ÖÆÈÈÍ£Ö¹ÎÂ¶È³É¹¦: %.1f¡æ\n", reg_data / 10.0f);
+                    printf("è®¾ç½®ç©ºè°ƒåˆ¶çƒ­åœæ­¢æ¸©åº¦æˆåŠŸ: %.1fâ„ƒ\n", reg_data / 10.0f);
 										executed = 1;
                 } else {
-                    printf("ÉèÖÃ¿Õµ÷ÖÆÈÈÍ£Ö¹ÎÂ¶ÈÊ§°Ü£¬´íÎóÂë: %d\n", ret);
+                    printf("è®¾ç½®ç©ºè°ƒåˆ¶çƒ­åœæ­¢æ¸©åº¦å¤±è´¥ï¼Œé”™è¯¯ç : %d\n", ret);
 										executed = 0;
                 }
                 
             } else {
                 ret = 1;
-                printf("ÉèÖÃ¿Õµ÷ÖÆÈÈÍ£Ö¹ÎÂ¶ÈÊ§°Ü£º×ÜÏßÃ¦\n");
+                printf("è®¾ç½®ç©ºè°ƒåˆ¶çƒ­åœæ­¢æ¸©åº¦å¤±è´¥ï¼šæ€»çº¿å¿™\n");
             }
             break;
 
-        // µØÖ· 0x60 ´¦Àí£¨ÎŞÈË»ú×´Ì¬¼à²â£¬Á¬ĞøÁ½´Î0Ôò¿ª»ú£©
+        // åœ°å€ 0x60 å¤„ç†ï¼ˆæ— äººæœºçŠ¶æ€ç›‘æµ‹ï¼Œè¿ç»­ä¸¤æ¬¡0åˆ™å¼€æœºï¼‰
 				case 0x60:
 				{
-						// ±£´æµ±Ç°Öµµ½×´Ì¬¼Ä´æÆ÷
+						// ä¿å­˜å½“å‰å€¼åˆ°çŠ¶æ€å¯„å­˜å™¨
 						StatusRegs_Update(REG_RESERVED4, reg_data);
-						printf("0x60¸üĞÂ¼Ä´æÆ÷Îª: %d\n", reg_data);
+						printf("0x60æ›´æ–°å¯„å­˜å™¨ä¸º: %d\n", reg_data);
 
-						// Èç¹ûÖµÎª2£¬ÔòÇå³ıµÈ´ı¿ª»ú±êÖ¾£¬²¢½ûÖ¹ºóĞø1´¥·¢¿ª»ú
+						// å¦‚æœå€¼ä¸º2ï¼Œåˆ™æ¸…é™¤ç­‰å¾…å¼€æœºæ ‡å¿—ï¼Œå¹¶ç¦æ­¢åç»­1è§¦å‘å¼€æœº
 						if (reg_data == 2) {
 								wait_openfly = 0;
-								printf("½ÓÊÕµ½0x60=2£¬Çå³ıµÈ´ı¿ª»ú±êÖ¾£¬ºóĞø½«²»ÔÙÖ´ĞĞÎŞÈË»ú¿ª»úĞòÁĞ\n");
+								printf("æ¥æ”¶åˆ°0x60=2ï¼Œæ¸…é™¤ç­‰å¾…å¼€æœºæ ‡å¿—ï¼Œåç»­å°†ä¸å†æ‰§è¡Œæ— äººæœºå¼€æœºåºåˆ—\n");
 								ret = 0;
 								executed = 1;
 						}
-						// Èç¹ûÖµÎª1ÇÒµÈ´ı¿ª»ú±êÖ¾ÖÃÎ»£¬ÔòÖ´ĞĞÎŞÈË»ú¿ª»úĞòÁĞ
+						// å¦‚æœå€¼ä¸º1ä¸”ç­‰å¾…å¼€æœºæ ‡å¿—ç½®ä½ï¼Œåˆ™æ‰§è¡Œæ— äººæœºå¼€æœºåºåˆ—
 						else if (reg_data == 1 && wait_openfly) {
 								if (!Sequence_IsBusy()) {
-										printf("¼ì²âµ½0x60=1ÇÒµÈ´ı¿ª»ú±êÖ¾£¬Ö´ĞĞÎŞÈË»ú¿ª»úĞòÁĞ\n");
+										printf("æ£€æµ‹åˆ°0x60=1ä¸”ç­‰å¾…å¼€æœºæ ‡å¿—ï¼Œæ‰§è¡Œæ— äººæœºå¼€æœºåºåˆ—\n");
 										Sequence_Start(SEQ_ID_TAKEOFF);
-										wait_openfly = 0;   // Çå³ı±êÖ¾£¬±ÜÃâÖØ¸´Ö´ĞĞ
+										wait_openfly = 0;   // æ¸…é™¤æ ‡å¿—ï¼Œé¿å…é‡å¤æ‰§è¡Œ
 										ret = 0;
 										executed = 1;
 								} else {
-										// ĞòÁĞÃ¦£¬²»Çå³ı±êÖ¾£¬µÈ´ıÏÂ´Î»ú»á
-										printf("ĞòÁĞÃ¦£¬ÎŞÈË»ú¿ª»úĞòÁĞÉÔºóÖ´ĞĞ\n");
+										// åºåˆ—å¿™ï¼Œä¸æ¸…é™¤æ ‡å¿—ï¼Œç­‰å¾…ä¸‹æ¬¡æœºä¼š
+										printf("åºåˆ—å¿™ï¼Œæ— äººæœºå¼€æœºåºåˆ—ç¨åæ‰§è¡Œ\n");
 										ret = 0;
-										executed = 1;   // ÈÔÈ»·µ»Ø³É¹¦£¬µ«Êµ¼ÊÎ´Ö´ĞĞ
+										executed = 1;   // ä»ç„¶è¿”å›æˆåŠŸï¼Œä½†å®é™…æœªæ‰§è¡Œ
 								}
 						} else {
-								// ÆäËûÇé¿ö£¨°üÀ¨ÖµÎª0,3,»òÖµÎª1µ«wait_openflyÎª0£©£¬½ö·µ»Ø³É¹¦
+								// å…¶ä»–æƒ…å†µï¼ˆåŒ…æ‹¬å€¼ä¸º0,3,æˆ–å€¼ä¸º1ä½†wait_openflyä¸º0ï¼‰ï¼Œä»…è¿”å›æˆåŠŸ
 								ret = 0;
 								executed = 1;
 						}
 						break;
 				}
 
-//        // µØÖ· 0x61 ´¦Àí£¨ÎŞÈË»ú×´Ì¬¼à²â£¬Á¬ĞøÁ½´Î0ÔòÆô¶¯¿ª»úĞòÁĞ£©
+//        // åœ°å€ 0x61 å¤„ç†ï¼ˆæ— äººæœºçŠ¶æ€ç›‘æµ‹ï¼Œè¿ç»­ä¸¤æ¬¡0åˆ™å¯åŠ¨å¼€æœºåºåˆ—ï¼‰
 //        case 0x61:
 //        {
 //            static uint8_t last_zero = 0;
@@ -522,7 +522,7 @@ void Handle06(void)
 //                    zero_count = 1;
 //                }
 //                if (zero_count >= 2) {
-////                    printf("¼ì²âµ½Á¬ĞøÁ½´ÎÎŞÈË»úÎ´¿ª»ú£¨0x61=0£©£¬Ö´ĞĞ¿ª»úĞòÁĞ\n");
+////                    printf("æ£€æµ‹åˆ°è¿ç»­ä¸¤æ¬¡æ— äººæœºæœªå¼€æœºï¼ˆ0x61=0ï¼‰ï¼Œæ‰§è¡Œå¼€æœºåºåˆ—\n");
 //                    if (WaitMasterIdle(100)) {
 ////                        MasterBusy_Acquire();
 ////                        Sequence_Start(SEQ_ID_OPENFLY);
@@ -532,7 +532,7 @@ void Handle06(void)
 //                        executed = 1;
 //                    } else {
 //                        ret = 1;
-//                        printf("ÎŞÈË»ú¿ª»úĞòÁĞÊ§°Ü£º×ÜÏßÃ¦\n");
+//                        printf("æ— äººæœºå¼€æœºåºåˆ—å¤±è´¥ï¼šæ€»çº¿å¿™\n");
 //                    }
 //                }
 //                last_zero = 1;
@@ -540,15 +540,15 @@ void Handle06(void)
 //                zero_count = 0;
 //                last_zero = 0;
 //            }
-//						// Ç¿ÖÆÉèÖÃ³É¹¦ÏìÓ¦  ²âÊÔÓÃ
+//						// å¼ºåˆ¶è®¾ç½®æˆåŠŸå“åº”  æµ‹è¯•ç”¨
 //						    ret = 0;
 //    executed = 1;
 //            break;
 //        }
 
         default:
-            // ²éÕÒÓ³Éä±í
-            ret = 1;   // Ä¬ÈÏÎ´ÕÒµ½
+            // æŸ¥æ‰¾æ˜ å°„è¡¨
+            ret = 1;   // é»˜è®¤æœªæ‰¾åˆ°
             for (uint8_t i = 0; i < CMD_MAP_COUNT; i++) {
                 if (cmd_map[i].gateway_reg == reg_addr) {
                     if (WaitMasterIdle(100)) {
@@ -556,10 +556,10 @@ void Handle06(void)
                         ret = Modbus_06_WriteSingleReg(cmd_map[i].motor_addr, cmd_map[i].motor_reg, reg_data);
                         MasterBusy_Release();
                         executed = 1;
-                        // ret ÒÑ¾­ÊÇ Modbus_06_WriteSingleReg µÄ·µ»ØÖµ£¨0³É¹¦£¬·Ç0Ê§°Ü£©
+                        // ret å·²ç»æ˜¯ Modbus_06_WriteSingleReg çš„è¿”å›å€¼ï¼ˆ0æˆåŠŸï¼Œé0å¤±è´¥ï¼‰
                     } else {
-                        ret = 1; // ×ÜÏßÃ¦£¬Î´Ö´ĞĞ
-                        printf("Ó³ÉäÃüÁîÊ§°Ü£º×ÜÏßÃ¦\n");
+                        ret = 1; // æ€»çº¿å¿™ï¼Œæœªæ‰§è¡Œ
+                        printf("æ˜ å°„å‘½ä»¤å¤±è´¥ï¼šæ€»çº¿å¿™\n");
                     }
                     break;
                 }
@@ -567,40 +567,40 @@ void Handle06(void)
             break;
     }
 
-    // ÈôÊµ¼ÊÖ´ĞĞÁË²Ù×÷£¨executed == 1£©£¬Ôò¸üĞÂÉÏ´ÎÃüÁî¼ÇÂ¼£¬ÓÃÓÚÏÂ´ÎÈ¥ÖØ
+    // è‹¥å®é™…æ‰§è¡Œäº†æ“ä½œï¼ˆexecuted == 1ï¼‰ï¼Œåˆ™æ›´æ–°ä¸Šæ¬¡å‘½ä»¤è®°å½•ï¼Œç”¨äºä¸‹æ¬¡å»é‡
     if (executed) {
         last_reg_addr = reg_addr;
         last_reg_data = reg_data;
     }
 
-    // ÏìÓ¦Íø¹Ø£ºret == 0 ±íÊ¾³É¹¦£¬·ñÔòÊ§°Ü
+    // å“åº”ç½‘å…³ï¼šret == 0 è¡¨ç¤ºæˆåŠŸï¼Œå¦åˆ™å¤±è´¥
     if (ret == 0) {
         SendAckOk();
     } else {
-        SendAckErr(0x02);   // ÃüÁîÎ´ÕÒµ½»òÖ´ĞĞÊ§°Ü
+        SendAckErr(0x02);   // å‘½ä»¤æœªæ‰¾åˆ°æˆ–æ‰§è¡Œå¤±è´¥
     }
 }
 
-/* Ğ´µ¥¸ö±£³Ö¼Ä´æÆ÷£¨Íø¹ØÏÂ·¢ÃüÁî£© */
+/* å†™å•ä¸ªä¿æŒå¯„å­˜å™¨ï¼ˆç½‘å…³ä¸‹å‘å‘½ä»¤ï¼‰ */
 //void Handle06(void)
 //{
 //    uint16_t reg_addr = BEBufToUint16(&g_tModS.RxBuf[2]);
 //    uint16_t reg_data = BEBufToUint16(&g_tModS.RxBuf[4]);
-//    uint8_t ret = 0;   // Ä¬ÈÏ³É¹¦
+//    uint8_t ret = 0;   // é»˜è®¤æˆåŠŸ
 
-//    // È¥ÖØ£º¼ÇÂ¼ÉÏ´ÎÖ´ĞĞµÄÃüÁî£¬ÈôÏàÍ¬ÔòºöÂÔ
+//    // å»é‡ï¼šè®°å½•ä¸Šæ¬¡æ‰§è¡Œçš„å‘½ä»¤ï¼Œè‹¥ç›¸åŒåˆ™å¿½ç•¥
 //    static uint16_t last_reg_addr = 0xFFFF;
 //    static uint16_t last_reg_data = 0xFFFF;
-//    uint8_t executed = 0;   // ±ê¼Çµ±Ç°ÃüÁîÊÇ·ñÊµ¼ÊÖ´ĞĞÁË²Ù×÷
+//    uint8_t executed = 0;   // æ ‡è®°å½“å‰å‘½ä»¤æ˜¯å¦å®é™…æ‰§è¡Œäº†æ“ä½œ
 
-//    // ÈôÓëÉÏ´ÎÃüÁîÍêÈ«ÏàÍ¬£¬ÔòºöÂÔÖ´ĞĞ£¬Ö±½Ó·µ»Ø³É¹¦
+//    // è‹¥ä¸ä¸Šæ¬¡å‘½ä»¤å®Œå…¨ç›¸åŒï¼Œåˆ™å¿½ç•¥æ‰§è¡Œï¼Œç›´æ¥è¿”å›æˆåŠŸ
 //    if (reg_addr == last_reg_addr && reg_data == last_reg_data) {
-//        printf("ºöÂÔÖØ¸´ÃüÁî: addr=0x%04X, data=0x%04X\n", reg_addr, reg_data);
+//        printf("å¿½ç•¥é‡å¤å‘½ä»¤: addr=0x%04X, data=0x%04X\n", reg_addr, reg_data);
 //        SendAckOk();
 //        return;
 //    }
 
-//    // ÌØÊâÃüÁî´¦Àí
+//    // ç‰¹æ®Šå‘½ä»¤å¤„ç†
 //    switch (reg_addr) {
 //        case 0x30: Sequence_Start(SEQ_ID_OPENDR); executed = 1; break;
 //        case 0x31: Sequence_Start(SEQ_ID_CLOSEDR); executed = 1; break;
@@ -619,115 +619,115 @@ void Handle06(void)
 //        case 0x50: Sequence_Start(SEQ_ID_OPENFLY); executed = 1; break;
 //        case 0x51: Sequence_Start(SEQ_ID_CLOSEFLY); executed = 1; break;
 
-//        // ¿ØÖÆbms³äµç¿Õ¿ª¿ª»ú£¨0x48£©
+//        // æ§åˆ¶bmså……ç”µç©ºå¼€å¼€æœºï¼ˆ0x48ï¼‰
 //        case 0x48:
 //            if (WaitMasterIdle(100)) {
 //                MasterBusy_Acquire();
 //                ret = Modbus_06_WriteSingleReg(MOTOR15_SLAVE_ADDR, 0x00, 0x01);
 //                MasterBusy_Release();
 //                if (ret == 0) {
-//                    printf("µç»ú0x13 ¿ª»úÖ¸Áî·¢ËÍ³É¹¦\n");
+//                    printf("ç”µæœº0x13 å¼€æœºæŒ‡ä»¤å‘é€æˆåŠŸ\n");
 //                } else {
-//                    printf("µç»ú0x13 ¿ª»úÖ¸Áî·¢ËÍÊ§°Ü£¬´íÎóÂë: %d\n", ret);
+//                    printf("ç”µæœº0x13 å¼€æœºæŒ‡ä»¤å‘é€å¤±è´¥ï¼Œé”™è¯¯ç : %d\n", ret);
 //                }
-//                executed = 1;   // Ö´ĞĞÁËĞ´²Ù×÷£¨ÎŞÂÛ½á¹û£©
+//                executed = 1;   // æ‰§è¡Œäº†å†™æ“ä½œï¼ˆæ— è®ºç»“æœï¼‰
 //            } else {
 //                ret = 1;
-//                printf("µç»ú0x13 ¿ª»úÖ¸ÁîÊ§°Ü£º×ÜÏßÃ¦\n");
-//                // ×ÜÏßÃ¦Î´Ö´ĞĞ£¬²»ÖÃ executed
+//                printf("ç”µæœº0x13 å¼€æœºæŒ‡ä»¤å¤±è´¥ï¼šæ€»çº¿å¿™\n");
+//                // æ€»çº¿å¿™æœªæ‰§è¡Œï¼Œä¸ç½® executed
 //            }
 //            break;
 
-//        // ¿ØÖÆbms³äµç¿Õ¿ª¹Ø»ú£¨0x49£©
+//        // æ§åˆ¶bmså……ç”µç©ºå¼€å…³æœºï¼ˆ0x49ï¼‰
 //        case 0x49:
 //            if (WaitMasterIdle(100)) {
 //                MasterBusy_Acquire();
 //                ret = Modbus_06_WriteSingleReg(MOTOR15_SLAVE_ADDR, 0x00, 0x00);
 //                MasterBusy_Release();
 //                if (ret == 0) {
-//                    printf("µç»ú0x13 ¹Ø»úÖ¸Áî·¢ËÍ³É¹¦\n");
+//                    printf("ç”µæœº0x13 å…³æœºæŒ‡ä»¤å‘é€æˆåŠŸ\n");
 //                } else {
-//                    printf("µç»ú0x13 ¹Ø»úÖ¸Áî·¢ËÍÊ§°Ü£¬´íÎóÂë: %d\n", ret);
+//                    printf("ç”µæœº0x13 å…³æœºæŒ‡ä»¤å‘é€å¤±è´¥ï¼Œé”™è¯¯ç : %d\n", ret);
 //                }
 //                executed = 1;
 //            } else {
 //                ret = 1;
-//                printf("µç»ú0x13 ¹Ø»úÖ¸ÁîÊ§°Ü£º×ÜÏßÃ¦\n");
+//                printf("ç”µæœº0x13 å…³æœºæŒ‡ä»¤å¤±è´¥ï¼šæ€»çº¿å¿™\n");
 //            }
 //            break;
 //				
-//				// ĞÂÔö£º0x52 ºÍ 0x53 ¿ØÖÆ¶æ»ú0x14µÄ¼Ä´æÆ÷0x01
-//        case 0x52:   // Ğ´1
+//				// æ–°å¢ï¼š0x52 å’Œ 0x53 æ§åˆ¶èˆµæœº0x14çš„å¯„å­˜å™¨0x01
+//        case 0x52:   // å†™1
 //            if (WaitMasterIdle(100)) {
 //                MasterBusy_Acquire();
 //                ret = Modbus_06_WriteSingleReg(0x14, 0x0001, 0x0001);
 //                MasterBusy_Release();
 //                if (ret == 0) {
-//                    printf("µç»ú0x14 ¼Ä´æÆ÷0x01 Ğ´1³É¹¦\n");
+//                    printf("ç”µæœº0x14 å¯„å­˜å™¨0x01 å†™1æˆåŠŸ\n");
 //                } else {
-//                    printf("µç»ú0x14 ¼Ä´æÆ÷0x01 Ğ´1Ê§°Ü£¬´íÎóÂë: %d\n", ret);
+//                    printf("ç”µæœº0x14 å¯„å­˜å™¨0x01 å†™1å¤±è´¥ï¼Œé”™è¯¯ç : %d\n", ret);
 //                }
 //                executed = 1;
 //            } else {
 //                ret = 1;
-//                printf("µç»ú0x14 Ğ´1Ê§°Ü£º×ÜÏßÃ¦\n");
+//                printf("ç”µæœº0x14 å†™1å¤±è´¥ï¼šæ€»çº¿å¿™\n");
 //            }
 //            break;
 
-//        case 0x53:   // Ğ´2
+//        case 0x53:   // å†™2
 //            if (WaitMasterIdle(100)) {
 //                MasterBusy_Acquire();
 //                ret = Modbus_06_WriteSingleReg(0x14, 0x0001, 0x0002);
 //                MasterBusy_Release();
 //                if (ret == 0) {
-//                    printf("µç»ú0x14 ¼Ä´æÆ÷0x01 Ğ´2³É¹¦\n");
+//                    printf("ç”µæœº0x14 å¯„å­˜å™¨0x01 å†™2æˆåŠŸ\n");
 //                } else {
-//                    printf("µç»ú0x14 ¼Ä´æÆ÷0x01 Ğ´2Ê§°Ü£¬´íÎóÂë: %d\n", ret);
+//                    printf("ç”µæœº0x14 å¯„å­˜å™¨0x01 å†™2å¤±è´¥ï¼Œé”™è¯¯ç : %d\n", ret);
 //                }
 //                executed = 1;
 //            } else {
 //                ret = 1;
-//                printf("µç»ú0x14 Ğ´2Ê§°Ü£º×ÜÏßÃ¦\n");
+//                printf("ç”µæœº0x14 å†™2å¤±è´¥ï¼šæ€»çº¿å¿™\n");
 //            }
 //            break;
 
-//        // ÉèÖÃ¿Õµ÷ÖÆÀäÍ£Ö¹ÎÂ¶È£¨0x54£©
+//        // è®¾ç½®ç©ºè°ƒåˆ¶å†·åœæ­¢æ¸©åº¦ï¼ˆ0x54ï¼‰
 //        case 0x54:
 //            if (WaitMasterIdle(100)) {
 //                MasterBusy_Acquire();
 //                ret = Modbus_06_WriteSingleReg(MOTOR13_SLAVE_ADDR, 0x00, reg_data);
 //                MasterBusy_Release();
 //                if (ret == 0) {
-//                    printf("ÉèÖÃ¿Õµ÷ÖÆÀäÍ£Ö¹ÎÂ¶È³É¹¦: %.1f¡æ\n", reg_data / 10.0f);
+//                    printf("è®¾ç½®ç©ºè°ƒåˆ¶å†·åœæ­¢æ¸©åº¦æˆåŠŸ: %.1fâ„ƒ\n", reg_data / 10.0f);
 //                } else {
-//                    printf("ÉèÖÃ¿Õµ÷ÖÆÀäÍ£Ö¹ÎÂ¶ÈÊ§°Ü£¬´íÎóÂë: %d\n", ret);
+//                    printf("è®¾ç½®ç©ºè°ƒåˆ¶å†·åœæ­¢æ¸©åº¦å¤±è´¥ï¼Œé”™è¯¯ç : %d\n", ret);
 //                }
 //                executed = 1;
 //            } else {
 //                ret = 1;
-//                printf("ÉèÖÃ¿Õµ÷ÖÆÀäÍ£Ö¹ÎÂ¶ÈÊ§°Ü£º×ÜÏßÃ¦\n");
+//                printf("è®¾ç½®ç©ºè°ƒåˆ¶å†·åœæ­¢æ¸©åº¦å¤±è´¥ï¼šæ€»çº¿å¿™\n");
 //            }
 //            break;
 
-//        // ÉèÖÃ¿Õµ÷ÖÆÈÈÍ£Ö¹ÎÂ¶È£¨0x55£©
+//        // è®¾ç½®ç©ºè°ƒåˆ¶çƒ­åœæ­¢æ¸©åº¦ï¼ˆ0x55ï¼‰
 //        case 0x55:
 //            if (WaitMasterIdle(100)) {
 //                MasterBusy_Acquire();
 //                ret = Modbus_06_WriteSingleReg(MOTOR13_SLAVE_ADDR, 0x02, reg_data);
 //                MasterBusy_Release();
 //                if (ret == 0) {
-//                    printf("ÉèÖÃ¿Õµ÷ÖÆÈÈÍ£Ö¹ÎÂ¶È³É¹¦: %.1f¡æ\n", reg_data / 10.0f);
+//                    printf("è®¾ç½®ç©ºè°ƒåˆ¶çƒ­åœæ­¢æ¸©åº¦æˆåŠŸ: %.1fâ„ƒ\n", reg_data / 10.0f);
 //                } else {
-//                    printf("ÉèÖÃ¿Õµ÷ÖÆÈÈÍ£Ö¹ÎÂ¶ÈÊ§°Ü£¬´íÎóÂë: %d\n", ret);
+//                    printf("è®¾ç½®ç©ºè°ƒåˆ¶çƒ­åœæ­¢æ¸©åº¦å¤±è´¥ï¼Œé”™è¯¯ç : %d\n", ret);
 //                }
 //                executed = 1;
 //            } else {
 //                ret = 1;
-//                printf("ÉèÖÃ¿Õµ÷ÖÆÈÈÍ£Ö¹ÎÂ¶ÈÊ§°Ü£º×ÜÏßÃ¦\n");
+//                printf("è®¾ç½®ç©ºè°ƒåˆ¶çƒ­åœæ­¢æ¸©åº¦å¤±è´¥ï¼šæ€»çº¿å¿™\n");
 //            }
 //            break;
 
-//        // µØÖ· 0x60 ´¦Àí£¨ÎŞÈË»ú×´Ì¬¼à²â£¬Á¬ĞøÁ½´Î0Ôò¿ª»ú£©
+//        // åœ°å€ 0x60 å¤„ç†ï¼ˆæ— äººæœºçŠ¶æ€ç›‘æµ‹ï¼Œè¿ç»­ä¸¤æ¬¡0åˆ™å¼€æœºï¼‰
 //        case 0x60:
 //        {
 //            static uint8_t last_zero = 0;
@@ -739,16 +739,16 @@ void Handle06(void)
 //                    zero_count = 1;
 //                }
 //                if (zero_count >= 2) {
-//                    printf("¼ì²âµ½Á¬ĞøÁ½´ÎÎŞÈË»úÎ´¿ª»ú£¨0x60=0£©£¬Ö´ĞĞ¿ª»úÖ¸Áî\n");
+//                    printf("æ£€æµ‹åˆ°è¿ç»­ä¸¤æ¬¡æ— äººæœºæœªå¼€æœºï¼ˆ0x60=0ï¼‰ï¼Œæ‰§è¡Œå¼€æœºæŒ‡ä»¤\n");
 //                    if (WaitMasterIdle(100)) {
 ////                        MasterBusy_Acquire();
 ////                        uint8_t result = Modbus_06_WriteSingleReg(MOTOR14_SLAVE_ADDR, 0x0001, 0x0000);
 ////                        MasterBusy_Release();
 //                        zero_count = 0;
-////                        executed = 1;   // Ö´ĞĞÁËĞ´²Ù×÷
+////                        executed = 1;   // æ‰§è¡Œäº†å†™æ“ä½œ
 //                    } else {
-//                        printf("ÎŞÈË»ú¿ª»úÖ¸ÁîÊ§°Ü£º×ÜÏßÃ¦\n");
-//                        // ×ÜÏßÃ¦Î´Ö´ĞĞ£¬²»ÖÃ executed
+//                        printf("æ— äººæœºå¼€æœºæŒ‡ä»¤å¤±è´¥ï¼šæ€»çº¿å¿™\n");
+//                        // æ€»çº¿å¿™æœªæ‰§è¡Œï¼Œä¸ç½® executed
 //                    }
 //                }
 //                last_zero = 1;
@@ -759,7 +759,7 @@ void Handle06(void)
 //            break;
 //        }
 
-//        // µØÖ· 0x61 ´¦Àí£¨ÎŞÈË»ú×´Ì¬¼à²â£¬Á¬ĞøÁ½´Î0ÔòÆô¶¯¿ª»úĞòÁĞ£©
+//        // åœ°å€ 0x61 å¤„ç†ï¼ˆæ— äººæœºçŠ¶æ€ç›‘æµ‹ï¼Œè¿ç»­ä¸¤æ¬¡0åˆ™å¯åŠ¨å¼€æœºåºåˆ—ï¼‰
 //        case 0x61:
 //        {
 //            static uint8_t last_zero = 0;
@@ -771,15 +771,15 @@ void Handle06(void)
 //                    zero_count = 1;
 //                }
 //                if (zero_count >= 2) {
-//                    printf("¼ì²âµ½Á¬ĞøÁ½´ÎÎŞÈË»úÎ´¿ª»ú£¨0x61=0£©£¬Ö´ĞĞ¿ª»úĞòÁĞ\n");
+//                    printf("æ£€æµ‹åˆ°è¿ç»­ä¸¤æ¬¡æ— äººæœºæœªå¼€æœºï¼ˆ0x61=0ï¼‰ï¼Œæ‰§è¡Œå¼€æœºåºåˆ—\n");
 //                    if (WaitMasterIdle(100)) {
 ////                        MasterBusy_Acquire();
 ////                        Sequence_Start(SEQ_ID_OPENFLY);
 ////                        MasterBusy_Release();
 //                        zero_count = 0;
-////                        executed = 1;   // Ö´ĞĞÁËĞòÁĞÆô¶¯
+////                        executed = 1;   // æ‰§è¡Œäº†åºåˆ—å¯åŠ¨
 //                    } else {
-//                        printf("ÎŞÈË»ú¿ª»úĞòÁĞÊ§°Ü£º×ÜÏßÃ¦\n");
+//                        printf("æ— äººæœºå¼€æœºåºåˆ—å¤±è´¥ï¼šæ€»çº¿å¿™\n");
 //                    }
 //                }
 //                last_zero = 1;
@@ -791,7 +791,7 @@ void Handle06(void)
 //        }
 
 //        default:
-//            // ²éÕÒÓ³Éä±í
+//            // æŸ¥æ‰¾æ˜ å°„è¡¨
 //            ret = 0;
 //            for (uint8_t i = 0; i < CMD_MAP_COUNT; i++) {
 //                if (cmd_map[i].gateway_reg == reg_addr) {
@@ -799,9 +799,9 @@ void Handle06(void)
 //                        MasterBusy_Acquire();
 //                        ret = Modbus_06_WriteSingleReg(cmd_map[i].motor_addr, cmd_map[i].motor_reg, reg_data);
 //                        MasterBusy_Release();
-//                        executed = 1;   // Ö´ĞĞÁËĞ´²Ù×÷
+//                        executed = 1;   // æ‰§è¡Œäº†å†™æ“ä½œ
 //                    } else {
-//                        ret = 1; // ×ÜÏßÃ¦£¬Î´Ö´ĞĞ
+//                        ret = 1; // æ€»çº¿å¿™ï¼Œæœªæ‰§è¡Œ
 //                    }
 //                    break;
 //                }
@@ -809,21 +809,21 @@ void Handle06(void)
 //            break;
 //    }
 
-//    // ÈôÊµ¼ÊÖ´ĞĞÁË²Ù×÷£¨executed == 1£©£¬Ôò¸üĞÂÉÏ´ÎÃüÁî¼ÇÂ¼£¬ÓÃÓÚÏÂ´ÎÈ¥ÖØ
+//    // è‹¥å®é™…æ‰§è¡Œäº†æ“ä½œï¼ˆexecuted == 1ï¼‰ï¼Œåˆ™æ›´æ–°ä¸Šæ¬¡å‘½ä»¤è®°å½•ï¼Œç”¨äºä¸‹æ¬¡å»é‡
 //    if (executed) {
 //        last_reg_addr = reg_addr;
 //        last_reg_data = reg_data;
 //    }
 
-//    // ÏìÓ¦Íø¹Ø
+//    // å“åº”ç½‘å…³
 //    if (ret == 0) {
-//        SendAckErr(0x02);   // ÃüÁîÎ´ÕÒµ½»òÖ´ĞĞÊ§°Ü
+//        SendAckErr(0x02);   // å‘½ä»¤æœªæ‰¾åˆ°æˆ–æ‰§è¡Œå¤±è´¥
 //    } else {
-//        SendAckOk();        // Ö´ĞĞ³É¹¦»ò×ÜÏßÃ¦£¨ÊÓÎª³É¹¦£©
+//        SendAckOk();        // æ‰§è¡ŒæˆåŠŸæˆ–æ€»çº¿å¿™ï¼ˆè§†ä¸ºæˆåŠŸï¼‰
 //    }
 //}
 
-/* 10 ¹¦ÄÜÂë´¦Àí£¨Ğ´¶à¸ö¼Ä´æÆ÷£© */
+/* 10 åŠŸèƒ½ç å¤„ç†ï¼ˆå†™å¤šä¸ªå¯„å­˜å™¨ï¼‰ */
 void Handle10(void)
 {
     uint16_t start_reg = BEBufToUint16(&g_tModS.RxBuf[2]);
@@ -836,11 +836,11 @@ void Handle10(void)
     uint8_t ok = 1;
     for (uint16_t i = 0; i < reg_num; i++) {
         uint16_t val = BEBufToUint16(&g_tModS.RxBuf[7 + i*2]);
-        // ´Ë´¦½öÖ§³ÖÌØÊâÃüÁî£¬ÆäËû¿ÉºöÂÔ
-        // Èç¹ûĞèÒªÖ§³ÖĞ´¶à¸ö×´Ì¬¼Ä´æÆ÷£¬¿ÉÀ©Õ¹
-        // Îª¼òµ¥£¬Ö»¼ì²éµÚÒ»¸ö¼Ä´æÆ÷µØÖ·ÊÇ·ñÎªÃüÁî·¶Î§
+        // æ­¤å¤„ä»…æ”¯æŒç‰¹æ®Šå‘½ä»¤ï¼Œå…¶ä»–å¯å¿½ç•¥
+        // å¦‚æœéœ€è¦æ”¯æŒå†™å¤šä¸ªçŠ¶æ€å¯„å­˜å™¨ï¼Œå¯æ‰©å±•
+        // ä¸ºç®€å•ï¼Œåªæ£€æŸ¥ç¬¬ä¸€ä¸ªå¯„å­˜å™¨åœ°å€æ˜¯å¦ä¸ºå‘½ä»¤èŒƒå›´
         if (start_reg + i >= 0x30 && start_reg + i <= 0x48) {
-            // µ÷ÓÃĞ´µ¥¸ö¼Ä´æÆ÷µÄ´¦Àí
+            // è°ƒç”¨å†™å•ä¸ªå¯„å­˜å™¨çš„å¤„ç†
             uint8_t tmp_buf[8];
             tmp_buf[0] = g_tModS.RxBuf[0];
             tmp_buf[1] = 0x06;
@@ -848,7 +848,7 @@ void Handle10(void)
             tmp_buf[3] = (start_reg + i) & 0xFF;
             tmp_buf[4] = val >> 8;
             tmp_buf[5] = val & 0xFF;
-            // ÁÙÊ±Ìæ»»È«¾Ö»º³åÇø£¬µ÷ÓÃ Handle06
+            // ä¸´æ—¶æ›¿æ¢å…¨å±€ç¼“å†²åŒºï¼Œè°ƒç”¨ Handle06
             uint8_t old_buf[8];
             memcpy(old_buf, g_tModS.RxBuf, 8);
             memcpy(g_tModS.RxBuf, tmp_buf, 8);
@@ -887,39 +887,39 @@ uint16_t BEBufToUint16(uint8_t *_pBuf)
 
 static uint8_t MODS_WriteRegValue(uint16_t reg_addr, uint16_t reg_value)
 {
-	switch (reg_addr)							/* ÅĞ¶Ï¼Ä´æÆ÷µØÖ· */
+	switch (reg_addr)							/* åˆ¤æ–­å¯„å­˜å™¨åœ°å€ */
 	{	
 		case SLAVE_REG_P01:
-			g_tVar.P01 = reg_value;				/* ½«ÖµĞ´Èë±£´æ¼Ä´æÆ÷ */
+			g_tVar.P01 = reg_value;				/* å°†å€¼å†™å…¥ä¿å­˜å¯„å­˜å™¨ */
 			break;
 		
 		case SLAVE_REG_P02:
-			g_tVar.P02 = reg_value;				/* ½«ÖµĞ´Èë±£´æ¼Ä´æÆ÷ */
+			g_tVar.P02 = reg_value;				/* å°†å€¼å†™å…¥ä¿å­˜å¯„å­˜å™¨ */
 			break;
 		
 		default:
-			return 0;		/* ²ÎÊıÒì³££¬·µ»Ø 0 */
+			return 0;		/* å‚æ•°å¼‚å¸¸ï¼Œè¿”å› 0 */
 	}
 
-	return 1;		/* ¶ÁÈ¡³É¹¦ */
+	return 1;		/* è¯»å–æˆåŠŸ */
 }
 
 /**
- * @brief ¼ì²é°ëĞ¡Ê±¶¨Ê±ÈÎÎñÊÇ·ñµ½ÆÚ£¬Èôµ½ÆÚÔòÖ´ĞĞÒ£¿ØÆ÷¿ª»ú
- * @note ĞèÔÚÖ÷Ñ­»·ÖĞÖÜÆÚĞÔµ÷ÓÃ
+ * @brief æ£€æŸ¥åŠå°æ—¶å®šæ—¶ä»»åŠ¡æ˜¯å¦åˆ°æœŸï¼Œè‹¥åˆ°æœŸåˆ™æ‰§è¡Œé¥æ§å™¨å¼€æœº
+ * @note éœ€åœ¨ä¸»å¾ªç¯ä¸­å‘¨æœŸæ€§è°ƒç”¨
  */
 void CheckRemoteOffTask(void)
 {
     if (remote_off_pending && GetTick() >= remote_off_time) {
-        remote_off_pending = 0;   // Çå³ı±êÖ¾£¬·ÀÖ¹ÖØ¸´Ö´ĞĞ
-        printf("°ëĞ¡Ê±¶¨Ê±µ½ÆÚ£¬Ö´ĞĞÒ£¿ØÆ÷¿ª»úÖ¸Áî\n");
+        remote_off_pending = 0;   // æ¸…é™¤æ ‡å¿—ï¼Œé˜²æ­¢é‡å¤æ‰§è¡Œ
+        printf("åŠå°æ—¶å®šæ—¶åˆ°æœŸï¼Œæ‰§è¡Œé¥æ§å™¨å¼€æœºæŒ‡ä»¤\n");
         MasterBusy_Acquire();
         uint8_t ret = Modbus_06_WriteSingleReg(0x14, 0x0001, 0x0001);
         MasterBusy_Release();
         if (ret == 0) {
-            printf("Ò£¿ØÆ÷¿ª»úÖ¸Áî·¢ËÍ³É¹¦£¨¶¨Ê±ÈÎÎñ£©\n");
+            printf("é¥æ§å™¨å¼€æœºæŒ‡ä»¤å‘é€æˆåŠŸï¼ˆå®šæ—¶ä»»åŠ¡ï¼‰\n");
         } else {
-            printf("Ò£¿ØÆ÷¿ª»úÖ¸Áî·¢ËÍÊ§°Ü£¨¶¨Ê±ÈÎÎñ£©£¬´íÎóÂë£º%d\n", ret);
+            printf("é¥æ§å™¨å¼€æœºæŒ‡ä»¤å‘é€å¤±è´¥ï¼ˆå®šæ—¶ä»»åŠ¡ï¼‰ï¼Œé”™è¯¯ç ï¼š%d\n", ret);
         }
     }
 }

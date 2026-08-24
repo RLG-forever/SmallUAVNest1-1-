@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 
-// ����Ŀ��λ�ã�ʾ��ֵ�������ʵ�ʲ�����
+// 居中目标位置（示例值，需根据实际测量）
 #define MOTOR5_CENTER_POS   0x00000000
 #define MOTOR6_CENTER_POS   0x00000000
 #define MOTOR7_CENTER_POS   0x00000000
@@ -14,7 +14,7 @@
 #define MOTOR11_CENTER_POS  0x00000000
 #define MOTOR12_CENTER_POS  0x00000000
 
-// �ͷ�Ŀ��λ�ã�ʾ����
+// 释放目标位置（示例）
 #define MOTOR5_RELEASE_POS  0x00010000
 #define MOTOR6_RELEASE_POS  0x00010000
 #define MOTOR7_RELEASE_POS  0x00010000
@@ -24,51 +24,51 @@
 #define MOTOR11_RELEASE_POS 0x00010000
 #define MOTOR12_RELEASE_POS 0x00010000
 
-// ����ID
+// 序列ID
 typedef enum {
-    SEQ_ID_TAKEOFF = 0,   // һ�����
-    SEQ_ID_LANDING,       // �������
-		SEQ_ID_CLOSECENTER,   // ���и˾���
-		SEQ_ID_LEAVECENTER,   // ���и��ͷ�
-		SEQ_ID_LOADBATTERY,   // װ���
-		SEQ_ID_DOWNBATTERY,   // �µ��
-		SEQ_ID_OPENUP,    		// ��������
-		SEQ_ID_CLOSEDOWN,    	// �½�����
-		SEQ_ID_OPENFLY,    	  // �ɻ�����
-	  SEQ_ID_CLOSEFLY,    	// �ɻ��ػ�
-		SEQ_ID_OPENDR,         // �򿪲���
-	  SEQ_ID_CLOSEDR,       // �رղ���
-		SEQ_ID_CANCEL,    		// ȡ��
-		SEQ_ID_OPENDR1,         // �򿪲���
+    SEQ_ID_TAKEOFF = 0,   // 一键起飞
+    SEQ_ID_LANDING,       // 降落完成
+		SEQ_ID_CLOSECENTER,   // 居中杆居中
+		SEQ_ID_LEAVECENTER,   // 居中杆释放
+		SEQ_ID_LOADBATTERY,   // 装电池
+		SEQ_ID_DOWNBATTERY,   // 下电池
+		SEQ_ID_OPENUP,    		// 开门上升
+		SEQ_ID_CLOSEDOWN,    	// 下降关门
+		SEQ_ID_OPENFLY,    	  // 飞机开机
+	  SEQ_ID_CLOSEFLY,    	// 飞机关机
+		SEQ_ID_OPENDR,         // 打开舱门
+	  SEQ_ID_CLOSEDR,       // 关闭舱门
+		SEQ_ID_CANCEL,    		// 取消
+		SEQ_ID_OPENDR1,         // 打开舱门
 } SeqId;
 
 
-// ���躯�����ͣ�����0�ɹ�����0ʧ��
+// 步骤函数类型：返回0成功，非0失败
 typedef uint8_t (*StepFunc)(void);
 
-// ���趨��
+// 步骤定义
 typedef struct {
-    StepFunc func;      // ִ�иò���ĺ���
-    uint32_t wait_ms;   // ִ�к�ȴ�ʱ�䣨���룩
-		uint16_t update_addr;    // ��ɺ�Ҫ���µļĴ�����ַ��0xFFFF��ʾ������
-    uint16_t update_value;   // ����ֵ
+    StepFunc func;      // 执行该步骤的函数
+    uint32_t wait_ms;   // 执行后等待时间（毫秒）
+		uint16_t update_addr;    // 完成后要更新的寄存器地址，0xFFFF表示不更新
+    uint16_t update_value;   // 更新值
 } StepDef;
 
-// ��ʼ������ģ��
+// 初始化序列模块
 void Sequence_Init(void);
 
-// ����ָ�����У��ɴ�վ�ص����ã�
+// 启动指定序列（由从站回调调用）
 void Sequence_Start(SeqId id);
 
-// ��ѯ�Ƿ�����������ִ��
+// 查询是否有序列正在执行
 uint8_t Sequence_IsBusy(void);
 
-// ���д���������������ѭ���������Ե��ã�
+// 序列处理函数（需在主循环中周期性调用）
 void Sequence_Process(void);
 
-void Sequence_Pause(void);   // ��ͣ��ǰ����
-void Sequence_Resume(void);  // �ָ�ִ��
-void BatterySequence_TimerTick(void);      // ��ʱ���жϵ���
+void Sequence_Pause(void);   // 暂停当前序列
+void Sequence_Resume(void);  // 恢复执行
+void BatterySequence_TimerTick(void);      // 定时器中断调用
 void Sequence_ForceStop(void);
 
 uint8_t LeaveCenter(void);

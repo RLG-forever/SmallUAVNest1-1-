@@ -5,254 +5,254 @@
 
 void RemoveBattery(void)
 {
-	  int battery_step = 0;  // 0:³õÊ¼×´Ì¬
+	  int battery_step = 0;  // 0:åˆå§‹çŠ¶æ€
 		
 		while(1)
    {
 				switch(battery_step)
 				{
-						case 0:     // 1£ºÉèÖÃµç»ú1³õÊ¼ËÙ¶È
+						case 0:     // 1ï¼šè®¾ç½®ç”µæœº1åˆå§‹é€Ÿåº¦
 								Battery1();
-								battery_step = 1;               // ½øÈëÏÂÒ»²½
-								tmr.TIMER_3_100MS = 5;          // Æô¶¯¶¨Ê±Æ÷3
+								battery_step = 1;               // è¿›å…¥ä¸‹ä¸€æ­¥
+								tmr.TIMER_3_100MS = 5;          // å¯åŠ¨å®šæ—¶å™¨3
 								break;
 
-						case 1:     // 2£ºµÈ´ı¶¨Ê±Æ÷3³¬Ê±£¬ÉèÖÃµç»ú2³õÊ¼ËÙ¶È
+						case 1:     // 2ï¼šç­‰å¾…å®šæ—¶å™¨3è¶…æ—¶ï¼Œè®¾ç½®ç”µæœº2åˆå§‹é€Ÿåº¦
 								if(tmr.TIMER_3_100MS == 0) {
 										Battery2();
-										battery_step = 2;           // ½øÈëÏÂÒ»²½
-										tmr.TIMER_4_100MS = 5;      // Æô¶¯¶¨Ê±Æ÷4
+										battery_step = 2;           // è¿›å…¥ä¸‹ä¸€æ­¥
+										tmr.TIMER_4_100MS = 5;      // å¯åŠ¨å®šæ—¶å™¨4
 								}
 								break;
 
-						case 2:     // 3£ºµÈ´ı¶¨Ê±Æ÷4³¬Ê±£¬µç»ú2Ç°½ø
+						case 2:     // 3ï¼šç­‰å¾…å®šæ—¶å™¨4è¶…æ—¶ï¼Œç”µæœº2å‰è¿›
 								if(tmr.TIMER_4_100MS == 0) {
 										Battery3();
-										battery_step = 3;           // ½øÈëÏÂÒ»²½
-										tmr.TIMER_3_100MS = 210;    // Æô¶¯¶¨Ê±Æ÷3
+										battery_step = 3;           // è¿›å…¥ä¸‹ä¸€æ­¥
+										tmr.TIMER_3_100MS = 210;    // å¯åŠ¨å®šæ—¶å™¨3
 								}
 								break;
 
-						case 3:     // 4£ºµÈ´ı¶¨Ê±Æ÷3³¬Ê±£¬µç»ú1ÏÂ½µÉèÖÃ
+						case 3:     // 4ï¼šç­‰å¾…å®šæ—¶å™¨3è¶…æ—¶ï¼Œç”µæœº1ä¸‹é™è®¾ç½®
 								if(tmr.TIMER_3_100MS == 0) {
 										Battery4();
-										battery_step = 4;           // ½øÈëÏÂÒ»²½
-										tmr.TIMER_4_100MS = 5;      // Æô¶¯¶¨Ê±Æ÷4
+										battery_step = 4;           // è¿›å…¥ä¸‹ä¸€æ­¥
+										tmr.TIMER_4_100MS = 5;      // å¯åŠ¨å®šæ—¶å™¨4
 								}
 								break;
 
-						case 4:     // 5£ºµÈ´ı¶¨Ê±Æ÷4³¬Ê±£¬µç»ú1Æô¶¯
+						case 4:     // 5ï¼šç­‰å¾…å®šæ—¶å™¨4è¶…æ—¶ï¼Œç”µæœº1å¯åŠ¨
 								if(tmr.TIMER_4_100MS == 0) {
 										Battery5();
-										battery_step = 5;           // ½øÈëÏÂÒ»²½
-										tmr.TIMER_3_100MS = 130;    // Æô¶¯¶¨Ê±Æ÷3
+										battery_step = 5;           // è¿›å…¥ä¸‹ä¸€æ­¥
+										tmr.TIMER_3_100MS = 130;    // å¯åŠ¨å®šæ—¶å™¨3
 								}
 								break;
 
-						case 5:     // 6£ºµÈ´ı¶¨Ê±Æ÷3³¬Ê±£¬µç»ú2Ç°½ø
+						case 5:     // 6ï¼šç­‰å¾…å®šæ—¶å™¨3è¶…æ—¶ï¼Œç”µæœº2å‰è¿›
 								if(tmr.TIMER_3_100MS == 0) {
 										Battery6();
-										battery_step = 6;           // ½øÈëÏÂÒ»²½
-										tmr.TIMER_4_100MS = 20;     // Æô¶¯¶¨Ê±Æ÷4
+										battery_step = 6;           // è¿›å…¥ä¸‹ä¸€æ­¥
+										tmr.TIMER_4_100MS = 20;     // å¯åŠ¨å®šæ—¶å™¨4
 								}
 								break;
 
-						case 6:     // 7£ºµÈ´ı¶¨Ê±Æ÷4³¬Ê±£¬µç»ú1ÉÏÉıÉèÖÃ
+						case 6:     // 7ï¼šç­‰å¾…å®šæ—¶å™¨4è¶…æ—¶ï¼Œç”µæœº1ä¸Šå‡è®¾ç½®
 								if(tmr.TIMER_4_100MS == 0) {
 										Battery7();
-										battery_step = 7;           // ½øÈëÏÂÒ»²½
-										tmr.TIMER_3_100MS = 5;      // Æô¶¯¶¨Ê±Æ÷3
+										battery_step = 7;           // è¿›å…¥ä¸‹ä¸€æ­¥
+										tmr.TIMER_3_100MS = 5;      // å¯åŠ¨å®šæ—¶å™¨3
 								}
 								break;
 
-						case 7:     // 8£ºµÈ´ı¶¨Ê±Æ÷3³¬Ê±£¬µç»ú1Æô¶¯
+						case 7:     // 8ï¼šç­‰å¾…å®šæ—¶å™¨3è¶…æ—¶ï¼Œç”µæœº1å¯åŠ¨
 								if(tmr.TIMER_3_100MS == 0) {
 										Battery8();
-										battery_step = 8;           // ½øÈëÏÂÒ»²½
-										tmr.TIMER_4_100MS = 130;    // Æô¶¯¶¨Ê±Æ÷4
+										battery_step = 8;           // è¿›å…¥ä¸‹ä¸€æ­¥
+										tmr.TIMER_4_100MS = 130;    // å¯åŠ¨å®šæ—¶å™¨4
 								}
 								break;
 
-						case 8:     // 9£ºµÈ´ı¶¨Ê±Æ÷4³¬Ê±£¬µç»ú3¼Ğ½ô
+						case 8:     // 9ï¼šç­‰å¾…å®šæ—¶å™¨4è¶…æ—¶ï¼Œç”µæœº3å¤¹ç´§
 								if(tmr.TIMER_4_100MS == 0) {
 										Battery9();
-										battery_step = 9;           // ½øÈëÏÂÒ»²½
-										tmr.TIMER_3_100MS = 5;      // Æô¶¯¶¨Ê±Æ÷3
+										battery_step = 9;           // è¿›å…¥ä¸‹ä¸€æ­¥
+										tmr.TIMER_3_100MS = 5;      // å¯åŠ¨å®šæ—¶å™¨3
 								}
 								break;
 
-						case 9:     // 10£ºµÈ´ı¶¨Ê±Æ÷3³¬Ê±£¬µç»ú2ºóÍË
+						case 9:     // 10ï¼šç­‰å¾…å®šæ—¶å™¨3è¶…æ—¶ï¼Œç”µæœº2åé€€
 								if(tmr.TIMER_3_100MS == 0) {
 										Battery10();
-										battery_step = 10;          // ½øÈëÏÂÒ»²½
-										tmr.TIMER_4_100MS = 240;    // Æô¶¯¶¨Ê±Æ÷4
+										battery_step = 10;          // è¿›å…¥ä¸‹ä¸€æ­¥
+										tmr.TIMER_4_100MS = 240;    // å¯åŠ¨å®šæ—¶å™¨4
 								}
 								break;
 
-						case 10:    // 11£ºµÈ´ı¶¨Ê±Æ÷4³¬Ê±£¬µç»ú3ËÉ¿ª
+						case 10:    // 11ï¼šç­‰å¾…å®šæ—¶å™¨4è¶…æ—¶ï¼Œç”µæœº3æ¾å¼€
 								if(tmr.TIMER_4_100MS == 0) {
 										Battery11();
-										battery_step = 11;          // ½øÈëÏÂÒ»²½
-										tmr.TIMER_3_100MS = 5;      // Æô¶¯¶¨Ê±Æ÷3
+										battery_step = 11;          // è¿›å…¥ä¸‹ä¸€æ­¥
+										tmr.TIMER_3_100MS = 5;      // å¯åŠ¨å®šæ—¶å™¨3
 								}
 								break;
 
-						case 11:    // 12£ºµÈ´ı¶¨Ê±Æ÷3³¬Ê±£¬µç»ú1ÏÂ½µÉèÖÃ
+						case 11:    // 12ï¼šç­‰å¾…å®šæ—¶å™¨3è¶…æ—¶ï¼Œç”µæœº1ä¸‹é™è®¾ç½®
 								if(tmr.TIMER_3_100MS == 0) {
 										Battery12();
-										battery_step = 12;          // ½øÈëÏÂÒ»²½
-										tmr.TIMER_4_100MS = 5;      // Æô¶¯¶¨Ê±Æ÷4
+										battery_step = 12;          // è¿›å…¥ä¸‹ä¸€æ­¥
+										tmr.TIMER_4_100MS = 5;      // å¯åŠ¨å®šæ—¶å™¨4
 								}
 								break;
 
-						case 12:    // 13£ºµÈ´ı¶¨Ê±Æ÷4³¬Ê±£¬µç»ú1Æô¶¯
+						case 12:    // 13ï¼šç­‰å¾…å®šæ—¶å™¨4è¶…æ—¶ï¼Œç”µæœº1å¯åŠ¨
 								if(tmr.TIMER_4_100MS == 0) {
 										Battery13();
-										battery_step = 13;          // ½øÈëÏÂÒ»²½
-										tmr.TIMER_3_100MS = 130;    // Æô¶¯¶¨Ê±Æ÷3
+										battery_step = 13;          // è¿›å…¥ä¸‹ä¸€æ­¥
+										tmr.TIMER_3_100MS = 130;    // å¯åŠ¨å®šæ—¶å™¨3
 								}
 								break;
 
-						case 13:    // 14£ºµÈ´ı¶¨Ê±Æ÷3³¬Ê±£¬µç»ú2ºóÍË
+						case 13:    // 14ï¼šç­‰å¾…å®šæ—¶å™¨3è¶…æ—¶ï¼Œç”µæœº2åé€€
 								if(tmr.TIMER_3_100MS == 0) {
 										Battery14();
-										battery_step = 14;          // ½øÈëÏÂÒ»²½
-										tmr.TIMER_4_100MS = 20;     // Æô¶¯¶¨Ê±Æ÷4
+										battery_step = 14;          // è¿›å…¥ä¸‹ä¸€æ­¥
+										tmr.TIMER_4_100MS = 20;     // å¯åŠ¨å®šæ—¶å™¨4
 								}
 								break;
 
-						case 14:    // 15£ºµÈ´ı¶¨Ê±Æ÷4³¬Ê±£¬µç»ú1ÉÏÉıÉèÖÃ
+						case 14:    // 15ï¼šç­‰å¾…å®šæ—¶å™¨4è¶…æ—¶ï¼Œç”µæœº1ä¸Šå‡è®¾ç½®
 								if(tmr.TIMER_4_100MS == 0) {
 										Battery15();
-										battery_step = 15;          // ½øÈëÏÂÒ»²½
-										tmr.TIMER_3_100MS = 5;      // Æô¶¯¶¨Ê±Æ÷3
+										battery_step = 15;          // è¿›å…¥ä¸‹ä¸€æ­¥
+										tmr.TIMER_3_100MS = 5;      // å¯åŠ¨å®šæ—¶å™¨3
 								}
 								break;
 
-						case 15:    // 16£ºµÈ´ı¶¨Ê±Æ÷3³¬Ê±£¬µç»ú1Æô¶¯
+						case 15:    // 16ï¼šç­‰å¾…å®šæ—¶å™¨3è¶…æ—¶ï¼Œç”µæœº1å¯åŠ¨
 								if(tmr.TIMER_3_100MS == 0) {
 										Battery16();
-										battery_step = 16;          // ½øÈëÏÂÒ»²½
-										tmr.TIMER_4_100MS = 100;    // Æô¶¯¶¨Ê±Æ÷4
+										battery_step = 16;          // è¿›å…¥ä¸‹ä¸€æ­¥
+										tmr.TIMER_4_100MS = 100;    // å¯åŠ¨å®šæ—¶å™¨4
 								}
 								break;
 
-						case 16:    // 17£ºµÈ´ı¶¨Ê±Æ÷4³¬Ê±£¬µç»ú2Ç°½ø
+						case 16:    // 17ï¼šç­‰å¾…å®šæ—¶å™¨4è¶…æ—¶ï¼Œç”µæœº2å‰è¿›
 								if(tmr.TIMER_4_100MS == 0) {
 										Battery17();
-										battery_step = 17;          // ½øÈëÏÂÒ»²½
-										tmr.TIMER_3_100MS = 110;    // Æô¶¯¶¨Ê±Æ÷3
+										battery_step = 17;          // è¿›å…¥ä¸‹ä¸€æ­¥
+										tmr.TIMER_3_100MS = 110;    // å¯åŠ¨å®šæ—¶å™¨3
 								}
 								break;
 
-						case 17:    // 18£ºµÈ´ı¶¨Ê±Æ÷3³¬Ê±£¬µç»ú1ÏÂ½µÉèÖÃ
+						case 17:    // 18ï¼šç­‰å¾…å®šæ—¶å™¨3è¶…æ—¶ï¼Œç”µæœº1ä¸‹é™è®¾ç½®
 								if(tmr.TIMER_3_100MS == 0) {
 										Battery18();
-										battery_step = 18;          // ½øÈëÏÂÒ»²½
-										tmr.TIMER_4_100MS = 5;      // Æô¶¯¶¨Ê±Æ÷4
+										battery_step = 18;          // è¿›å…¥ä¸‹ä¸€æ­¥
+										tmr.TIMER_4_100MS = 5;      // å¯åŠ¨å®šæ—¶å™¨4
 								}
 								break;
 
-						case 18:    // 19£ºµÈ´ı¶¨Ê±Æ÷4³¬Ê±£¬µç»ú1Æô¶¯
+						case 18:    // 19ï¼šç­‰å¾…å®šæ—¶å™¨4è¶…æ—¶ï¼Œç”µæœº1å¯åŠ¨
 								if(tmr.TIMER_4_100MS == 0) {
 										Battery19();
-										battery_step = 19;          // ½øÈëÏÂÒ»²½
-										tmr.TIMER_3_100MS = 130;    // Æô¶¯¶¨Ê±Æ÷3
+										battery_step = 19;          // è¿›å…¥ä¸‹ä¸€æ­¥
+										tmr.TIMER_3_100MS = 130;    // å¯åŠ¨å®šæ—¶å™¨3
 								}
 								break;
 
-						case 19:    // 20£ºµÈ´ı¶¨Ê±Æ÷3³¬Ê±£¬µç»ú2Ç°½ø
+						case 19:    // 20ï¼šç­‰å¾…å®šæ—¶å™¨3è¶…æ—¶ï¼Œç”µæœº2å‰è¿›
 								if(tmr.TIMER_3_100MS == 0) {
 										Battery20();
-										battery_step = 20;          // ½øÈëÏÂÒ»²½
-										tmr.TIMER_4_100MS = 20;     // Æô¶¯¶¨Ê±Æ÷4
+										battery_step = 20;          // è¿›å…¥ä¸‹ä¸€æ­¥
+										tmr.TIMER_4_100MS = 20;     // å¯åŠ¨å®šæ—¶å™¨4
 								}
 								break;
 
-						case 20:    // 21£ºµÈ´ı¶¨Ê±Æ÷4³¬Ê±£¬µç»ú1ÉÏÉıÉèÖÃ
+						case 20:    // 21ï¼šç­‰å¾…å®šæ—¶å™¨4è¶…æ—¶ï¼Œç”µæœº1ä¸Šå‡è®¾ç½®
 								if(tmr.TIMER_4_100MS == 0) {
 										Battery21();
-										battery_step = 21;          // ½øÈëÏÂÒ»²½
-										tmr.TIMER_3_100MS = 5;      // Æô¶¯¶¨Ê±Æ÷3
+										battery_step = 21;          // è¿›å…¥ä¸‹ä¸€æ­¥
+										tmr.TIMER_3_100MS = 5;      // å¯åŠ¨å®šæ—¶å™¨3
 								}
 								break;
 
-						case 21:    // 22£ºµÈ´ı¶¨Ê±Æ÷3³¬Ê±£¬µç»ú1Æô¶¯
+						case 21:    // 22ï¼šç­‰å¾…å®šæ—¶å™¨3è¶…æ—¶ï¼Œç”µæœº1å¯åŠ¨
 								if(tmr.TIMER_3_100MS == 0) {
 										Battery22();
-										battery_step = 22;          // ½øÈëÏÂÒ»²½
-										tmr.TIMER_4_100MS = 130;    // Æô¶¯¶¨Ê±Æ÷4
+										battery_step = 22;          // è¿›å…¥ä¸‹ä¸€æ­¥
+										tmr.TIMER_4_100MS = 130;    // å¯åŠ¨å®šæ—¶å™¨4
 								}
 								break;
 
-						case 22:    // 23£ºµÈ´ı¶¨Ê±Æ÷4³¬Ê±£¬µç»ú3¼Ğ½ô
+						case 22:    // 23ï¼šç­‰å¾…å®šæ—¶å™¨4è¶…æ—¶ï¼Œç”µæœº3å¤¹ç´§
 								if(tmr.TIMER_4_100MS == 0) {
 										Battery23();
-										battery_step = 23;          // ½øÈëÏÂÒ»²½
-										tmr.TIMER_3_100MS = 5;      // Æô¶¯¶¨Ê±Æ÷3
+										battery_step = 23;          // è¿›å…¥ä¸‹ä¸€æ­¥
+										tmr.TIMER_3_100MS = 5;      // å¯åŠ¨å®šæ—¶å™¨3
 								}
 								break;
 
-						case 23:    // 24£ºµÈ´ı¶¨Ê±Æ÷3³¬Ê±£¬µç»ú2Ç°½ø
+						case 23:    // 24ï¼šç­‰å¾…å®šæ—¶å™¨3è¶…æ—¶ï¼Œç”µæœº2å‰è¿›
 								if(tmr.TIMER_3_100MS == 0) {
 										Battery24();
-										battery_step = 24;          // ½øÈëÏÂÒ»²½
-										tmr.TIMER_4_100MS = 120;    // Æô¶¯¶¨Ê±Æ÷4
+										battery_step = 24;          // è¿›å…¥ä¸‹ä¸€æ­¥
+										tmr.TIMER_4_100MS = 120;    // å¯åŠ¨å®šæ—¶å™¨4
 								}
 								break;
 
-						case 24:    // 25£ºµÈ´ı¶¨Ê±Æ÷4³¬Ê±£¬µç»ú3ËÉ¿ª
+						case 24:    // 25ï¼šç­‰å¾…å®šæ—¶å™¨4è¶…æ—¶ï¼Œç”µæœº3æ¾å¼€
 								if(tmr.TIMER_4_100MS == 0) {
 										Battery25();
-										battery_step = 25;          // ½øÈëÏÂÒ»²½
-										tmr.TIMER_3_100MS = 5;      // Æô¶¯¶¨Ê±Æ÷3
+										battery_step = 25;          // è¿›å…¥ä¸‹ä¸€æ­¥
+										tmr.TIMER_3_100MS = 5;      // å¯åŠ¨å®šæ—¶å™¨3
 								}
 								break;
 
-						case 25:    // 26£ºµÈ´ı¶¨Ê±Æ÷3³¬Ê±£¬µç»ú1ÏÂ½µÉèÖÃ
+						case 25:    // 26ï¼šç­‰å¾…å®šæ—¶å™¨3è¶…æ—¶ï¼Œç”µæœº1ä¸‹é™è®¾ç½®
 								if(tmr.TIMER_3_100MS == 0) {
 										Battery26();
-										battery_step = 26;          // ½øÈëÏÂÒ»²½
-										tmr.TIMER_4_100MS = 5;      // Æô¶¯¶¨Ê±Æ÷4
+										battery_step = 26;          // è¿›å…¥ä¸‹ä¸€æ­¥
+										tmr.TIMER_4_100MS = 5;      // å¯åŠ¨å®šæ—¶å™¨4
 								}
 								break;
 
-						case 26:    // 27£ºµÈ´ı¶¨Ê±Æ÷4³¬Ê±£¬µç»ú1Æô¶¯
+						case 26:    // 27ï¼šç­‰å¾…å®šæ—¶å™¨4è¶…æ—¶ï¼Œç”µæœº1å¯åŠ¨
 								if(tmr.TIMER_4_100MS == 0) {
 										Battery27();
-										battery_step = 27;          // ½øÈëÏÂÒ»²½
-										tmr.TIMER_3_100MS = 130;    // Æô¶¯¶¨Ê±Æ÷3
+										battery_step = 27;          // è¿›å…¥ä¸‹ä¸€æ­¥
+										tmr.TIMER_3_100MS = 130;    // å¯åŠ¨å®šæ—¶å™¨3
 								}
 								break;
 
-						case 27:    // 28£ºµÈ´ı¶¨Ê±Æ÷3³¬Ê±£¬µç»ú2ºóÍË
+						case 27:    // 28ï¼šç­‰å¾…å®šæ—¶å™¨3è¶…æ—¶ï¼Œç”µæœº2åé€€
 								if(tmr.TIMER_3_100MS == 0) {
 										Battery28();
-										battery_step = 28;          // ½øÈëÏÂÒ»²½
-										tmr.TIMER_4_100MS = 10;     // Æô¶¯¶¨Ê±Æ÷4
+										battery_step = 28;          // è¿›å…¥ä¸‹ä¸€æ­¥
+										tmr.TIMER_4_100MS = 10;     // å¯åŠ¨å®šæ—¶å™¨4
 								}
 								break;
 
-						case 28:    // 29£ºµÈ´ı¶¨Ê±Æ÷4³¬Ê±£¬µç»ú1ÉÏÉıÉèÖÃ
+						case 28:    // 29ï¼šç­‰å¾…å®šæ—¶å™¨4è¶…æ—¶ï¼Œç”µæœº1ä¸Šå‡è®¾ç½®
 								if(tmr.TIMER_4_100MS == 0) {
 										Battery29();
-										battery_step = 29;          // ½øÈëÏÂÒ»²½
-										tmr.TIMER_3_100MS = 5;      // Æô¶¯¶¨Ê±Æ÷3
+										battery_step = 29;          // è¿›å…¥ä¸‹ä¸€æ­¥
+										tmr.TIMER_3_100MS = 5;      // å¯åŠ¨å®šæ—¶å™¨3
 								}
 								break;
 
-						case 29:    // 30£ºµÈ´ı¶¨Ê±Æ÷3³¬Ê±£¬µç»ú1Æô¶¯
+						case 29:    // 30ï¼šç­‰å¾…å®šæ—¶å™¨3è¶…æ—¶ï¼Œç”µæœº1å¯åŠ¨
 								if(tmr.TIMER_3_100MS == 0) {
 										Battery30();
-									  battery_step = 30;          // ½øÈëÏÂÒ»²½
-									  tmr.TIMER_4_100MS = 130;    // Æô¶¯¶¨Ê±Æ÷4
+									  battery_step = 30;          // è¿›å…¥ä¸‹ä¸€æ­¥
+									  tmr.TIMER_4_100MS = 130;    // å¯åŠ¨å®šæ—¶å™¨4
 								}
 								break;
 								
-						case 30: // 31£ºµÈ´ı¶¨Ê±Æ÷4³¬Ê±£¬µç»ú1Æô¶¯
+						case 30: // 31ï¼šç­‰å¾…å®šæ—¶å™¨4è¶…æ—¶ï¼Œç”µæœº1å¯åŠ¨
 								if(tmr.TIMER_4_100MS == 0) {
-									  battery_step = 31;          // ½øÈëÏÂÒ»²½
-										break;                     // ÍË³öÑ­»·
+									  battery_step = 31;          // è¿›å…¥ä¸‹ä¸€æ­¥
+										break;                     // é€€å‡ºå¾ªç¯
 								}
 								return;
 
@@ -260,7 +260,7 @@ void RemoveBattery(void)
 								return;
 				}
 
-				// Ìí¼ÓÊÊµ±ÑÓÊ±±ÜÃâCPUÕ¼ÓÃ¹ı¸ß
+				// æ·»åŠ é€‚å½“å»¶æ—¶é¿å…CPUå ç”¨è¿‡é«˜
 				delay_ms(10);
    }
 }	
@@ -268,961 +268,961 @@ void RemoveBattery(void)
 
 void Battery1(void)
 {
-  	//µç»ú1³õÊ¼ËÙ¶È
-		uint8_t motor_num1 = 3;   // ¼Ä´æÆ÷µØÖ·  
-		uint16_t motor_cmd1 = MOTOR1_RUN; // ËÙ¶È30000£¨0x7530£©
-		uint8_t ctrl_ret1 = Motor_Control(MOTOR1_SLAVE_ADDR, motor_num1, motor_cmd1);//Ö¸Áî·¢ËÍ·µ»ØÖµ
+  	//ç”µæœº1åˆå§‹é€Ÿåº¦
+		uint8_t motor_num1 = 3;   // å¯„å­˜å™¨åœ°å€  
+		uint16_t motor_cmd1 = MOTOR1_RUN; // é€Ÿåº¦30000ï¼ˆ0x7530ï¼‰
+		uint8_t ctrl_ret1 = Motor_Control(MOTOR1_SLAVE_ADDR, motor_num1, motor_cmd1);//æŒ‡ä»¤å‘é€è¿”å›å€¼
 		master_state = MASTER_IDLE;
-		timeout_cnt = 0; // Í¬Ê±ÖØÖÃ³¬Ê±¼ÆÊıÆ÷
+		timeout_cnt = 0; // åŒæ—¶é‡ç½®è¶…æ—¶è®¡æ•°å™¨
 }
 
 void Battery2(void)
 {
-  	//µç»ú2³õÊ¼ËÙ¶È
-		uint8_t motor_num1 = 4; //ĞĞ³ÌµÍÎ»¼Ä´æÆ÷µØÖ·
+  	//ç”µæœº2åˆå§‹é€Ÿåº¦
+		uint8_t motor_num1 = 4; //è¡Œç¨‹ä½ä½å¯„å­˜å™¨åœ°å€
 		uint16_t motor_cmd1 = Speed; 
 		uint8_t ctrl_ret1 = Motor_Control(MOTOR2_SLAVE_ADDR, motor_num1, motor_cmd1);
 		master_state = MASTER_IDLE;
-		timeout_cnt = 0; // Í¬Ê±ÖØÖÃ³¬Ê±¼ÆÊıÆ÷
+		timeout_cnt = 0; // åŒæ—¶é‡ç½®è¶…æ—¶è®¡æ•°å™¨
 }
 
 void Battery3(void)
 {
-//2.µç»ú2Ç°½ø 
-		uint8_t Reg_num = 2;   // ¼Ä´æÆ÷ÊıÁ¿
-		uint16_t slave2_cmds[Reg_num];//¼Ä´æÆ÷Ö¸Áî
-		// ³õÊ¼»¯Êı×é£¨±ÜÃâÔàÊı¾İ£©
+//2.ç”µæœº2å‰è¿› 
+		uint8_t Reg_num = 2;   // å¯„å­˜å™¨æ•°é‡
+		uint16_t slave2_cmds[Reg_num];//å¯„å­˜å™¨æŒ‡ä»¤
+		// åˆå§‹åŒ–æ•°ç»„ï¼ˆé¿å…è„æ•°æ®ï¼‰
 		memset(slave2_cmds, 0, sizeof(slave2_cmds));
 		if(Reg_num >= 2) 
 		{
-				slave2_cmds[0] = Pulse_num1;            // ¼Ä´æÆ÷1£º¸ßÎ»
-				slave2_cmds[1] = Pulse_num2;            // ¼Ä´æÆ÷2£ºµÍÎ»			
-//				printf("¸³Öµºó£ºslave1_cmds[2] = 0x%04X\n", slave1_cmds[2]); // È·ÈÏ¸³Öµ³É¹¦
+				slave2_cmds[0] = Pulse_num1;            // å¯„å­˜å™¨1ï¼šé«˜ä½
+				slave2_cmds[1] = Pulse_num2;            // å¯„å­˜å™¨2ï¼šä½ä½			
+//				printf("èµ‹å€¼åï¼šslave1_cmds[2] = 0x%04X\n", slave1_cmds[2]); // ç¡®è®¤èµ‹å€¼æˆåŠŸ
 		} else
 		{
-				// Reg_num²»×ãÊ±µÄÈİ´í´¦Àí£¨±ÈÈçÇå¿ÕÊı×é£©
+				// Reg_numä¸è¶³æ—¶çš„å®¹é”™å¤„ç†ï¼ˆæ¯”å¦‚æ¸…ç©ºæ•°ç»„ï¼‰
 				memset(slave2_cmds, 0, sizeof(slave2_cmds));
 		}
 		if(master_state != MASTER_IDLE) 
 		{
 				master_state = MASTER_IDLE;
 				timeout_cnt = 0;
-				printf("Ç¿ÖÆÖØÖÃÖ÷Õ¾×´Ì¬Îª¿ÕÏĞ\r\n");
+				printf("å¼ºåˆ¶é‡ç½®ä¸»ç«™çŠ¶æ€ä¸ºç©ºé—²\r\n");
 				fflush(stdout);
 		}
-		uint8_t ctrl_ret2 = Motor_Batch_Control(MOTOR2_SLAVE_ADDR, MOTOR2_CTRL_REG3, Reg_num, slave2_cmds);// Ö¸Áî·¢ËÍ·µ»ØÖµ 
-		// Ç°½øÖ¸Áî½á¹ûÅĞ¶Ï
+		uint8_t ctrl_ret2 = Motor_Batch_Control(MOTOR2_SLAVE_ADDR, MOTOR2_CTRL_REG3, Reg_num, slave2_cmds);// æŒ‡ä»¤å‘é€è¿”å›å€¼ 
+		// å‰è¿›æŒ‡ä»¤ç»“æœåˆ¤æ–­
     switch(ctrl_ret2)
     {
         case 0:
-            printf("ÉÏÉıÖ¸Áî·¢ËÍ³É¹¦£¬µç»ú¿ªÊ¼ÔËĞĞ\r\n");
+            printf("ä¸Šå‡æŒ‡ä»¤å‘é€æˆåŠŸï¼Œç”µæœºå¼€å§‹è¿è¡Œ\r\n");
             break;
         case 1:
-            printf("´íÎó£ºµç»ú±àºÅ·Ç·¨»òÖ÷Õ¾·Ç¿ÕÏĞ£¨ÉÏÉıÖ¸ÁîÎ´·¢ËÍ£©\r\n");
-            // Ö±½ÓÍË³ö£¬±ÜÃâÖ´ĞĞÍ£Ö¹Ö¸Áî
+            printf("é”™è¯¯ï¼šç”µæœºç¼–å·éæ³•æˆ–ä¸»ç«™éç©ºé—²ï¼ˆä¸Šå‡æŒ‡ä»¤æœªå‘é€ï¼‰\r\n");
+            // ç›´æ¥é€€å‡ºï¼Œé¿å…æ‰§è¡Œåœæ­¢æŒ‡ä»¤
             while(1) { delay_ms(1000); }
         case 2:
-            printf("¾¯¸æ£ºÉÏÉıÖ¸Áî³¬Ê±£¬µ«µç»ú¿ÉÄÜÒÑÔËĞĞ\r\n");
+            printf("è­¦å‘Šï¼šä¸Šå‡æŒ‡ä»¤è¶…æ—¶ï¼Œä½†ç”µæœºå¯èƒ½å·²è¿è¡Œ\r\n");
             break;
         case 3:
-            printf("´íÎó£ºÉÏÉıÖ¸ÁîÏìÓ¦ÄÚÈİ²»Æ¥Åä\r\n");
+            printf("é”™è¯¯ï¼šä¸Šå‡æŒ‡ä»¤å“åº”å†…å®¹ä¸åŒ¹é…\r\n");
             break;
         default:
-            printf("´íÎó£ºÉÏÉıÖ¸Áî·¢ËÍÒì³£\r\n");
+            printf("é”™è¯¯ï¼šä¸Šå‡æŒ‡ä»¤å‘é€å¼‚å¸¸\r\n");
             break;
     }
 		master_state = MASTER_IDLE;
-		timeout_cnt = 0; // Í¬Ê±ÖØÖÃ³¬Ê±¼ÆÊıÆ÷
+		timeout_cnt = 0; // åŒæ—¶é‡ç½®è¶…æ—¶è®¡æ•°å™¨
 }
 
 void Battery4(void)
 {
-  	//3.µç»ú1ÏÂ½µÉèÖÃ
-		uint8_t motor_num1 = 2;  //È¦Êı
-		uint16_t motor_cmd1 = MOTOR1_deLengthRun; //ÏÂ½µ·½ÏòºÍÈ¦ÊıÖµÉèÖÃ
-		uint8_t ctrl_ret1 = Motor_Control(MOTOR1_SLAVE_ADDR, motor_num1, motor_cmd1);// Ö¸Áî·¢ËÍ·µ»ØÖµ 
-		// ÏÂ½µÖ¸Áî½á¹ûÅĞ¶Ï
+  	//3.ç”µæœº1ä¸‹é™è®¾ç½®
+		uint8_t motor_num1 = 2;  //åœˆæ•°
+		uint16_t motor_cmd1 = MOTOR1_deLengthRun; //ä¸‹é™æ–¹å‘å’Œåœˆæ•°å€¼è®¾ç½®
+		uint8_t ctrl_ret1 = Motor_Control(MOTOR1_SLAVE_ADDR, motor_num1, motor_cmd1);// æŒ‡ä»¤å‘é€è¿”å›å€¼ 
+		// ä¸‹é™æŒ‡ä»¤ç»“æœåˆ¤æ–­
     switch(ctrl_ret1)
     {
         case 0:
-            printf("ÉÏÉıÖ¸Áî·¢ËÍ³É¹¦£¬µç»ú¿ªÊ¼ÔËĞĞ\r\n");
+            printf("ä¸Šå‡æŒ‡ä»¤å‘é€æˆåŠŸï¼Œç”µæœºå¼€å§‹è¿è¡Œ\r\n");
             break;
         case 1:
-            printf("´íÎó£ºµç»ú±àºÅ·Ç·¨»òÖ÷Õ¾·Ç¿ÕÏĞ£¨ÉÏÉıÖ¸ÁîÎ´·¢ËÍ£©\r\n");
-            // Ö±½ÓÍË³ö£¬±ÜÃâÖ´ĞĞÍ£Ö¹Ö¸Áî
+            printf("é”™è¯¯ï¼šç”µæœºç¼–å·éæ³•æˆ–ä¸»ç«™éç©ºé—²ï¼ˆä¸Šå‡æŒ‡ä»¤æœªå‘é€ï¼‰\r\n");
+            // ç›´æ¥é€€å‡ºï¼Œé¿å…æ‰§è¡Œåœæ­¢æŒ‡ä»¤
             while(1) { delay_ms(1000); }
         case 2:
-            printf("¾¯¸æ£ºÉÏÉıÖ¸Áî³¬Ê±£¬µ«µç»ú¿ÉÄÜÒÑÔËĞĞ\r\n");
+            printf("è­¦å‘Šï¼šä¸Šå‡æŒ‡ä»¤è¶…æ—¶ï¼Œä½†ç”µæœºå¯èƒ½å·²è¿è¡Œ\r\n");
             break;
         case 3:
-            printf("´íÎó£ºÉÏÉıÖ¸ÁîÏìÓ¦ÄÚÈİ²»Æ¥Åä\r\n");
+            printf("é”™è¯¯ï¼šä¸Šå‡æŒ‡ä»¤å“åº”å†…å®¹ä¸åŒ¹é…\r\n");
             break;
         default:
-            printf("´íÎó£ºÉÏÉıÖ¸Áî·¢ËÍÒì³£\r\n");
+            printf("é”™è¯¯ï¼šä¸Šå‡æŒ‡ä»¤å‘é€å¼‚å¸¸\r\n");
             break;
     }
 		master_state = MASTER_IDLE;
-		timeout_cnt = 0; // Í¬Ê±ÖØÖÃ³¬Ê±¼ÆÊıÆ÷
+		timeout_cnt = 0; // åŒæ—¶é‡ç½®è¶…æ—¶è®¡æ•°å™¨
 }
 
 void Battery5(void)
 {
-  	//4.µç»ú1Æô¶¯
-		uint8_t motor_num1 = 1;  //ÆôÍ£
-		uint16_t motor_cmd1 = MOTOR1_deRUN; //Æô¶¯
-		uint8_t ctrl_ret1 = Motor_Control(MOTOR1_SLAVE_ADDR, motor_num1, motor_cmd1);// Ö¸Áî·¢ËÍ·µ»ØÖµ 
+  	//4.ç”µæœº1å¯åŠ¨
+		uint8_t motor_num1 = 1;  //å¯åœ
+		uint16_t motor_cmd1 = MOTOR1_deRUN; //å¯åŠ¨
+		uint8_t ctrl_ret1 = Motor_Control(MOTOR1_SLAVE_ADDR, motor_num1, motor_cmd1);// æŒ‡ä»¤å‘é€è¿”å›å€¼ 
 		switch(ctrl_ret1)
     {
         case 0:
-            printf("ÉÏÉıÖ¸Áî·¢ËÍ³É¹¦£¬µç»ú¿ªÊ¼ÔËĞĞ\r\n");
+            printf("ä¸Šå‡æŒ‡ä»¤å‘é€æˆåŠŸï¼Œç”µæœºå¼€å§‹è¿è¡Œ\r\n");
             break;
         case 1:
-            printf("´íÎó£ºµç»ú±àºÅ·Ç·¨»òÖ÷Õ¾·Ç¿ÕÏĞ£¨ÉÏÉıÖ¸ÁîÎ´·¢ËÍ£©\r\n");
-            // Ö±½ÓÍË³ö£¬±ÜÃâÖ´ĞĞÍ£Ö¹Ö¸Áî
+            printf("é”™è¯¯ï¼šç”µæœºç¼–å·éæ³•æˆ–ä¸»ç«™éç©ºé—²ï¼ˆä¸Šå‡æŒ‡ä»¤æœªå‘é€ï¼‰\r\n");
+            // ç›´æ¥é€€å‡ºï¼Œé¿å…æ‰§è¡Œåœæ­¢æŒ‡ä»¤
             while(1) { delay_ms(1000); }
         case 2:
-            printf("¾¯¸æ£ºÉÏÉıÖ¸Áî³¬Ê±£¬µ«µç»ú¿ÉÄÜÒÑÔËĞĞ\r\n");
+            printf("è­¦å‘Šï¼šä¸Šå‡æŒ‡ä»¤è¶…æ—¶ï¼Œä½†ç”µæœºå¯èƒ½å·²è¿è¡Œ\r\n");
             break;
         case 3:
-            printf("´íÎó£ºÉÏÉıÖ¸ÁîÏìÓ¦ÄÚÈİ²»Æ¥Åä\r\n");
+            printf("é”™è¯¯ï¼šä¸Šå‡æŒ‡ä»¤å“åº”å†…å®¹ä¸åŒ¹é…\r\n");
             break;
         default:
-            printf("´íÎó£ºÉÏÉıÖ¸Áî·¢ËÍÒì³£\r\n");
+            printf("é”™è¯¯ï¼šä¸Šå‡æŒ‡ä»¤å‘é€å¼‚å¸¸\r\n");
             break;
     }
 		master_state = MASTER_IDLE;
-		timeout_cnt = 0; // Í¬Ê±ÖØÖÃ³¬Ê±¼ÆÊıÆ÷
+		timeout_cnt = 0; // åŒæ—¶é‡ç½®è¶…æ—¶è®¡æ•°å™¨
 }  	
 		
 void Battery6(void)
 {
-  			//5.µç»ú2Ç°½ø
-		// ³õÊ¼»¯Êı×é£¨±ÜÃâÔàÊı¾İ£©
-		uint8_t Reg_num = 2;   // ¼Ä´æÆ÷ÊıÁ¿
-	  uint16_t slave2_cmds[Reg_num];//¼Ä´æÆ÷Ö¸Áî
-		// ³õÊ¼»¯Êı×é£¨±ÜÃâÔàÊı¾İ£©
+  			//5.ç”µæœº2å‰è¿›
+		// åˆå§‹åŒ–æ•°ç»„ï¼ˆé¿å…è„æ•°æ®ï¼‰
+		uint8_t Reg_num = 2;   // å¯„å­˜å™¨æ•°é‡
+	  uint16_t slave2_cmds[Reg_num];//å¯„å­˜å™¨æŒ‡ä»¤
+		// åˆå§‹åŒ–æ•°ç»„ï¼ˆé¿å…è„æ•°æ®ï¼‰
 		memset(slave2_cmds, 0, sizeof(slave2_cmds));
 		if(Reg_num >= 2) 
 		{
-				slave2_cmds[0] = Pulse_num3;            // ¼Ä´æÆ÷1£º¸ßÎ»
-				slave2_cmds[1] = Pulse_num4;            // ¼Ä´æÆ÷2£ºµÍÎ»			
-//				printf("¸³Öµºó£ºslave1_cmds[2] = 0x%04X\n", slave1_cmds[2]); // È·ÈÏ¸³Öµ³É¹¦
+				slave2_cmds[0] = Pulse_num3;            // å¯„å­˜å™¨1ï¼šé«˜ä½
+				slave2_cmds[1] = Pulse_num4;            // å¯„å­˜å™¨2ï¼šä½ä½			
+//				printf("èµ‹å€¼åï¼šslave1_cmds[2] = 0x%04X\n", slave1_cmds[2]); // ç¡®è®¤èµ‹å€¼æˆåŠŸ
 		} else
 		{
-				// Reg_num²»×ãÊ±µÄÈİ´í´¦Àí£¨±ÈÈçÇå¿ÕÊı×é£©
+				// Reg_numä¸è¶³æ—¶çš„å®¹é”™å¤„ç†ï¼ˆæ¯”å¦‚æ¸…ç©ºæ•°ç»„ï¼‰
 				memset(slave2_cmds, 0, sizeof(slave2_cmds));
 		}
 		if(master_state != MASTER_IDLE) 
 		{
 				master_state = MASTER_IDLE;
 				timeout_cnt = 0;
-				printf("Ç¿ÖÆÖØÖÃÖ÷Õ¾×´Ì¬Îª¿ÕÏĞ\r\n");
+				printf("å¼ºåˆ¶é‡ç½®ä¸»ç«™çŠ¶æ€ä¸ºç©ºé—²\r\n");
 				fflush(stdout);
 		}
 		uint8_t ctrl_ret2 = Motor_Batch_Control(MOTOR2_SLAVE_ADDR, MOTOR2_CTRL_REG3, Reg_num, slave2_cmds);
-		// Ç°½øÖ¸Áî½á¹ûÅĞ¶Ï
+		// å‰è¿›æŒ‡ä»¤ç»“æœåˆ¤æ–­
     switch(ctrl_ret2)
     {
         case 0:
-            printf("ÉÏÉıÖ¸Áî·¢ËÍ³É¹¦£¬µç»ú¿ªÊ¼ÔËĞĞ\r\n");
+            printf("ä¸Šå‡æŒ‡ä»¤å‘é€æˆåŠŸï¼Œç”µæœºå¼€å§‹è¿è¡Œ\r\n");
             break;
         case 1:
-            printf("´íÎó£ºµç»ú±àºÅ·Ç·¨»òÖ÷Õ¾·Ç¿ÕÏĞ£¨ÉÏÉıÖ¸ÁîÎ´·¢ËÍ£©\r\n");
-            // Ö±½ÓÍË³ö£¬±ÜÃâÖ´ĞĞÍ£Ö¹Ö¸Áî
+            printf("é”™è¯¯ï¼šç”µæœºç¼–å·éæ³•æˆ–ä¸»ç«™éç©ºé—²ï¼ˆä¸Šå‡æŒ‡ä»¤æœªå‘é€ï¼‰\r\n");
+            // ç›´æ¥é€€å‡ºï¼Œé¿å…æ‰§è¡Œåœæ­¢æŒ‡ä»¤
             while(1) { delay_ms(1000); }
         case 2:
-            printf("¾¯¸æ£ºÉÏÉıÖ¸Áî³¬Ê±£¬µ«µç»ú¿ÉÄÜÒÑÔËĞĞ\r\n");
+            printf("è­¦å‘Šï¼šä¸Šå‡æŒ‡ä»¤è¶…æ—¶ï¼Œä½†ç”µæœºå¯èƒ½å·²è¿è¡Œ\r\n");
             break;
         case 3:
-            printf("´íÎó£ºÉÏÉıÖ¸ÁîÏìÓ¦ÄÚÈİ²»Æ¥Åä\r\n");
+            printf("é”™è¯¯ï¼šä¸Šå‡æŒ‡ä»¤å“åº”å†…å®¹ä¸åŒ¹é…\r\n");
             break;
         default:
-            printf("´íÎó£ºÉÏÉıÖ¸Áî·¢ËÍÒì³£\r\n");
+            printf("é”™è¯¯ï¼šä¸Šå‡æŒ‡ä»¤å‘é€å¼‚å¸¸\r\n");
             break;
     }
 		master_state = MASTER_IDLE;
-		timeout_cnt = 0; // Í¬Ê±ÖØÖÃ³¬Ê±¼ÆÊıÆ÷
+		timeout_cnt = 0; // åŒæ—¶é‡ç½®è¶…æ—¶è®¡æ•°å™¨
 }		
 		
 void Battery7(void)
 {
-  	//6.µç»ú1ÉÏÉıÉèÖÃ
-		uint8_t motor_num1 = 2;  //È¦Êı
-		uint16_t motor_cmd1 = MOTOR1_LengthRun; //ÉÏÉı·½ÏòºÍÈ¦ÊıÖµÉèÖÃ
+  	//6.ç”µæœº1ä¸Šå‡è®¾ç½®
+		uint8_t motor_num1 = 2;  //åœˆæ•°
+		uint16_t motor_cmd1 = MOTOR1_LengthRun; //ä¸Šå‡æ–¹å‘å’Œåœˆæ•°å€¼è®¾ç½®
 		uint8_t ctrl_ret1 = Motor_Control(MOTOR1_SLAVE_ADDR, motor_num1, motor_cmd1);
-		// ÏÂ½µÖ¸Áî½á¹ûÅĞ¶Ï
+		// ä¸‹é™æŒ‡ä»¤ç»“æœåˆ¤æ–­
     switch(ctrl_ret1)
     {
         case 0:
-            printf("ÉÏÉıÖ¸Áî·¢ËÍ³É¹¦£¬µç»ú¿ªÊ¼ÔËĞĞ\r\n");
+            printf("ä¸Šå‡æŒ‡ä»¤å‘é€æˆåŠŸï¼Œç”µæœºå¼€å§‹è¿è¡Œ\r\n");
             break;
         case 1:
-            printf("´íÎó£ºµç»ú±àºÅ·Ç·¨»òÖ÷Õ¾·Ç¿ÕÏĞ£¨ÉÏÉıÖ¸ÁîÎ´·¢ËÍ£©\r\n");
-            // Ö±½ÓÍË³ö£¬±ÜÃâÖ´ĞĞÍ£Ö¹Ö¸Áî
+            printf("é”™è¯¯ï¼šç”µæœºç¼–å·éæ³•æˆ–ä¸»ç«™éç©ºé—²ï¼ˆä¸Šå‡æŒ‡ä»¤æœªå‘é€ï¼‰\r\n");
+            // ç›´æ¥é€€å‡ºï¼Œé¿å…æ‰§è¡Œåœæ­¢æŒ‡ä»¤
             while(1) { delay_ms(1000); }
         case 2:
-            printf("¾¯¸æ£ºÉÏÉıÖ¸Áî³¬Ê±£¬µ«µç»ú¿ÉÄÜÒÑÔËĞĞ\r\n");
+            printf("è­¦å‘Šï¼šä¸Šå‡æŒ‡ä»¤è¶…æ—¶ï¼Œä½†ç”µæœºå¯èƒ½å·²è¿è¡Œ\r\n");
             break;
         case 3:
-            printf("´íÎó£ºÉÏÉıÖ¸ÁîÏìÓ¦ÄÚÈİ²»Æ¥Åä\r\n");
+            printf("é”™è¯¯ï¼šä¸Šå‡æŒ‡ä»¤å“åº”å†…å®¹ä¸åŒ¹é…\r\n");
             break;
         default:
-            printf("´íÎó£ºÉÏÉıÖ¸Áî·¢ËÍÒì³£\r\n");
+            printf("é”™è¯¯ï¼šä¸Šå‡æŒ‡ä»¤å‘é€å¼‚å¸¸\r\n");
             break;
     }
 		master_state = MASTER_IDLE;
-		timeout_cnt = 0; // Í¬Ê±ÖØÖÃ³¬Ê±¼ÆÊıÆ÷
+		timeout_cnt = 0; // åŒæ—¶é‡ç½®è¶…æ—¶è®¡æ•°å™¨
 } 		
 		
 void Battery8(void)
 {
-  	//7.µç»ú1Æô¶¯
-		uint8_t motor_num1 = 1;  //ÆôÍ£
-		uint16_t motor_cmd1 = MOTOR1_deRUN; //Æô¶¯
+  	//7.ç”µæœº1å¯åŠ¨
+		uint8_t motor_num1 = 1;  //å¯åœ
+		uint16_t motor_cmd1 = MOTOR1_deRUN; //å¯åŠ¨
 		uint8_t ctrl_ret1 = Motor_Control(MOTOR1_SLAVE_ADDR, motor_num1, motor_cmd1);
 		switch(ctrl_ret1)
     {
         case 0:
-            printf("ÉÏÉıÖ¸Áî·¢ËÍ³É¹¦£¬µç»ú¿ªÊ¼ÔËĞĞ\r\n");
+            printf("ä¸Šå‡æŒ‡ä»¤å‘é€æˆåŠŸï¼Œç”µæœºå¼€å§‹è¿è¡Œ\r\n");
             break;
         case 1:
-            printf("´íÎó£ºµç»ú±àºÅ·Ç·¨»òÖ÷Õ¾·Ç¿ÕÏĞ£¨ÉÏÉıÖ¸ÁîÎ´·¢ËÍ£©\r\n");
-            // Ö±½ÓÍË³ö£¬±ÜÃâÖ´ĞĞÍ£Ö¹Ö¸Áî
+            printf("é”™è¯¯ï¼šç”µæœºç¼–å·éæ³•æˆ–ä¸»ç«™éç©ºé—²ï¼ˆä¸Šå‡æŒ‡ä»¤æœªå‘é€ï¼‰\r\n");
+            // ç›´æ¥é€€å‡ºï¼Œé¿å…æ‰§è¡Œåœæ­¢æŒ‡ä»¤
             while(1) { delay_ms(1000); }
         case 2:
-            printf("¾¯¸æ£ºÉÏÉıÖ¸Áî³¬Ê±£¬µ«µç»ú¿ÉÄÜÒÑÔËĞĞ\r\n");
+            printf("è­¦å‘Šï¼šä¸Šå‡æŒ‡ä»¤è¶…æ—¶ï¼Œä½†ç”µæœºå¯èƒ½å·²è¿è¡Œ\r\n");
             break;
         case 3:
-            printf("´íÎó£ºÉÏÉıÖ¸ÁîÏìÓ¦ÄÚÈİ²»Æ¥Åä\r\n");
+            printf("é”™è¯¯ï¼šä¸Šå‡æŒ‡ä»¤å“åº”å†…å®¹ä¸åŒ¹é…\r\n");
             break;
         default:
-            printf("´íÎó£ºÉÏÉıÖ¸Áî·¢ËÍÒì³£\r\n");
+            printf("é”™è¯¯ï¼šä¸Šå‡æŒ‡ä»¤å‘é€å¼‚å¸¸\r\n");
             break;
     }
 		master_state = MASTER_IDLE;
-		timeout_cnt = 0; // Í¬Ê±ÖØÖÃ³¬Ê±¼ÆÊıÆ÷
+		timeout_cnt = 0; // åŒæ—¶é‡ç½®è¶…æ—¶è®¡æ•°å™¨
 } 		
 	 
 void Battery9(void)
 {
-  	//8.µç»ú3¼Ğ×¡µç³Ø
-		uint8_t ctrl_ret3;  // Ö¸Áî·¢ËÍ·µ»ØÖµ
-		uint8_t motor_num3 = 2;   // ¼Ä´æÆ÷µØÖ·£¨¼Ğ½ô£©
-		uint16_t motor_cmd3 = Clamp; // µç»úÖ¸Áî£º
+  	//8.ç”µæœº3å¤¹ä½ç”µæ± 
+		uint8_t ctrl_ret3;  // æŒ‡ä»¤å‘é€è¿”å›å€¼
+		uint8_t motor_num3 = 2;   // å¯„å­˜å™¨åœ°å€ï¼ˆå¤¹ç´§ï¼‰
+		uint16_t motor_cmd3 = Clamp; // ç”µæœºæŒ‡ä»¤ï¼š
 		ctrl_ret3 = Motor_Control(MOTOR3_SLAVE_ADDR, motor_num3, motor_cmd3);
 		if(ctrl_ret3 == 0)
     {
-        printf("´Ó»ú3¼Ğ½ôÖ¸Áî·¢ËÍ³É¹¦£¡\r\n");
+        printf("ä»æœº3å¤¹ç´§æŒ‡ä»¤å‘é€æˆåŠŸï¼\r\n");
     }
     else
     {
-        printf("´Ó»ú3¼Ğ½ôÖ¸Áî·¢ËÍÊ§°Ü£¬´íÎóÂë£º%d\r\n", ctrl_ret3);
+        printf("ä»æœº3å¤¹ç´§æŒ‡ä»¤å‘é€å¤±è´¥ï¼Œé”™è¯¯ç ï¼š%d\r\n", ctrl_ret3);
     }
 		master_state = MASTER_IDLE;
-		timeout_cnt = 0; // Í¬Ê±ÖØÖÃ³¬Ê±¼ÆÊıÆ÷
+		timeout_cnt = 0; // åŒæ—¶é‡ç½®è¶…æ—¶è®¡æ•°å™¨
 } 		
 		
 void Battery10(void)
 {
-  	//9.µç»ú2ºóÍË
-		uint8_t Reg_num = 2;   // ¼Ä´æÆ÷ÊıÁ¿
-	  uint16_t slave2_cmds[Reg_num];//¼Ä´æÆ÷Ö¸Áî
-		// ³õÊ¼»¯Êı×é£¨±ÜÃâÔàÊı¾İ£©
+  	//9.ç”µæœº2åé€€
+		uint8_t Reg_num = 2;   // å¯„å­˜å™¨æ•°é‡
+	  uint16_t slave2_cmds[Reg_num];//å¯„å­˜å™¨æŒ‡ä»¤
+		// åˆå§‹åŒ–æ•°ç»„ï¼ˆé¿å…è„æ•°æ®ï¼‰
 		memset(slave2_cmds, 0, sizeof(slave2_cmds));
 		if(Reg_num >= 2) 
 		{
-				slave2_cmds[0] = Pulse_num9;            // ¼Ä´æÆ÷1£º¸ßÎ»
-				slave2_cmds[1] = Pulse_num10;            // ¼Ä´æÆ÷2£ºµÍÎ»			
-//				printf("¸³Öµºó£ºslave1_cmds[2] = 0x%04X\n", slave1_cmds[2]); // È·ÈÏ¸³Öµ³É¹¦
+				slave2_cmds[0] = Pulse_num9;            // å¯„å­˜å™¨1ï¼šé«˜ä½
+				slave2_cmds[1] = Pulse_num10;            // å¯„å­˜å™¨2ï¼šä½ä½			
+//				printf("èµ‹å€¼åï¼šslave1_cmds[2] = 0x%04X\n", slave1_cmds[2]); // ç¡®è®¤èµ‹å€¼æˆåŠŸ
 		} else
 		{
-				// Reg_num²»×ãÊ±µÄÈİ´í´¦Àí£¨±ÈÈçÇå¿ÕÊı×é£©
+				// Reg_numä¸è¶³æ—¶çš„å®¹é”™å¤„ç†ï¼ˆæ¯”å¦‚æ¸…ç©ºæ•°ç»„ï¼‰
 				memset(slave2_cmds, 0, sizeof(slave2_cmds));
 		}
 		if(master_state != MASTER_IDLE) 
 		{
 				master_state = MASTER_IDLE;
 				timeout_cnt = 0;
-				printf("Ç¿ÖÆÖØÖÃÖ÷Õ¾×´Ì¬Îª¿ÕÏĞ\r\n");
+				printf("å¼ºåˆ¶é‡ç½®ä¸»ç«™çŠ¶æ€ä¸ºç©ºé—²\r\n");
 				fflush(stdout);
 		}
 		uint8_t ctrl_ret2 = Motor_Batch_Control(MOTOR2_SLAVE_ADDR, MOTOR2_CTRL_REG2, Reg_num, slave2_cmds);
-		// Ç°½øÖ¸Áî½á¹ûÅĞ¶Ï
+		// å‰è¿›æŒ‡ä»¤ç»“æœåˆ¤æ–­
     switch(ctrl_ret2)
     {
         case 0:
-            printf("ÉÏÉıÖ¸Áî·¢ËÍ³É¹¦£¬µç»ú¿ªÊ¼ÔËĞĞ\r\n");
+            printf("ä¸Šå‡æŒ‡ä»¤å‘é€æˆåŠŸï¼Œç”µæœºå¼€å§‹è¿è¡Œ\r\n");
             break;
         case 1:
-            printf("´íÎó£ºµç»ú±àºÅ·Ç·¨»òÖ÷Õ¾·Ç¿ÕÏĞ£¨ÉÏÉıÖ¸ÁîÎ´·¢ËÍ£©\r\n");
-            // Ö±½ÓÍË³ö£¬±ÜÃâÖ´ĞĞÍ£Ö¹Ö¸Áî
+            printf("é”™è¯¯ï¼šç”µæœºç¼–å·éæ³•æˆ–ä¸»ç«™éç©ºé—²ï¼ˆä¸Šå‡æŒ‡ä»¤æœªå‘é€ï¼‰\r\n");
+            // ç›´æ¥é€€å‡ºï¼Œé¿å…æ‰§è¡Œåœæ­¢æŒ‡ä»¤
             while(1) { delay_ms(1000); }
         case 2:
-            printf("¾¯¸æ£ºÉÏÉıÖ¸Áî³¬Ê±£¬µ«µç»ú¿ÉÄÜÒÑÔËĞĞ\r\n");
+            printf("è­¦å‘Šï¼šä¸Šå‡æŒ‡ä»¤è¶…æ—¶ï¼Œä½†ç”µæœºå¯èƒ½å·²è¿è¡Œ\r\n");
             break;
         case 3:
-            printf("´íÎó£ºÉÏÉıÖ¸ÁîÏìÓ¦ÄÚÈİ²»Æ¥Åä\r\n");
+            printf("é”™è¯¯ï¼šä¸Šå‡æŒ‡ä»¤å“åº”å†…å®¹ä¸åŒ¹é…\r\n");
             break;
         default:
-            printf("´íÎó£ºÉÏÉıÖ¸Áî·¢ËÍÒì³£\r\n");
+            printf("é”™è¯¯ï¼šä¸Šå‡æŒ‡ä»¤å‘é€å¼‚å¸¸\r\n");
             break;
     }
 		master_state = MASTER_IDLE;
-		timeout_cnt = 0; // Í¬Ê±ÖØÖÃ³¬Ê±¼ÆÊıÆ÷
+		timeout_cnt = 0; // åŒæ—¶é‡ç½®è¶…æ—¶è®¡æ•°å™¨
 } 		
 		
 void Battery11(void)
 {
-  	//10.µç»ú3ËÉ¿ªµç³Ø
-		uint8_t motor_num3 = 1;   // ¼Ä´æÆ÷µØÖ·£¨ËÉ¿ª£©
-		uint16_t motor_cmd3 = Lossen; // µç»úÖ¸Áî£º
+  	//10.ç”µæœº3æ¾å¼€ç”µæ± 
+		uint8_t motor_num3 = 1;   // å¯„å­˜å™¨åœ°å€ï¼ˆæ¾å¼€ï¼‰
+		uint16_t motor_cmd3 = Lossen; // ç”µæœºæŒ‡ä»¤ï¼š
 		uint8_t ctrl_ret3 = Motor_Control(MOTOR3_SLAVE_ADDR, motor_num3, motor_cmd3);
 		if(ctrl_ret3 == 0)
     {
-        printf("´Ó»ú3ËÉ¿ªÖ¸Áî·¢ËÍ³É¹¦£¡\r\n");
+        printf("ä»æœº3æ¾å¼€æŒ‡ä»¤å‘é€æˆåŠŸï¼\r\n");
     }
     else
     {
-        printf("´Ó»ú3ËÉ¿ªÖ¸Áî·¢ËÍÊ§°Ü£¬´íÎóÂë£º%d\r\n", ctrl_ret3);
+        printf("ä»æœº3æ¾å¼€æŒ‡ä»¤å‘é€å¤±è´¥ï¼Œé”™è¯¯ç ï¼š%d\r\n", ctrl_ret3);
     }
 		master_state = MASTER_IDLE;
-		timeout_cnt = 0; // Í¬Ê±ÖØÖÃ³¬Ê±¼ÆÊıÆ÷
+		timeout_cnt = 0; // åŒæ—¶é‡ç½®è¶…æ—¶è®¡æ•°å™¨
 } 	
 		
 void Battery12(void)
 {
-  	//11.µç»ú1ÏÂ½µÉèÖÃ
-		uint8_t motor_num1 = 2;  //È¦Êı
-		uint16_t motor_cmd1 = MOTOR1_deLengthRun; //ÏÂ½µ·½ÏòºÍÈ¦ÊıÖµÉèÖÃ
+  	//11.ç”µæœº1ä¸‹é™è®¾ç½®
+		uint8_t motor_num1 = 2;  //åœˆæ•°
+		uint16_t motor_cmd1 = MOTOR1_deLengthRun; //ä¸‹é™æ–¹å‘å’Œåœˆæ•°å€¼è®¾ç½®
 		uint8_t ctrl_ret1 = Motor_Control(MOTOR1_SLAVE_ADDR, motor_num1, motor_cmd1);
-		// ÏÂ½µÖ¸Áî½á¹ûÅĞ¶Ï
+		// ä¸‹é™æŒ‡ä»¤ç»“æœåˆ¤æ–­
     switch(ctrl_ret1)
     {
         case 0:
-            printf("ÉÏÉıÖ¸Áî·¢ËÍ³É¹¦£¬µç»ú¿ªÊ¼ÔËĞĞ\r\n");
+            printf("ä¸Šå‡æŒ‡ä»¤å‘é€æˆåŠŸï¼Œç”µæœºå¼€å§‹è¿è¡Œ\r\n");
             break;
         case 1:
-            printf("´íÎó£ºµç»ú±àºÅ·Ç·¨»òÖ÷Õ¾·Ç¿ÕÏĞ£¨ÉÏÉıÖ¸ÁîÎ´·¢ËÍ£©\r\n");
-            // Ö±½ÓÍË³ö£¬±ÜÃâÖ´ĞĞÍ£Ö¹Ö¸Áî
+            printf("é”™è¯¯ï¼šç”µæœºç¼–å·éæ³•æˆ–ä¸»ç«™éç©ºé—²ï¼ˆä¸Šå‡æŒ‡ä»¤æœªå‘é€ï¼‰\r\n");
+            // ç›´æ¥é€€å‡ºï¼Œé¿å…æ‰§è¡Œåœæ­¢æŒ‡ä»¤
             while(1) { delay_ms(1000); }
         case 2:
-            printf("¾¯¸æ£ºÉÏÉıÖ¸Áî³¬Ê±£¬µ«µç»ú¿ÉÄÜÒÑÔËĞĞ\r\n");
+            printf("è­¦å‘Šï¼šä¸Šå‡æŒ‡ä»¤è¶…æ—¶ï¼Œä½†ç”µæœºå¯èƒ½å·²è¿è¡Œ\r\n");
             break;
         case 3:
-            printf("´íÎó£ºÉÏÉıÖ¸ÁîÏìÓ¦ÄÚÈİ²»Æ¥Åä\r\n");
+            printf("é”™è¯¯ï¼šä¸Šå‡æŒ‡ä»¤å“åº”å†…å®¹ä¸åŒ¹é…\r\n");
             break;
         default:
-            printf("´íÎó£ºÉÏÉıÖ¸Áî·¢ËÍÒì³£\r\n");
+            printf("é”™è¯¯ï¼šä¸Šå‡æŒ‡ä»¤å‘é€å¼‚å¸¸\r\n");
             break;
     }
 		master_state = MASTER_IDLE;
-		timeout_cnt = 0; // Í¬Ê±ÖØÖÃ³¬Ê±¼ÆÊıÆ÷
+		timeout_cnt = 0; // åŒæ—¶é‡ç½®è¶…æ—¶è®¡æ•°å™¨
 } 		
 		
 void Battery13(void)
 {
-  	//12.µç»ú1Æô¶¯
-		uint8_t motor_num1 = 1;  //ÆôÍ£
-		uint16_t motor_cmd1 = MOTOR1_deRUN; //Æô¶¯
+  	//12.ç”µæœº1å¯åŠ¨
+		uint8_t motor_num1 = 1;  //å¯åœ
+		uint16_t motor_cmd1 = MOTOR1_deRUN; //å¯åŠ¨
 		uint8_t ctrl_ret1 = Motor_Control(MOTOR1_SLAVE_ADDR, motor_num1, motor_cmd1);
 		switch(ctrl_ret1)
     {
         case 0:
-            printf("ÉÏÉıÖ¸Áî·¢ËÍ³É¹¦£¬µç»ú¿ªÊ¼ÔËĞĞ\r\n");
+            printf("ä¸Šå‡æŒ‡ä»¤å‘é€æˆåŠŸï¼Œç”µæœºå¼€å§‹è¿è¡Œ\r\n");
             break;
         case 1:
-            printf("´íÎó£ºµç»ú±àºÅ·Ç·¨»òÖ÷Õ¾·Ç¿ÕÏĞ£¨ÉÏÉıÖ¸ÁîÎ´·¢ËÍ£©\r\n");
-            // Ö±½ÓÍË³ö£¬±ÜÃâÖ´ĞĞÍ£Ö¹Ö¸Áî
+            printf("é”™è¯¯ï¼šç”µæœºç¼–å·éæ³•æˆ–ä¸»ç«™éç©ºé—²ï¼ˆä¸Šå‡æŒ‡ä»¤æœªå‘é€ï¼‰\r\n");
+            // ç›´æ¥é€€å‡ºï¼Œé¿å…æ‰§è¡Œåœæ­¢æŒ‡ä»¤
             while(1) { delay_ms(1000); }
         case 2:
-            printf("¾¯¸æ£ºÉÏÉıÖ¸Áî³¬Ê±£¬µ«µç»ú¿ÉÄÜÒÑÔËĞĞ\r\n");
+            printf("è­¦å‘Šï¼šä¸Šå‡æŒ‡ä»¤è¶…æ—¶ï¼Œä½†ç”µæœºå¯èƒ½å·²è¿è¡Œ\r\n");
             break;
         case 3:
-            printf("´íÎó£ºÉÏÉıÖ¸ÁîÏìÓ¦ÄÚÈİ²»Æ¥Åä\r\n");
+            printf("é”™è¯¯ï¼šä¸Šå‡æŒ‡ä»¤å“åº”å†…å®¹ä¸åŒ¹é…\r\n");
             break;
         default:
-            printf("´íÎó£ºÉÏÉıÖ¸Áî·¢ËÍÒì³£\r\n");
+            printf("é”™è¯¯ï¼šä¸Šå‡æŒ‡ä»¤å‘é€å¼‚å¸¸\r\n");
             break;
     }
 		master_state = MASTER_IDLE;
-		timeout_cnt = 0; // Í¬Ê±ÖØÖÃ³¬Ê±¼ÆÊıÆ÷		
+		timeout_cnt = 0; // åŒæ—¶é‡ç½®è¶…æ—¶è®¡æ•°å™¨		
 } 		
 		
 void Battery14(void)
 {
-  	//13.µç»ú2ºóÍË
-		uint8_t Reg_num = 2;   // ¼Ä´æÆ÷ÊıÁ¿
-	  uint16_t slave2_cmds[Reg_num];//¼Ä´æÆ÷Ö¸Áî
-		// ³õÊ¼»¯Êı×é£¨±ÜÃâÔàÊı¾İ£©
+  	//13.ç”µæœº2åé€€
+		uint8_t Reg_num = 2;   // å¯„å­˜å™¨æ•°é‡
+	  uint16_t slave2_cmds[Reg_num];//å¯„å­˜å™¨æŒ‡ä»¤
+		// åˆå§‹åŒ–æ•°ç»„ï¼ˆé¿å…è„æ•°æ®ï¼‰
 		memset(slave2_cmds, 0, sizeof(slave2_cmds));
 		if(Reg_num >= 2) 
 		{
-				slave2_cmds[0] = Pulse_num11;            // ¼Ä´æÆ÷1£º¸ßÎ»
-				slave2_cmds[1] = Pulse_num12;            // ¼Ä´æÆ÷2£ºµÍÎ»			
-//				printf("¸³Öµºó£ºslave1_cmds[2] = 0x%04X\n", slave1_cmds[2]); // È·ÈÏ¸³Öµ³É¹¦
+				slave2_cmds[0] = Pulse_num11;            // å¯„å­˜å™¨1ï¼šé«˜ä½
+				slave2_cmds[1] = Pulse_num12;            // å¯„å­˜å™¨2ï¼šä½ä½			
+//				printf("èµ‹å€¼åï¼šslave1_cmds[2] = 0x%04X\n", slave1_cmds[2]); // ç¡®è®¤èµ‹å€¼æˆåŠŸ
 		} else
 		{
-				// Reg_num²»×ãÊ±µÄÈİ´í´¦Àí£¨±ÈÈçÇå¿ÕÊı×é£©
+				// Reg_numä¸è¶³æ—¶çš„å®¹é”™å¤„ç†ï¼ˆæ¯”å¦‚æ¸…ç©ºæ•°ç»„ï¼‰
 				memset(slave2_cmds, 0, sizeof(slave2_cmds));
 		}
 		if(master_state != MASTER_IDLE) 
 		{
 				master_state = MASTER_IDLE;
 				timeout_cnt = 0;
-				printf("Ç¿ÖÆÖØÖÃÖ÷Õ¾×´Ì¬Îª¿ÕÏĞ\r\n");
+				printf("å¼ºåˆ¶é‡ç½®ä¸»ç«™çŠ¶æ€ä¸ºç©ºé—²\r\n");
 				fflush(stdout);
 		}
 		uint8_t ctrl_ret2 = Motor_Batch_Control(MOTOR2_SLAVE_ADDR, MOTOR2_CTRL_REG2, Reg_num, slave2_cmds);
-		// Ç°½øÖ¸Áî½á¹ûÅĞ¶Ï
+		// å‰è¿›æŒ‡ä»¤ç»“æœåˆ¤æ–­
     switch(ctrl_ret2)
     {
         case 0:
-            printf("ÉÏÉıÖ¸Áî·¢ËÍ³É¹¦£¬µç»ú¿ªÊ¼ÔËĞĞ\r\n");
+            printf("ä¸Šå‡æŒ‡ä»¤å‘é€æˆåŠŸï¼Œç”µæœºå¼€å§‹è¿è¡Œ\r\n");
             break;
         case 1:
-            printf("´íÎó£ºµç»ú±àºÅ·Ç·¨»òÖ÷Õ¾·Ç¿ÕÏĞ£¨ÉÏÉıÖ¸ÁîÎ´·¢ËÍ£©\r\n");
-            // Ö±½ÓÍË³ö£¬±ÜÃâÖ´ĞĞÍ£Ö¹Ö¸Áî
+            printf("é”™è¯¯ï¼šç”µæœºç¼–å·éæ³•æˆ–ä¸»ç«™éç©ºé—²ï¼ˆä¸Šå‡æŒ‡ä»¤æœªå‘é€ï¼‰\r\n");
+            // ç›´æ¥é€€å‡ºï¼Œé¿å…æ‰§è¡Œåœæ­¢æŒ‡ä»¤
             while(1) { delay_ms(1000); }
         case 2:
-            printf("¾¯¸æ£ºÉÏÉıÖ¸Áî³¬Ê±£¬µ«µç»ú¿ÉÄÜÒÑÔËĞĞ\r\n");
+            printf("è­¦å‘Šï¼šä¸Šå‡æŒ‡ä»¤è¶…æ—¶ï¼Œä½†ç”µæœºå¯èƒ½å·²è¿è¡Œ\r\n");
             break;
         case 3:
-            printf("´íÎó£ºÉÏÉıÖ¸ÁîÏìÓ¦ÄÚÈİ²»Æ¥Åä\r\n");
+            printf("é”™è¯¯ï¼šä¸Šå‡æŒ‡ä»¤å“åº”å†…å®¹ä¸åŒ¹é…\r\n");
             break;
         default:
-            printf("´íÎó£ºÉÏÉıÖ¸Áî·¢ËÍÒì³£\r\n");
+            printf("é”™è¯¯ï¼šä¸Šå‡æŒ‡ä»¤å‘é€å¼‚å¸¸\r\n");
             break;
     }
 		master_state = MASTER_IDLE;
-		timeout_cnt = 0; // Í¬Ê±ÖØÖÃ³¬Ê±¼ÆÊıÆ÷	
+		timeout_cnt = 0; // åŒæ—¶é‡ç½®è¶…æ—¶è®¡æ•°å™¨	
 } 		
 		
 				
 void Battery15(void)
 {
-  	//14.µç»ú1ÉÏÉıÉèÖÃ
-		uint8_t motor_num1 = 2;  //È¦Êı
-		uint16_t motor_cmd1 = MOTOR1_LengthRun; //ÉÏÉı·½ÏòºÍÈ¦ÊıÖµÉèÖÃ
+  	//14.ç”µæœº1ä¸Šå‡è®¾ç½®
+		uint8_t motor_num1 = 2;  //åœˆæ•°
+		uint16_t motor_cmd1 = MOTOR1_LengthRun; //ä¸Šå‡æ–¹å‘å’Œåœˆæ•°å€¼è®¾ç½®
 		uint8_t ctrl_ret1 = Motor_Control(MOTOR1_SLAVE_ADDR, motor_num1, motor_cmd1);
-		// ÏÂ½µÖ¸Áî½á¹ûÅĞ¶Ï
+		// ä¸‹é™æŒ‡ä»¤ç»“æœåˆ¤æ–­
     switch(ctrl_ret1)
     {
         case 0:
-            printf("ÉÏÉıÖ¸Áî·¢ËÍ³É¹¦£¬µç»ú¿ªÊ¼ÔËĞĞ\r\n");
+            printf("ä¸Šå‡æŒ‡ä»¤å‘é€æˆåŠŸï¼Œç”µæœºå¼€å§‹è¿è¡Œ\r\n");
             break;
         case 1:
-            printf("´íÎó£ºµç»ú±àºÅ·Ç·¨»òÖ÷Õ¾·Ç¿ÕÏĞ£¨ÉÏÉıÖ¸ÁîÎ´·¢ËÍ£©\r\n");
-            // Ö±½ÓÍË³ö£¬±ÜÃâÖ´ĞĞÍ£Ö¹Ö¸Áî
+            printf("é”™è¯¯ï¼šç”µæœºç¼–å·éæ³•æˆ–ä¸»ç«™éç©ºé—²ï¼ˆä¸Šå‡æŒ‡ä»¤æœªå‘é€ï¼‰\r\n");
+            // ç›´æ¥é€€å‡ºï¼Œé¿å…æ‰§è¡Œåœæ­¢æŒ‡ä»¤
             while(1) { delay_ms(1000); }
         case 2:
-            printf("¾¯¸æ£ºÉÏÉıÖ¸Áî³¬Ê±£¬µ«µç»ú¿ÉÄÜÒÑÔËĞĞ\r\n");
+            printf("è­¦å‘Šï¼šä¸Šå‡æŒ‡ä»¤è¶…æ—¶ï¼Œä½†ç”µæœºå¯èƒ½å·²è¿è¡Œ\r\n");
             break;
         case 3:
-            printf("´íÎó£ºÉÏÉıÖ¸ÁîÏìÓ¦ÄÚÈİ²»Æ¥Åä\r\n");
+            printf("é”™è¯¯ï¼šä¸Šå‡æŒ‡ä»¤å“åº”å†…å®¹ä¸åŒ¹é…\r\n");
             break;
         default:
-            printf("´íÎó£ºÉÏÉıÖ¸Áî·¢ËÍÒì³£\r\n");
+            printf("é”™è¯¯ï¼šä¸Šå‡æŒ‡ä»¤å‘é€å¼‚å¸¸\r\n");
             break;
     }
 		master_state = MASTER_IDLE;
-		timeout_cnt = 0; // Í¬Ê±ÖØÖÃ³¬Ê±¼ÆÊıÆ÷
+		timeout_cnt = 0; // åŒæ—¶é‡ç½®è¶…æ—¶è®¡æ•°å™¨
 }
 		
 void Battery16(void)
 {
-  	//15.µç»ú1Æô¶¯
-		uint8_t motor_num1 = 1;  //ÆôÍ£
-		uint16_t motor_cmd1 = MOTOR1_deRUN; //Æô¶¯
+  	//15.ç”µæœº1å¯åŠ¨
+		uint8_t motor_num1 = 1;  //å¯åœ
+		uint16_t motor_cmd1 = MOTOR1_deRUN; //å¯åŠ¨
 		uint8_t ctrl_ret1 = Motor_Control(MOTOR1_SLAVE_ADDR, motor_num1, motor_cmd1);
 		switch(ctrl_ret1)
     {
         case 0:
-            printf("ÉÏÉıÖ¸Áî·¢ËÍ³É¹¦£¬µç»ú¿ªÊ¼ÔËĞĞ\r\n");
+            printf("ä¸Šå‡æŒ‡ä»¤å‘é€æˆåŠŸï¼Œç”µæœºå¼€å§‹è¿è¡Œ\r\n");
             break;
         case 1:
-            printf("´íÎó£ºµç»ú±àºÅ·Ç·¨»òÖ÷Õ¾·Ç¿ÕÏĞ£¨ÉÏÉıÖ¸ÁîÎ´·¢ËÍ£©\r\n");
-            // Ö±½ÓÍË³ö£¬±ÜÃâÖ´ĞĞÍ£Ö¹Ö¸Áî
+            printf("é”™è¯¯ï¼šç”µæœºç¼–å·éæ³•æˆ–ä¸»ç«™éç©ºé—²ï¼ˆä¸Šå‡æŒ‡ä»¤æœªå‘é€ï¼‰\r\n");
+            // ç›´æ¥é€€å‡ºï¼Œé¿å…æ‰§è¡Œåœæ­¢æŒ‡ä»¤
             while(1) { delay_ms(1000); }
         case 2:
-            printf("¾¯¸æ£ºÉÏÉıÖ¸Áî³¬Ê±£¬µ«µç»ú¿ÉÄÜÒÑÔËĞĞ\r\n");
+            printf("è­¦å‘Šï¼šä¸Šå‡æŒ‡ä»¤è¶…æ—¶ï¼Œä½†ç”µæœºå¯èƒ½å·²è¿è¡Œ\r\n");
             break;
         case 3:
-            printf("´íÎó£ºÉÏÉıÖ¸ÁîÏìÓ¦ÄÚÈİ²»Æ¥Åä\r\n");
+            printf("é”™è¯¯ï¼šä¸Šå‡æŒ‡ä»¤å“åº”å†…å®¹ä¸åŒ¹é…\r\n");
             break;
         default:
-            printf("´íÎó£ºÉÏÉıÖ¸Áî·¢ËÍÒì³£\r\n");
+            printf("é”™è¯¯ï¼šä¸Šå‡æŒ‡ä»¤å‘é€å¼‚å¸¸\r\n");
             break;
     }
 		master_state = MASTER_IDLE;
-		timeout_cnt = 0; // Í¬Ê±ÖØÖÃ³¬Ê±¼ÆÊıÆ÷
+		timeout_cnt = 0; // åŒæ—¶é‡ç½®è¶…æ—¶è®¡æ•°å™¨
 }	
 		
 		
 void Battery17(void)
 {
-  	//16.µç»ú2Ç°½ø
-		uint8_t Reg_num = 2;   // ¼Ä´æÆ÷ÊıÁ¿
-	  uint16_t slave2_cmds[Reg_num];//¼Ä´æÆ÷Ö¸Áî
-		// ³õÊ¼»¯Êı×é£¨±ÜÃâÔàÊı¾İ£©
+  	//16.ç”µæœº2å‰è¿›
+		uint8_t Reg_num = 2;   // å¯„å­˜å™¨æ•°é‡
+	  uint16_t slave2_cmds[Reg_num];//å¯„å­˜å™¨æŒ‡ä»¤
+		// åˆå§‹åŒ–æ•°ç»„ï¼ˆé¿å…è„æ•°æ®ï¼‰
 		memset(slave2_cmds, 0, sizeof(slave2_cmds));
 		if(Reg_num >= 2) 
 		{
-				slave2_cmds[0] = Pulse_num5;            // ¼Ä´æÆ÷1£º¸ßÎ»
-				slave2_cmds[1] = Pulse_num6;            // ¼Ä´æÆ÷2£ºµÍÎ»			
-//				printf("¸³Öµºó£ºslave1_cmds[2] = 0x%04X\n", slave1_cmds[2]); // È·ÈÏ¸³Öµ³É¹¦
+				slave2_cmds[0] = Pulse_num5;            // å¯„å­˜å™¨1ï¼šé«˜ä½
+				slave2_cmds[1] = Pulse_num6;            // å¯„å­˜å™¨2ï¼šä½ä½			
+//				printf("èµ‹å€¼åï¼šslave1_cmds[2] = 0x%04X\n", slave1_cmds[2]); // ç¡®è®¤èµ‹å€¼æˆåŠŸ
 		} else
 		{
-				// Reg_num²»×ãÊ±µÄÈİ´í´¦Àí£¨±ÈÈçÇå¿ÕÊı×é£©
+				// Reg_numä¸è¶³æ—¶çš„å®¹é”™å¤„ç†ï¼ˆæ¯”å¦‚æ¸…ç©ºæ•°ç»„ï¼‰
 				memset(slave2_cmds, 0, sizeof(slave2_cmds));
 		}
 		if(master_state != MASTER_IDLE) 
 		{
 				master_state = MASTER_IDLE;
 				timeout_cnt = 0;
-				printf("Ç¿ÖÆÖØÖÃÖ÷Õ¾×´Ì¬Îª¿ÕÏĞ\r\n");
+				printf("å¼ºåˆ¶é‡ç½®ä¸»ç«™çŠ¶æ€ä¸ºç©ºé—²\r\n");
 				fflush(stdout);
 		}
 		uint8_t ctrl_ret2 = Motor_Batch_Control(MOTOR2_SLAVE_ADDR, MOTOR2_CTRL_REG3, Reg_num, slave2_cmds);
-		// Ç°½øÖ¸Áî½á¹ûÅĞ¶Ï
+		// å‰è¿›æŒ‡ä»¤ç»“æœåˆ¤æ–­
     switch(ctrl_ret2)
     {
         case 0:
-            printf("ÉÏÉıÖ¸Áî·¢ËÍ³É¹¦£¬µç»ú¿ªÊ¼ÔËĞĞ\r\n");
+            printf("ä¸Šå‡æŒ‡ä»¤å‘é€æˆåŠŸï¼Œç”µæœºå¼€å§‹è¿è¡Œ\r\n");
             break;
         case 1:
-            printf("´íÎó£ºµç»ú±àºÅ·Ç·¨»òÖ÷Õ¾·Ç¿ÕÏĞ£¨ÉÏÉıÖ¸ÁîÎ´·¢ËÍ£©\r\n");
-            // Ö±½ÓÍË³ö£¬±ÜÃâÖ´ĞĞÍ£Ö¹Ö¸Áî
+            printf("é”™è¯¯ï¼šç”µæœºç¼–å·éæ³•æˆ–ä¸»ç«™éç©ºé—²ï¼ˆä¸Šå‡æŒ‡ä»¤æœªå‘é€ï¼‰\r\n");
+            // ç›´æ¥é€€å‡ºï¼Œé¿å…æ‰§è¡Œåœæ­¢æŒ‡ä»¤
             while(1) { delay_ms(1000); }
         case 2:
-            printf("¾¯¸æ£ºÉÏÉıÖ¸Áî³¬Ê±£¬µ«µç»ú¿ÉÄÜÒÑÔËĞĞ\r\n");
+            printf("è­¦å‘Šï¼šä¸Šå‡æŒ‡ä»¤è¶…æ—¶ï¼Œä½†ç”µæœºå¯èƒ½å·²è¿è¡Œ\r\n");
             break;
         case 3:
-            printf("´íÎó£ºÉÏÉıÖ¸ÁîÏìÓ¦ÄÚÈİ²»Æ¥Åä\r\n");
+            printf("é”™è¯¯ï¼šä¸Šå‡æŒ‡ä»¤å“åº”å†…å®¹ä¸åŒ¹é…\r\n");
             break;
         default:
-            printf("´íÎó£ºÉÏÉıÖ¸Áî·¢ËÍÒì³£\r\n");
+            printf("é”™è¯¯ï¼šä¸Šå‡æŒ‡ä»¤å‘é€å¼‚å¸¸\r\n");
             break;
     }
 		master_state = MASTER_IDLE;
-		timeout_cnt = 0; // Í¬Ê±ÖØÖÃ³¬Ê±¼ÆÊıÆ÷
+		timeout_cnt = 0; // åŒæ—¶é‡ç½®è¶…æ—¶è®¡æ•°å™¨
 }			
 		
 void Battery18(void)
 {
-  	//17.µç»ú1ÏÂ½µÉèÖÃ
-		uint8_t motor_num1 = 2;  //È¦Êı
-		uint16_t motor_cmd1 = MOTOR1_deLengthRun; //ÏÂ½µ·½ÏòºÍÈ¦ÊıÖµÉèÖÃ
+  	//17.ç”µæœº1ä¸‹é™è®¾ç½®
+		uint8_t motor_num1 = 2;  //åœˆæ•°
+		uint16_t motor_cmd1 = MOTOR1_deLengthRun; //ä¸‹é™æ–¹å‘å’Œåœˆæ•°å€¼è®¾ç½®
 		uint8_t ctrl_ret1 = Motor_Control(MOTOR1_SLAVE_ADDR, motor_num1, motor_cmd1);
-		// ÏÂ½µÖ¸Áî½á¹ûÅĞ¶Ï
+		// ä¸‹é™æŒ‡ä»¤ç»“æœåˆ¤æ–­
     switch(ctrl_ret1)
     {
         case 0:
-            printf("ÉÏÉıÖ¸Áî·¢ËÍ³É¹¦£¬µç»ú¿ªÊ¼ÔËĞĞ\r\n");
+            printf("ä¸Šå‡æŒ‡ä»¤å‘é€æˆåŠŸï¼Œç”µæœºå¼€å§‹è¿è¡Œ\r\n");
             break;
         case 1:
-            printf("´íÎó£ºµç»ú±àºÅ·Ç·¨»òÖ÷Õ¾·Ç¿ÕÏĞ£¨ÉÏÉıÖ¸ÁîÎ´·¢ËÍ£©\r\n");
-            // Ö±½ÓÍË³ö£¬±ÜÃâÖ´ĞĞÍ£Ö¹Ö¸Áî
+            printf("é”™è¯¯ï¼šç”µæœºç¼–å·éæ³•æˆ–ä¸»ç«™éç©ºé—²ï¼ˆä¸Šå‡æŒ‡ä»¤æœªå‘é€ï¼‰\r\n");
+            // ç›´æ¥é€€å‡ºï¼Œé¿å…æ‰§è¡Œåœæ­¢æŒ‡ä»¤
             while(1) { delay_ms(1000); }
         case 2:
-            printf("¾¯¸æ£ºÉÏÉıÖ¸Áî³¬Ê±£¬µ«µç»ú¿ÉÄÜÒÑÔËĞĞ\r\n");
+            printf("è­¦å‘Šï¼šä¸Šå‡æŒ‡ä»¤è¶…æ—¶ï¼Œä½†ç”µæœºå¯èƒ½å·²è¿è¡Œ\r\n");
             break;
         case 3:
-            printf("´íÎó£ºÉÏÉıÖ¸ÁîÏìÓ¦ÄÚÈİ²»Æ¥Åä\r\n");
+            printf("é”™è¯¯ï¼šä¸Šå‡æŒ‡ä»¤å“åº”å†…å®¹ä¸åŒ¹é…\r\n");
             break;
         default:
-            printf("´íÎó£ºÉÏÉıÖ¸Áî·¢ËÍÒì³£\r\n");
+            printf("é”™è¯¯ï¼šä¸Šå‡æŒ‡ä»¤å‘é€å¼‚å¸¸\r\n");
             break;
     }
 		master_state = MASTER_IDLE;
-		timeout_cnt = 0; // Í¬Ê±ÖØÖÃ³¬Ê±¼ÆÊıÆ÷
+		timeout_cnt = 0; // åŒæ—¶é‡ç½®è¶…æ—¶è®¡æ•°å™¨
 }			
 		
 void Battery19(void)
 {
-  	//18.µç»ú1Æô¶¯
-		uint8_t motor_num1 = 1;  //ÆôÍ£
-		uint16_t motor_cmd1 = MOTOR1_deRUN; //Æô¶¯
+  	//18.ç”µæœº1å¯åŠ¨
+		uint8_t motor_num1 = 1;  //å¯åœ
+		uint16_t motor_cmd1 = MOTOR1_deRUN; //å¯åŠ¨
 		uint8_t ctrl_ret1 = Motor_Control(MOTOR1_SLAVE_ADDR, motor_num1, motor_cmd1);
 		switch(ctrl_ret1)
     {
         case 0:
-            printf("ÉÏÉıÖ¸Áî·¢ËÍ³É¹¦£¬µç»ú¿ªÊ¼ÔËĞĞ\r\n");
+            printf("ä¸Šå‡æŒ‡ä»¤å‘é€æˆåŠŸï¼Œç”µæœºå¼€å§‹è¿è¡Œ\r\n");
             break;
         case 1:
-            printf("´íÎó£ºµç»ú±àºÅ·Ç·¨»òÖ÷Õ¾·Ç¿ÕÏĞ£¨ÉÏÉıÖ¸ÁîÎ´·¢ËÍ£©\r\n");
-            // Ö±½ÓÍË³ö£¬±ÜÃâÖ´ĞĞÍ£Ö¹Ö¸Áî
+            printf("é”™è¯¯ï¼šç”µæœºç¼–å·éæ³•æˆ–ä¸»ç«™éç©ºé—²ï¼ˆä¸Šå‡æŒ‡ä»¤æœªå‘é€ï¼‰\r\n");
+            // ç›´æ¥é€€å‡ºï¼Œé¿å…æ‰§è¡Œåœæ­¢æŒ‡ä»¤
             while(1) { delay_ms(1000); }
         case 2:
-            printf("¾¯¸æ£ºÉÏÉıÖ¸Áî³¬Ê±£¬µ«µç»ú¿ÉÄÜÒÑÔËĞĞ\r\n");
+            printf("è­¦å‘Šï¼šä¸Šå‡æŒ‡ä»¤è¶…æ—¶ï¼Œä½†ç”µæœºå¯èƒ½å·²è¿è¡Œ\r\n");
             break;
         case 3:
-            printf("´íÎó£ºÉÏÉıÖ¸ÁîÏìÓ¦ÄÚÈİ²»Æ¥Åä\r\n");
+            printf("é”™è¯¯ï¼šä¸Šå‡æŒ‡ä»¤å“åº”å†…å®¹ä¸åŒ¹é…\r\n");
             break;
         default:
-            printf("´íÎó£ºÉÏÉıÖ¸Áî·¢ËÍÒì³£\r\n");
+            printf("é”™è¯¯ï¼šä¸Šå‡æŒ‡ä»¤å‘é€å¼‚å¸¸\r\n");
             break;
     }
 		master_state = MASTER_IDLE;
-		timeout_cnt = 0; // Í¬Ê±ÖØÖÃ³¬Ê±¼ÆÊıÆ÷
+		timeout_cnt = 0; // åŒæ—¶é‡ç½®è¶…æ—¶è®¡æ•°å™¨
 }			
 		
 void Battery20(void)
 {
-  	//19.µç»ú2Ç°½ø
-		uint8_t Reg_num = 2;   // ¼Ä´æÆ÷ÊıÁ¿
-	  uint16_t slave2_cmds[Reg_num];//¼Ä´æÆ÷Ö¸Áî
-		// ³õÊ¼»¯Êı×é£¨±ÜÃâÔàÊı¾İ£©
+  	//19.ç”µæœº2å‰è¿›
+		uint8_t Reg_num = 2;   // å¯„å­˜å™¨æ•°é‡
+	  uint16_t slave2_cmds[Reg_num];//å¯„å­˜å™¨æŒ‡ä»¤
+		// åˆå§‹åŒ–æ•°ç»„ï¼ˆé¿å…è„æ•°æ®ï¼‰
 		memset(slave2_cmds, 0, sizeof(slave2_cmds));
 		if(Reg_num >= 2) 
 		{
-				slave2_cmds[0] = Pulse_num3;            // ¼Ä´æÆ÷1£º¸ßÎ»
-				slave2_cmds[1] = Pulse_num4;            // ¼Ä´æÆ÷2£ºµÍÎ»			
-//				printf("¸³Öµºó£ºslave1_cmds[2] = 0x%04X\n", slave1_cmds[2]); // È·ÈÏ¸³Öµ³É¹¦
+				slave2_cmds[0] = Pulse_num3;            // å¯„å­˜å™¨1ï¼šé«˜ä½
+				slave2_cmds[1] = Pulse_num4;            // å¯„å­˜å™¨2ï¼šä½ä½			
+//				printf("èµ‹å€¼åï¼šslave1_cmds[2] = 0x%04X\n", slave1_cmds[2]); // ç¡®è®¤èµ‹å€¼æˆåŠŸ
 		} else
 		{
-				// Reg_num²»×ãÊ±µÄÈİ´í´¦Àí£¨±ÈÈçÇå¿ÕÊı×é£©
+				// Reg_numä¸è¶³æ—¶çš„å®¹é”™å¤„ç†ï¼ˆæ¯”å¦‚æ¸…ç©ºæ•°ç»„ï¼‰
 				memset(slave2_cmds, 0, sizeof(slave2_cmds));
 		}
 		if(master_state != MASTER_IDLE) 
 		{
 				master_state = MASTER_IDLE;
 				timeout_cnt = 0;
-				printf("Ç¿ÖÆÖØÖÃÖ÷Õ¾×´Ì¬Îª¿ÕÏĞ\r\n");
+				printf("å¼ºåˆ¶é‡ç½®ä¸»ç«™çŠ¶æ€ä¸ºç©ºé—²\r\n");
 				fflush(stdout);
 		}
 		uint8_t ctrl_ret2 = Motor_Batch_Control(MOTOR2_SLAVE_ADDR, MOTOR2_CTRL_REG3, Reg_num, slave2_cmds);
-		// Ç°½øÖ¸Áî½á¹ûÅĞ¶Ï
+		// å‰è¿›æŒ‡ä»¤ç»“æœåˆ¤æ–­
     switch(ctrl_ret2)
     {
         case 0:
-            printf("ÉÏÉıÖ¸Áî·¢ËÍ³É¹¦£¬µç»ú¿ªÊ¼ÔËĞĞ\r\n");
+            printf("ä¸Šå‡æŒ‡ä»¤å‘é€æˆåŠŸï¼Œç”µæœºå¼€å§‹è¿è¡Œ\r\n");
             break;
         case 1:
-            printf("´íÎó£ºµç»ú±àºÅ·Ç·¨»òÖ÷Õ¾·Ç¿ÕÏĞ£¨ÉÏÉıÖ¸ÁîÎ´·¢ËÍ£©\r\n");
-            // Ö±½ÓÍË³ö£¬±ÜÃâÖ´ĞĞÍ£Ö¹Ö¸Áî
+            printf("é”™è¯¯ï¼šç”µæœºç¼–å·éæ³•æˆ–ä¸»ç«™éç©ºé—²ï¼ˆä¸Šå‡æŒ‡ä»¤æœªå‘é€ï¼‰\r\n");
+            // ç›´æ¥é€€å‡ºï¼Œé¿å…æ‰§è¡Œåœæ­¢æŒ‡ä»¤
             while(1) { delay_ms(1000); }
         case 2:
-            printf("¾¯¸æ£ºÉÏÉıÖ¸Áî³¬Ê±£¬µ«µç»ú¿ÉÄÜÒÑÔËĞĞ\r\n");
+            printf("è­¦å‘Šï¼šä¸Šå‡æŒ‡ä»¤è¶…æ—¶ï¼Œä½†ç”µæœºå¯èƒ½å·²è¿è¡Œ\r\n");
             break;
         case 3:
-            printf("´íÎó£ºÉÏÉıÖ¸ÁîÏìÓ¦ÄÚÈİ²»Æ¥Åä\r\n");
+            printf("é”™è¯¯ï¼šä¸Šå‡æŒ‡ä»¤å“åº”å†…å®¹ä¸åŒ¹é…\r\n");
             break;
         default:
-            printf("´íÎó£ºÉÏÉıÖ¸Áî·¢ËÍÒì³£\r\n");
+            printf("é”™è¯¯ï¼šä¸Šå‡æŒ‡ä»¤å‘é€å¼‚å¸¸\r\n");
             break;
     }
 		master_state = MASTER_IDLE;
-		timeout_cnt = 0; // Í¬Ê±ÖØÖÃ³¬Ê±¼ÆÊıÆ÷
+		timeout_cnt = 0; // åŒæ—¶é‡ç½®è¶…æ—¶è®¡æ•°å™¨
 }		
 	
 void Battery21(void)
 {
-  	//20.µç»ú1ÉÏÉıÉèÖÃ
-		uint8_t motor_num1 = 2;  //È¦Êı
-		uint16_t motor_cmd1 = MOTOR1_LengthRun; //ÉÏÉı·½ÏòºÍÈ¦ÊıÖµÉèÖÃ
+  	//20.ç”µæœº1ä¸Šå‡è®¾ç½®
+		uint8_t motor_num1 = 2;  //åœˆæ•°
+		uint16_t motor_cmd1 = MOTOR1_LengthRun; //ä¸Šå‡æ–¹å‘å’Œåœˆæ•°å€¼è®¾ç½®
 		uint8_t ctrl_ret1 = Motor_Control(MOTOR1_SLAVE_ADDR, motor_num1, motor_cmd1);
-		// ÏÂ½µÖ¸Áî½á¹ûÅĞ¶Ï
+		// ä¸‹é™æŒ‡ä»¤ç»“æœåˆ¤æ–­
     switch(ctrl_ret1)
     {
         case 0:
-            printf("ÉÏÉıÖ¸Áî·¢ËÍ³É¹¦£¬µç»ú¿ªÊ¼ÔËĞĞ\r\n");
+            printf("ä¸Šå‡æŒ‡ä»¤å‘é€æˆåŠŸï¼Œç”µæœºå¼€å§‹è¿è¡Œ\r\n");
             break;
         case 1:
-            printf("´íÎó£ºµç»ú±àºÅ·Ç·¨»òÖ÷Õ¾·Ç¿ÕÏĞ£¨ÉÏÉıÖ¸ÁîÎ´·¢ËÍ£©\r\n");
-            // Ö±½ÓÍË³ö£¬±ÜÃâÖ´ĞĞÍ£Ö¹Ö¸Áî
+            printf("é”™è¯¯ï¼šç”µæœºç¼–å·éæ³•æˆ–ä¸»ç«™éç©ºé—²ï¼ˆä¸Šå‡æŒ‡ä»¤æœªå‘é€ï¼‰\r\n");
+            // ç›´æ¥é€€å‡ºï¼Œé¿å…æ‰§è¡Œåœæ­¢æŒ‡ä»¤
             while(1) { delay_ms(1000); }
         case 2:
-            printf("¾¯¸æ£ºÉÏÉıÖ¸Áî³¬Ê±£¬µ«µç»ú¿ÉÄÜÒÑÔËĞĞ\r\n");
+            printf("è­¦å‘Šï¼šä¸Šå‡æŒ‡ä»¤è¶…æ—¶ï¼Œä½†ç”µæœºå¯èƒ½å·²è¿è¡Œ\r\n");
             break;
         case 3:
-            printf("´íÎó£ºÉÏÉıÖ¸ÁîÏìÓ¦ÄÚÈİ²»Æ¥Åä\r\n");
+            printf("é”™è¯¯ï¼šä¸Šå‡æŒ‡ä»¤å“åº”å†…å®¹ä¸åŒ¹é…\r\n");
             break;
         default:
-            printf("´íÎó£ºÉÏÉıÖ¸Áî·¢ËÍÒì³£\r\n");
+            printf("é”™è¯¯ï¼šä¸Šå‡æŒ‡ä»¤å‘é€å¼‚å¸¸\r\n");
             break;
     }
 		master_state = MASTER_IDLE;
-		timeout_cnt = 0; // Í¬Ê±ÖØÖÃ³¬Ê±¼ÆÊıÆ÷
+		timeout_cnt = 0; // åŒæ—¶é‡ç½®è¶…æ—¶è®¡æ•°å™¨
 }
 		
 void Battery22(void)
 {
-  	//21.µç»ú1Æô¶¯
-		uint8_t motor_num1 = 1;  //ÆôÍ£
-		uint16_t motor_cmd1 = MOTOR1_deRUN; //Æô¶¯
+  	//21.ç”µæœº1å¯åŠ¨
+		uint8_t motor_num1 = 1;  //å¯åœ
+		uint16_t motor_cmd1 = MOTOR1_deRUN; //å¯åŠ¨
 		uint8_t ctrl_ret1 = Motor_Control(MOTOR1_SLAVE_ADDR, motor_num1, motor_cmd1);
 		switch(ctrl_ret1)
     {
         case 0:
-            printf("ÉÏÉıÖ¸Áî·¢ËÍ³É¹¦£¬µç»ú¿ªÊ¼ÔËĞĞ\r\n");
+            printf("ä¸Šå‡æŒ‡ä»¤å‘é€æˆåŠŸï¼Œç”µæœºå¼€å§‹è¿è¡Œ\r\n");
             break;
         case 1:
-            printf("´íÎó£ºµç»ú±àºÅ·Ç·¨»òÖ÷Õ¾·Ç¿ÕÏĞ£¨ÉÏÉıÖ¸ÁîÎ´·¢ËÍ£©\r\n");
-            // Ö±½ÓÍË³ö£¬±ÜÃâÖ´ĞĞÍ£Ö¹Ö¸Áî
+            printf("é”™è¯¯ï¼šç”µæœºç¼–å·éæ³•æˆ–ä¸»ç«™éç©ºé—²ï¼ˆä¸Šå‡æŒ‡ä»¤æœªå‘é€ï¼‰\r\n");
+            // ç›´æ¥é€€å‡ºï¼Œé¿å…æ‰§è¡Œåœæ­¢æŒ‡ä»¤
             while(1) { delay_ms(1000); }
         case 2:
-            printf("¾¯¸æ£ºÉÏÉıÖ¸Áî³¬Ê±£¬µ«µç»ú¿ÉÄÜÒÑÔËĞĞ\r\n");
+            printf("è­¦å‘Šï¼šä¸Šå‡æŒ‡ä»¤è¶…æ—¶ï¼Œä½†ç”µæœºå¯èƒ½å·²è¿è¡Œ\r\n");
             break;
         case 3:
-            printf("´íÎó£ºÉÏÉıÖ¸ÁîÏìÓ¦ÄÚÈİ²»Æ¥Åä\r\n");
+            printf("é”™è¯¯ï¼šä¸Šå‡æŒ‡ä»¤å“åº”å†…å®¹ä¸åŒ¹é…\r\n");
             break;
         default:
-            printf("´íÎó£ºÉÏÉıÖ¸Áî·¢ËÍÒì³£\r\n");
+            printf("é”™è¯¯ï¼šä¸Šå‡æŒ‡ä»¤å‘é€å¼‚å¸¸\r\n");
             break;
     }
 		master_state = MASTER_IDLE;
-		timeout_cnt = 0; // Í¬Ê±ÖØÖÃ³¬Ê±¼ÆÊıÆ÷
+		timeout_cnt = 0; // åŒæ—¶é‡ç½®è¶…æ—¶è®¡æ•°å™¨
 }			
 		
 void Battery23(void)
 {
-  	//22.µç»ú3¼Ğ½ôµç³Ø
-		uint8_t motor_num3 = 2;   // ¼Ä´æÆ÷µØÖ·£¨¼Ğ½ô£©
-		uint16_t motor_cmd3 = Clamp; // µç»úÖ¸Áî£º
+  	//22.ç”µæœº3å¤¹ç´§ç”µæ± 
+		uint8_t motor_num3 = 2;   // å¯„å­˜å™¨åœ°å€ï¼ˆå¤¹ç´§ï¼‰
+		uint16_t motor_cmd3 = Clamp; // ç”µæœºæŒ‡ä»¤ï¼š
 		uint8_t ctrl_ret3 = Motor_Control(MOTOR3_SLAVE_ADDR, motor_num3, motor_cmd3);
 		if(ctrl_ret3 == 0)
     {
-        printf("´Ó»ú3¼Ğ½ôÖ¸Áî·¢ËÍ³É¹¦£¡\r\n");
+        printf("ä»æœº3å¤¹ç´§æŒ‡ä»¤å‘é€æˆåŠŸï¼\r\n");
     }
     else
     {
-        printf("´Ó»ú3¼Ğ½ôÖ¸Áî·¢ËÍÊ§°Ü£¬´íÎóÂë£º%d\r\n", ctrl_ret3);
+        printf("ä»æœº3å¤¹ç´§æŒ‡ä»¤å‘é€å¤±è´¥ï¼Œé”™è¯¯ç ï¼š%d\r\n", ctrl_ret3);
     }
 		master_state = MASTER_IDLE;
-		timeout_cnt = 0; // Í¬Ê±ÖØÖÃ³¬Ê±¼ÆÊıÆ÷
+		timeout_cnt = 0; // åŒæ—¶é‡ç½®è¶…æ—¶è®¡æ•°å™¨
 }			
 		
 void Battery24(void)
 {
-  	//23.µç»ú2Ç°½ø
-		uint8_t Reg_num = 2;   // ¼Ä´æÆ÷ÊıÁ¿
-	  uint16_t slave2_cmds[Reg_num];//¼Ä´æÆ÷Ö¸Áî
-		// ³õÊ¼»¯Êı×é£¨±ÜÃâÔàÊı¾İ£©
+  	//23.ç”µæœº2å‰è¿›
+		uint8_t Reg_num = 2;   // å¯„å­˜å™¨æ•°é‡
+	  uint16_t slave2_cmds[Reg_num];//å¯„å­˜å™¨æŒ‡ä»¤
+		// åˆå§‹åŒ–æ•°ç»„ï¼ˆé¿å…è„æ•°æ®ï¼‰
 		memset(slave2_cmds, 0, sizeof(slave2_cmds));
 		if(Reg_num >= 2) 
 		{
-				slave2_cmds[0] = Pulse_num7;            // ¼Ä´æÆ÷1£º¸ßÎ»
-				slave2_cmds[1] = Pulse_num8;            // ¼Ä´æÆ÷2£ºµÍÎ»			
-//				printf("¸³Öµºó£ºslave1_cmds[2] = 0x%04X\n", slave1_cmds[2]); // È·ÈÏ¸³Öµ³É¹¦
+				slave2_cmds[0] = Pulse_num7;            // å¯„å­˜å™¨1ï¼šé«˜ä½
+				slave2_cmds[1] = Pulse_num8;            // å¯„å­˜å™¨2ï¼šä½ä½			
+//				printf("èµ‹å€¼åï¼šslave1_cmds[2] = 0x%04X\n", slave1_cmds[2]); // ç¡®è®¤èµ‹å€¼æˆåŠŸ
 		} else
 		{
-				// Reg_num²»×ãÊ±µÄÈİ´í´¦Àí£¨±ÈÈçÇå¿ÕÊı×é£©
+				// Reg_numä¸è¶³æ—¶çš„å®¹é”™å¤„ç†ï¼ˆæ¯”å¦‚æ¸…ç©ºæ•°ç»„ï¼‰
 				memset(slave2_cmds, 0, sizeof(slave2_cmds));
 		}
 		if(master_state != MASTER_IDLE) 
 		{
 				master_state = MASTER_IDLE;
 				timeout_cnt = 0;
-				printf("Ç¿ÖÆÖØÖÃÖ÷Õ¾×´Ì¬Îª¿ÕÏĞ\r\n");
+				printf("å¼ºåˆ¶é‡ç½®ä¸»ç«™çŠ¶æ€ä¸ºç©ºé—²\r\n");
 				fflush(stdout);
 		}
 		uint8_t ctrl_ret2 = Motor_Batch_Control(MOTOR2_SLAVE_ADDR, MOTOR2_CTRL_REG3, Reg_num, slave2_cmds);
-		// Ç°½øÖ¸Áî½á¹ûÅĞ¶Ï
+		// å‰è¿›æŒ‡ä»¤ç»“æœåˆ¤æ–­
     switch(ctrl_ret2)
     {
         case 0:
-            printf("ÉÏÉıÖ¸Áî·¢ËÍ³É¹¦£¬µç»ú¿ªÊ¼ÔËĞĞ\r\n");
+            printf("ä¸Šå‡æŒ‡ä»¤å‘é€æˆåŠŸï¼Œç”µæœºå¼€å§‹è¿è¡Œ\r\n");
             break;
         case 1:
-            printf("´íÎó£ºµç»ú±àºÅ·Ç·¨»òÖ÷Õ¾·Ç¿ÕÏĞ£¨ÉÏÉıÖ¸ÁîÎ´·¢ËÍ£©\r\n");
-            // Ö±½ÓÍË³ö£¬±ÜÃâÖ´ĞĞÍ£Ö¹Ö¸Áî
+            printf("é”™è¯¯ï¼šç”µæœºç¼–å·éæ³•æˆ–ä¸»ç«™éç©ºé—²ï¼ˆä¸Šå‡æŒ‡ä»¤æœªå‘é€ï¼‰\r\n");
+            // ç›´æ¥é€€å‡ºï¼Œé¿å…æ‰§è¡Œåœæ­¢æŒ‡ä»¤
             while(1) { delay_ms(1000); }
         case 2:
-            printf("¾¯¸æ£ºÉÏÉıÖ¸Áî³¬Ê±£¬µ«µç»ú¿ÉÄÜÒÑÔËĞĞ\r\n");
+            printf("è­¦å‘Šï¼šä¸Šå‡æŒ‡ä»¤è¶…æ—¶ï¼Œä½†ç”µæœºå¯èƒ½å·²è¿è¡Œ\r\n");
             break;
         case 3:
-            printf("´íÎó£ºÉÏÉıÖ¸ÁîÏìÓ¦ÄÚÈİ²»Æ¥Åä\r\n");
+            printf("é”™è¯¯ï¼šä¸Šå‡æŒ‡ä»¤å“åº”å†…å®¹ä¸åŒ¹é…\r\n");
             break;
         default:
-            printf("´íÎó£ºÉÏÉıÖ¸Áî·¢ËÍÒì³£\r\n");
+            printf("é”™è¯¯ï¼šä¸Šå‡æŒ‡ä»¤å‘é€å¼‚å¸¸\r\n");
             break;
     }
 		master_state = MASTER_IDLE;
-		timeout_cnt = 0; // Í¬Ê±ÖØÖÃ³¬Ê±¼ÆÊıÆ÷
+		timeout_cnt = 0; // åŒæ—¶é‡ç½®è¶…æ—¶è®¡æ•°å™¨
 }			
 				
 void Battery25(void)
 {
-  	//24.µç»ú3ËÉ¿ªµç³Ø
-		uint8_t motor_num3 = 1;   // ¼Ä´æÆ÷µØÖ·£¨ËÉ¿ª£©
-		uint16_t motor_cmd3 = Lossen; // µç»úÖ¸Áî£º
+  	//24.ç”µæœº3æ¾å¼€ç”µæ± 
+		uint8_t motor_num3 = 1;   // å¯„å­˜å™¨åœ°å€ï¼ˆæ¾å¼€ï¼‰
+		uint16_t motor_cmd3 = Lossen; // ç”µæœºæŒ‡ä»¤ï¼š
 		uint8_t ctrl_ret3 = Motor_Control(MOTOR3_SLAVE_ADDR, motor_num3, motor_cmd3);
 		if(ctrl_ret3 == 0)
     {
-        printf("´Ó»ú3ËÉ¿ªÖ¸Áî·¢ËÍ³É¹¦£¡\r\n");
+        printf("ä»æœº3æ¾å¼€æŒ‡ä»¤å‘é€æˆåŠŸï¼\r\n");
     }
     else
     {
-        printf("´Ó»ú3ËÉ¿ªÖ¸Áî·¢ËÍÊ§°Ü£¬´íÎóÂë£º%d\r\n", ctrl_ret3);
+        printf("ä»æœº3æ¾å¼€æŒ‡ä»¤å‘é€å¤±è´¥ï¼Œé”™è¯¯ç ï¼š%d\r\n", ctrl_ret3);
     }
 		master_state = MASTER_IDLE;
-		timeout_cnt = 0; // Í¬Ê±ÖØÖÃ³¬Ê±¼ÆÊıÆ÷
+		timeout_cnt = 0; // åŒæ—¶é‡ç½®è¶…æ—¶è®¡æ•°å™¨
 }
 
 void Battery26(void)
 {
-  	//25.µç»ú1ÏÂ½µÉèÖÃ
-		uint8_t motor_num1 = 2;  //È¦Êı
-		uint16_t motor_cmd1 = MOTOR1_deLengthRun; //ÏÂ½µ·½ÏòºÍÈ¦ÊıÖµÉèÖÃ
+  	//25.ç”µæœº1ä¸‹é™è®¾ç½®
+		uint8_t motor_num1 = 2;  //åœˆæ•°
+		uint16_t motor_cmd1 = MOTOR1_deLengthRun; //ä¸‹é™æ–¹å‘å’Œåœˆæ•°å€¼è®¾ç½®
 		uint8_t ctrl_ret1 = Motor_Control(MOTOR1_SLAVE_ADDR, motor_num1, motor_cmd1);
-		// ÏÂ½µÖ¸Áî½á¹ûÅĞ¶Ï
+		// ä¸‹é™æŒ‡ä»¤ç»“æœåˆ¤æ–­
     switch(ctrl_ret1)
     {
         case 0:
-            printf("ÉÏÉıÖ¸Áî·¢ËÍ³É¹¦£¬µç»ú¿ªÊ¼ÔËĞĞ\r\n");
+            printf("ä¸Šå‡æŒ‡ä»¤å‘é€æˆåŠŸï¼Œç”µæœºå¼€å§‹è¿è¡Œ\r\n");
             break;
         case 1:
-            printf("´íÎó£ºµç»ú±àºÅ·Ç·¨»òÖ÷Õ¾·Ç¿ÕÏĞ£¨ÉÏÉıÖ¸ÁîÎ´·¢ËÍ£©\r\n");
-            // Ö±½ÓÍË³ö£¬±ÜÃâÖ´ĞĞÍ£Ö¹Ö¸Áî
+            printf("é”™è¯¯ï¼šç”µæœºç¼–å·éæ³•æˆ–ä¸»ç«™éç©ºé—²ï¼ˆä¸Šå‡æŒ‡ä»¤æœªå‘é€ï¼‰\r\n");
+            // ç›´æ¥é€€å‡ºï¼Œé¿å…æ‰§è¡Œåœæ­¢æŒ‡ä»¤
             while(1) { delay_ms(1000); }
         case 2:
-            printf("¾¯¸æ£ºÉÏÉıÖ¸Áî³¬Ê±£¬µ«µç»ú¿ÉÄÜÒÑÔËĞĞ\r\n");
+            printf("è­¦å‘Šï¼šä¸Šå‡æŒ‡ä»¤è¶…æ—¶ï¼Œä½†ç”µæœºå¯èƒ½å·²è¿è¡Œ\r\n");
             break;
         case 3:
-            printf("´íÎó£ºÉÏÉıÖ¸ÁîÏìÓ¦ÄÚÈİ²»Æ¥Åä\r\n");
+            printf("é”™è¯¯ï¼šä¸Šå‡æŒ‡ä»¤å“åº”å†…å®¹ä¸åŒ¹é…\r\n");
             break;
         default:
-            printf("´íÎó£ºÉÏÉıÖ¸Áî·¢ËÍÒì³£\r\n");
+            printf("é”™è¯¯ï¼šä¸Šå‡æŒ‡ä»¤å‘é€å¼‚å¸¸\r\n");
             break;
     }
 		master_state = MASTER_IDLE;
-		timeout_cnt = 0; // Í¬Ê±ÖØÖÃ³¬Ê±¼ÆÊıÆ÷
+		timeout_cnt = 0; // åŒæ—¶é‡ç½®è¶…æ—¶è®¡æ•°å™¨
 }
 		
 void Battery27(void)
 {
-  	//26.µç»ú1Æô¶¯
-		uint8_t motor_num1 = 1;  //ÆôÍ£
-		uint16_t motor_cmd1 = MOTOR1_deRUN; //Æô¶¯
+  	//26.ç”µæœº1å¯åŠ¨
+		uint8_t motor_num1 = 1;  //å¯åœ
+		uint16_t motor_cmd1 = MOTOR1_deRUN; //å¯åŠ¨
 		uint8_t ctrl_ret1 = Motor_Control(MOTOR1_SLAVE_ADDR, motor_num1, motor_cmd1);
 		switch(ctrl_ret1)
     {
         case 0:
-            printf("ÉÏÉıÖ¸Áî·¢ËÍ³É¹¦£¬µç»ú¿ªÊ¼ÔËĞĞ\r\n");
+            printf("ä¸Šå‡æŒ‡ä»¤å‘é€æˆåŠŸï¼Œç”µæœºå¼€å§‹è¿è¡Œ\r\n");
             break;
         case 1:
-            printf("´íÎó£ºµç»ú±àºÅ·Ç·¨»òÖ÷Õ¾·Ç¿ÕÏĞ£¨ÉÏÉıÖ¸ÁîÎ´·¢ËÍ£©\r\n");
-            // Ö±½ÓÍË³ö£¬±ÜÃâÖ´ĞĞÍ£Ö¹Ö¸Áî
+            printf("é”™è¯¯ï¼šç”µæœºç¼–å·éæ³•æˆ–ä¸»ç«™éç©ºé—²ï¼ˆä¸Šå‡æŒ‡ä»¤æœªå‘é€ï¼‰\r\n");
+            // ç›´æ¥é€€å‡ºï¼Œé¿å…æ‰§è¡Œåœæ­¢æŒ‡ä»¤
             while(1) { delay_ms(1000); }
         case 2:
-            printf("¾¯¸æ£ºÉÏÉıÖ¸Áî³¬Ê±£¬µ«µç»ú¿ÉÄÜÒÑÔËĞĞ\r\n");
+            printf("è­¦å‘Šï¼šä¸Šå‡æŒ‡ä»¤è¶…æ—¶ï¼Œä½†ç”µæœºå¯èƒ½å·²è¿è¡Œ\r\n");
             break;
         case 3:
-            printf("´íÎó£ºÉÏÉıÖ¸ÁîÏìÓ¦ÄÚÈİ²»Æ¥Åä\r\n");
+            printf("é”™è¯¯ï¼šä¸Šå‡æŒ‡ä»¤å“åº”å†…å®¹ä¸åŒ¹é…\r\n");
             break;
         default:
-            printf("´íÎó£ºÉÏÉıÖ¸Áî·¢ËÍÒì³£\r\n");
+            printf("é”™è¯¯ï¼šä¸Šå‡æŒ‡ä»¤å‘é€å¼‚å¸¸\r\n");
             break;
     }
 		master_state = MASTER_IDLE;
-		timeout_cnt = 0; // Í¬Ê±ÖØÖÃ³¬Ê±¼ÆÊıÆ÷
+		timeout_cnt = 0; // åŒæ—¶é‡ç½®è¶…æ—¶è®¡æ•°å™¨
 }		
 		
 void Battery28(void)
 {	
-	  //27.µç»ú2ºóÍË
-		uint8_t Reg_num = 2;   // ¼Ä´æÆ÷ÊıÁ¿
-	  uint16_t slave2_cmds[Reg_num];//¼Ä´æÆ÷Ö¸Áî
-		// ³õÊ¼»¯Êı×é£¨±ÜÃâÔàÊı¾İ£©
+	  //27.ç”µæœº2åé€€
+		uint8_t Reg_num = 2;   // å¯„å­˜å™¨æ•°é‡
+	  uint16_t slave2_cmds[Reg_num];//å¯„å­˜å™¨æŒ‡ä»¤
+		// åˆå§‹åŒ–æ•°ç»„ï¼ˆé¿å…è„æ•°æ®ï¼‰
 		memset(slave2_cmds, 0, sizeof(slave2_cmds));
 		if(Reg_num >= 2) 
 		{
-				slave2_cmds[0] = Pulse_num13;            // ¼Ä´æÆ÷1£º¸ßÎ»
-				slave2_cmds[1] = Pulse_num14;            // ¼Ä´æÆ÷2£ºµÍÎ»			
+				slave2_cmds[0] = Pulse_num13;            // å¯„å­˜å™¨1ï¼šé«˜ä½
+				slave2_cmds[1] = Pulse_num14;            // å¯„å­˜å™¨2ï¼šä½ä½			
 		} else
 		{
-				// Reg_num²»×ãÊ±µÄÈİ´í´¦Àí£¨±ÈÈçÇå¿ÕÊı×é£©
+				// Reg_numä¸è¶³æ—¶çš„å®¹é”™å¤„ç†ï¼ˆæ¯”å¦‚æ¸…ç©ºæ•°ç»„ï¼‰
 				memset(slave2_cmds, 0, sizeof(slave2_cmds));
 		}
 		if(master_state != MASTER_IDLE) 
 		{
 				master_state = MASTER_IDLE;
 				timeout_cnt = 0;
-				printf("Ç¿ÖÆÖØÖÃÖ÷Õ¾×´Ì¬Îª¿ÕÏĞ\r\n");
+				printf("å¼ºåˆ¶é‡ç½®ä¸»ç«™çŠ¶æ€ä¸ºç©ºé—²\r\n");
 				fflush(stdout);
 		}
 		uint8_t ctrl_ret2 = Motor_Batch_Control(MOTOR2_SLAVE_ADDR, MOTOR2_CTRL_REG2, Reg_num, slave2_cmds);
-		// Ç°½øÖ¸Áî½á¹ûÅĞ¶Ï
+		// å‰è¿›æŒ‡ä»¤ç»“æœåˆ¤æ–­
     switch(ctrl_ret2)
     {
         case 0:
-            printf("ÉÏÉıÖ¸Áî·¢ËÍ³É¹¦£¬µç»ú¿ªÊ¼ÔËĞĞ\r\n");
+            printf("ä¸Šå‡æŒ‡ä»¤å‘é€æˆåŠŸï¼Œç”µæœºå¼€å§‹è¿è¡Œ\r\n");
             break;
         case 1:
-            printf("´íÎó£ºµç»ú±àºÅ·Ç·¨»òÖ÷Õ¾·Ç¿ÕÏĞ£¨ÉÏÉıÖ¸ÁîÎ´·¢ËÍ£©\r\n");
-            // Ö±½ÓÍË³ö£¬±ÜÃâÖ´ĞĞÍ£Ö¹Ö¸Áî
+            printf("é”™è¯¯ï¼šç”µæœºç¼–å·éæ³•æˆ–ä¸»ç«™éç©ºé—²ï¼ˆä¸Šå‡æŒ‡ä»¤æœªå‘é€ï¼‰\r\n");
+            // ç›´æ¥é€€å‡ºï¼Œé¿å…æ‰§è¡Œåœæ­¢æŒ‡ä»¤
             while(1) { delay_ms(1000); }
         case 2:
-            printf("¾¯¸æ£ºÉÏÉıÖ¸Áî³¬Ê±£¬µ«µç»ú¿ÉÄÜÒÑÔËĞĞ\r\n");
+            printf("è­¦å‘Šï¼šä¸Šå‡æŒ‡ä»¤è¶…æ—¶ï¼Œä½†ç”µæœºå¯èƒ½å·²è¿è¡Œ\r\n");
             break;
         case 3:
-            printf("´íÎó£ºÉÏÉıÖ¸ÁîÏìÓ¦ÄÚÈİ²»Æ¥Åä\r\n");
+            printf("é”™è¯¯ï¼šä¸Šå‡æŒ‡ä»¤å“åº”å†…å®¹ä¸åŒ¹é…\r\n");
             break;
         default:
-            printf("´íÎó£ºÉÏÉıÖ¸Áî·¢ËÍÒì³£\r\n");
+            printf("é”™è¯¯ï¼šä¸Šå‡æŒ‡ä»¤å‘é€å¼‚å¸¸\r\n");
             break;
     }
 		master_state = MASTER_IDLE;
-		timeout_cnt = 0; // Í¬Ê±ÖØÖÃ³¬Ê±¼ÆÊıÆ÷
+		timeout_cnt = 0; // åŒæ—¶é‡ç½®è¶…æ—¶è®¡æ•°å™¨
 }	 
 		
 void Battery29(void)
 {
-  	//28.µç»ú1ÉÏÉıÉèÖÃ
-		uint8_t motor_num1 = 2;  //È¦Êı
-		uint16_t motor_cmd1 = MOTOR1_LengthRun; //ÉÏÉı·½ÏòºÍÈ¦ÊıÖµÉèÖÃ
+  	//28.ç”µæœº1ä¸Šå‡è®¾ç½®
+		uint8_t motor_num1 = 2;  //åœˆæ•°
+		uint16_t motor_cmd1 = MOTOR1_LengthRun; //ä¸Šå‡æ–¹å‘å’Œåœˆæ•°å€¼è®¾ç½®
 		uint8_t ctrl_ret1 = Motor_Control(MOTOR1_SLAVE_ADDR, motor_num1, motor_cmd1);
-		// ÏÂ½µÖ¸Áî½á¹ûÅĞ¶Ï
+		// ä¸‹é™æŒ‡ä»¤ç»“æœåˆ¤æ–­
     switch(ctrl_ret1)
     {
         case 0:
-            printf("ÉÏÉıÖ¸Áî·¢ËÍ³É¹¦£¬µç»ú¿ªÊ¼ÔËĞĞ\r\n");
+            printf("ä¸Šå‡æŒ‡ä»¤å‘é€æˆåŠŸï¼Œç”µæœºå¼€å§‹è¿è¡Œ\r\n");
             break;
         case 1:
-            printf("´íÎó£ºµç»ú±àºÅ·Ç·¨»òÖ÷Õ¾·Ç¿ÕÏĞ£¨ÉÏÉıÖ¸ÁîÎ´·¢ËÍ£©\r\n");
-            // Ö±½ÓÍË³ö£¬±ÜÃâÖ´ĞĞÍ£Ö¹Ö¸Áî
+            printf("é”™è¯¯ï¼šç”µæœºç¼–å·éæ³•æˆ–ä¸»ç«™éç©ºé—²ï¼ˆä¸Šå‡æŒ‡ä»¤æœªå‘é€ï¼‰\r\n");
+            // ç›´æ¥é€€å‡ºï¼Œé¿å…æ‰§è¡Œåœæ­¢æŒ‡ä»¤
             while(1) { delay_ms(1000); }
         case 2:
-            printf("¾¯¸æ£ºÉÏÉıÖ¸Áî³¬Ê±£¬µ«µç»ú¿ÉÄÜÒÑÔËĞĞ\r\n");
+            printf("è­¦å‘Šï¼šä¸Šå‡æŒ‡ä»¤è¶…æ—¶ï¼Œä½†ç”µæœºå¯èƒ½å·²è¿è¡Œ\r\n");
             break;
         case 3:
-            printf("´íÎó£ºÉÏÉıÖ¸ÁîÏìÓ¦ÄÚÈİ²»Æ¥Åä\r\n");
+            printf("é”™è¯¯ï¼šä¸Šå‡æŒ‡ä»¤å“åº”å†…å®¹ä¸åŒ¹é…\r\n");
             break;
         default:
-            printf("´íÎó£ºÉÏÉıÖ¸Áî·¢ËÍÒì³£\r\n");
+            printf("é”™è¯¯ï¼šä¸Šå‡æŒ‡ä»¤å‘é€å¼‚å¸¸\r\n");
             break;
     }
 		master_state = MASTER_IDLE;
-		timeout_cnt = 0; // Í¬Ê±ÖØÖÃ³¬Ê±¼ÆÊıÆ÷
+		timeout_cnt = 0; // åŒæ—¶é‡ç½®è¶…æ—¶è®¡æ•°å™¨
 }			
 		
 void Battery30(void)
 {
-  	//29.µç»ú1Æô¶¯
-		uint8_t motor_num1 = 1;  //ÆôÍ£
-		uint16_t motor_cmd1 = MOTOR1_deRUN; //Æô¶¯
+  	//29.ç”µæœº1å¯åŠ¨
+		uint8_t motor_num1 = 1;  //å¯åœ
+		uint16_t motor_cmd1 = MOTOR1_deRUN; //å¯åŠ¨
 		uint8_t ctrl_ret1 = Motor_Control(MOTOR1_SLAVE_ADDR, motor_num1, motor_cmd1);
 		switch(ctrl_ret1)
     {
         case 0:
-            printf("ÉÏÉıÖ¸Áî·¢ËÍ³É¹¦£¬µç»ú¿ªÊ¼ÔËĞĞ\r\n");
+            printf("ä¸Šå‡æŒ‡ä»¤å‘é€æˆåŠŸï¼Œç”µæœºå¼€å§‹è¿è¡Œ\r\n");
             break;
         case 1:
-            printf("´íÎó£ºµç»ú±àºÅ·Ç·¨»òÖ÷Õ¾·Ç¿ÕÏĞ£¨ÉÏÉıÖ¸ÁîÎ´·¢ËÍ£©\r\n");
-            // Ö±½ÓÍË³ö£¬±ÜÃâÖ´ĞĞÍ£Ö¹Ö¸Áî
+            printf("é”™è¯¯ï¼šç”µæœºç¼–å·éæ³•æˆ–ä¸»ç«™éç©ºé—²ï¼ˆä¸Šå‡æŒ‡ä»¤æœªå‘é€ï¼‰\r\n");
+            // ç›´æ¥é€€å‡ºï¼Œé¿å…æ‰§è¡Œåœæ­¢æŒ‡ä»¤
             while(1) { delay_ms(1000); }
         case 2:
-            printf("¾¯¸æ£ºÉÏÉıÖ¸Áî³¬Ê±£¬µ«µç»ú¿ÉÄÜÒÑÔËĞĞ\r\n");
+            printf("è­¦å‘Šï¼šä¸Šå‡æŒ‡ä»¤è¶…æ—¶ï¼Œä½†ç”µæœºå¯èƒ½å·²è¿è¡Œ\r\n");
             break;
         case 3:
-            printf("´íÎó£ºÉÏÉıÖ¸ÁîÏìÓ¦ÄÚÈİ²»Æ¥Åä\r\n");
+            printf("é”™è¯¯ï¼šä¸Šå‡æŒ‡ä»¤å“åº”å†…å®¹ä¸åŒ¹é…\r\n");
             break;
         default:
-            printf("´íÎó£ºÉÏÉıÖ¸Áî·¢ËÍÒì³£\r\n");
+            printf("é”™è¯¯ï¼šä¸Šå‡æŒ‡ä»¤å‘é€å¼‚å¸¸\r\n");
             break;
     }
 		master_state = MASTER_IDLE;
-		timeout_cnt = 0; // Í¬Ê±ÖØÖÃ³¬Ê±¼ÆÊıÆ÷
+		timeout_cnt = 0; // åŒæ—¶é‡ç½®è¶…æ—¶è®¡æ•°å™¨
 }	
 
 

@@ -2,60 +2,60 @@
 #define STATUS_REGS_H
 
 #include <stdint.h>
-// ÁÙ½çÇø±£»¤£¨¸ù¾ÝRTOS»òÂã»úÊµÏÖ£©
-// ´Ë´¦Ê¹ÓÃ¼òµ¥µÄ¿ª¹ØÖÐ¶Ï£¬ÈôÊ¹ÓÃFreeRTOS¿ÉÓÃtaskENTER_CRITICAL()
+// ä¸´ç•ŒåŒºä¿æŠ¤ï¼ˆæ ¹æ®RTOSæˆ–è£¸æœºå®žçŽ°ï¼‰
+// æ­¤å¤„ä½¿ç”¨ç®€å•çš„å¼€å…³ä¸­æ–­ï¼Œè‹¥ä½¿ç”¨FreeRTOSå¯ç”¨taskENTER_CRITICAL()
 #define ENTER_CRITICAL()   __disable_irq()
 #define EXIT_CRITICAL()    __enable_irq()
 
-// ¼Ä´æÆ÷×ÜÊý£¨0x00 ~ 0x1B ¹²28¸ö£©
+// å¯„å­˜å™¨æ€»æ•°ï¼ˆ0x00 ~ 0x1B å…±28ä¸ªï¼‰
 #define STATUS_REG_COUNT  28
 
-// ¼Ä´æÆ÷µØÖ·Ã¶¾Ù
+// å¯„å­˜å™¨åœ°å€æžšä¸¾
 typedef enum {
-    REG_RAINFALL = 0x00,      // ½µÓêÁ¿£¨mm£©
-    REG_WIND_SPEED,           // ·çËÙ£¨m/s£©
-    REG_AMBIENT_TEMP,         // »·¾³ÎÂ¶È£¨0.1¡æ£©
-    REG_CABIN_TEMP,           // ²ÕÄÚÎÂ¶È£¨0.1¡æ£©
-    REG_CABIN_HUMIDITY,       // ²ÕÄÚÊª¶È£¨%£©
-    REG_BAT1_SN,              // µç³Ø1ÐòºÅ
-    REG_BAT1_CHARGE_STATE,    // µç³Ø1³äµç×´Ì¬
-    REG_BAT1_POWER,           // µç³Ø1µçÁ¿£¨%£©
-    REG_BAT1_TEMP,            // µç³Ø1ÎÂ¶È£¨0.1¡æ£©
-    REG_BAT2_SN,              // µç³Ø2ÐòºÅ
-    REG_BAT2_CHARGE_STATE,    // µç³Ø2³äµç×´Ì¬
-    REG_BAT2_POWER,           // µç³Ø2µçÁ¿
-    REG_BAT2_TEMP,            // µç³Ø2ÎÂ¶È
-    REG_BAT3_SN,              // µç³Ø3ÐòºÅ
-    REG_BAT3_CHARGE_STATE,    // µç³Ø3³äµç×´Ì¬
-    REG_BAT3_POWER,           // µç³Ø3µçÁ¿
-    REG_BAT3_TEMP,            // µç³Ø3ÎÂ¶È
-    REG_DOOR_STATE,           // ²ÕÃÅ×´Ì¬£¨1´ò¿ªÖÐ2¿ªµ½Î»3¹ØÃÅÖÐ4¹Øµ½Î»£©
-    REG_LIFT_STATE,           // Éý½µ¸Ë×´Ì¬£¨1ÉÏÉýÖÐ2Éýµ½Î»3ÏÂ½µÖÐ4½µµ½Î»£©
-    REG_AC_STATE,             // ¿Õµ÷×´Ì¬£¨1ÖÆÀä2ÖÆÈÈ3´ý»ú£©
-    REG_SWAP_MECH_STATE,      // »»µç»ú¹¹×´Ì¬£¨Ô¤Áô£©
-    REG_CENTER_ROD_STATE,     // ¾ÓÖÐ¸Ë×´Ì¬£¨1ÊÕ½ô2ÊÍ·Å£©
-    REG_AIRCRAFT_PRESENT,     // ·É»úÊÇ·ñÔÚ»ú³²£¨1ÊÇ2·ñ£©
-    REG_FAULT_CODE,           // ¹ÊÕÏÂë
-    REG_RESERVED1,            // ±¸ÓÃ
-    REG_RESERVED2,            // ±¸ÓÃ
-		REG_RESERVED3,						// ±¸ÓÃ
-		REG_RESERVED4,						// ±¸ÓÃ  ´æ´¢0x60µÄÖµ
+    REG_RAINFALL = 0x00,      // é™é›¨é‡ï¼ˆmmï¼‰
+    REG_WIND_SPEED,           // é£Žé€Ÿï¼ˆm/sï¼‰
+    REG_AMBIENT_TEMP,         // çŽ¯å¢ƒæ¸©åº¦ï¼ˆ0.1â„ƒï¼‰
+    REG_CABIN_TEMP,           // èˆ±å†…æ¸©åº¦ï¼ˆ0.1â„ƒï¼‰
+    REG_CABIN_HUMIDITY,       // èˆ±å†…æ¹¿åº¦ï¼ˆ%ï¼‰
+    REG_BAT1_SN,              // ç”µæ± 1åºå·
+    REG_BAT1_CHARGE_STATE,    // ç”µæ± 1å……ç”µçŠ¶æ€
+    REG_BAT1_POWER,           // ç”µæ± 1ç”µé‡ï¼ˆ%ï¼‰
+    REG_BAT1_TEMP,            // ç”µæ± 1æ¸©åº¦ï¼ˆ0.1â„ƒï¼‰
+    REG_BAT2_SN,              // ç”µæ± 2åºå·
+    REG_BAT2_CHARGE_STATE,    // ç”µæ± 2å……ç”µçŠ¶æ€
+    REG_BAT2_POWER,           // ç”µæ± 2ç”µé‡
+    REG_BAT2_TEMP,            // ç”µæ± 2æ¸©åº¦
+    REG_BAT3_SN,              // ç”µæ± 3åºå·
+    REG_BAT3_CHARGE_STATE,    // ç”µæ± 3å……ç”µçŠ¶æ€
+    REG_BAT3_POWER,           // ç”µæ± 3ç”µé‡
+    REG_BAT3_TEMP,            // ç”µæ± 3æ¸©åº¦
+    REG_DOOR_STATE,           // èˆ±é—¨çŠ¶æ€ï¼ˆ1æ‰“å¼€ä¸­2å¼€åˆ°ä½3å…³é—¨ä¸­4å…³åˆ°ä½ï¼‰
+    REG_LIFT_STATE,           // å‡é™æ†çŠ¶æ€ï¼ˆ1ä¸Šå‡ä¸­2å‡åˆ°ä½3ä¸‹é™ä¸­4é™åˆ°ä½ï¼‰
+    REG_AC_STATE,             // ç©ºè°ƒçŠ¶æ€ï¼ˆ1åˆ¶å†·2åˆ¶çƒ­3å¾…æœºï¼‰
+    REG_SWAP_MECH_STATE,      // æ¢ç”µæœºæž„çŠ¶æ€ï¼ˆé¢„ç•™ï¼‰
+    REG_CENTER_ROD_STATE,     // å±…ä¸­æ†çŠ¶æ€ï¼ˆ1æ”¶ç´§2é‡Šæ”¾ï¼‰
+    REG_AIRCRAFT_PRESENT,     // é£žæœºæ˜¯å¦åœ¨æœºå·¢ï¼ˆ1æ˜¯2å¦ï¼‰
+    REG_FAULT_CODE,           // æ•…éšœç 
+    REG_RESERVED1,            // å¤‡ç”¨
+    REG_RESERVED2,            // å¤‡ç”¨
+		REG_RESERVED3,						// å¤‡ç”¨
+		REG_RESERVED4,						// å¤‡ç”¨  å­˜å‚¨0x60çš„å€¼
 } StatusRegAddr;
 
-// È«¾Ö×´Ì¬¼Ä´æÆ÷Êý×é£¨ÓÉÖ÷Õ¾¸üÐÂ£¬´ÓÕ¾¶ÁÈ¡£©
+// å…¨å±€çŠ¶æ€å¯„å­˜å™¨æ•°ç»„ï¼ˆç”±ä¸»ç«™æ›´æ–°ï¼Œä»Žç«™è¯»å–ï¼‰
 extern uint16_t status_regs[STATUS_REG_COUNT];
-// ³õÊ¼»¯×´Ì¬¼Ä´æÆ÷
+// åˆå§‹åŒ–çŠ¶æ€å¯„å­˜å™¨
 void StatusRegs_Init(void);
-// ¸üÐÂÄ³¸ö¼Ä´æÆ÷µÄÖµ£¨´øÁÙ½çÇø±£»¤£©
+// æ›´æ–°æŸä¸ªå¯„å­˜å™¨çš„å€¼ï¼ˆå¸¦ä¸´ç•ŒåŒºä¿æŠ¤ï¼‰
 void StatusRegs_Update(StatusRegAddr addr, uint16_t value);
-// ÅúÁ¿¸üÐÂÁ¬Ðø¼Ä´æÆ÷
+// æ‰¹é‡æ›´æ–°è¿žç»­å¯„å­˜å™¨
 void StatusRegs_UpdateBatch(uint16_t start_addr, const uint16_t *values, uint8_t count);
-// »ñÈ¡¼Ä´æÆ÷Öµ£¨¹©´ÓÕ¾¶ÁÈ¡£©
+// èŽ·å–å¯„å­˜å™¨å€¼ï¼ˆä¾›ä»Žç«™è¯»å–ï¼‰
 uint16_t StatusRegs_Get(StatusRegAddr addr);
 void StatusRegs_TakeSnapshot(void);
 void StatusRegs_ReleaseSnapshot(void);
 uint8_t StatusRegs_IsSnapshotActive(void);
-// ÅúÁ¿¶ÁÈ¡¼Ä´æÆ÷Öµ£¨¹©03ÏìÓ¦¿ìËÙÊ¹ÓÃ£©
+// æ‰¹é‡è¯»å–å¯„å­˜å™¨å€¼ï¼ˆä¾›03å“åº”å¿«é€Ÿä½¿ç”¨ï¼‰
 void StatusRegs_GetBatch(uint16_t start_addr, uint8_t count, uint8_t *resp);
 
 uint8_t GetBatteryInUAV(void);

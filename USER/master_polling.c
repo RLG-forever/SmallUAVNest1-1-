@@ -2,37 +2,37 @@
 
 #include <string.h>
 
-// ÂÖÑ¯¿é¶¨Òå£ºÃ¿¸ö¿é¶ÔÓ¦Ò»´ÎModbus¶Á²Ù×÷
+// è½®è¯¢å—å®šä¹‰ï¼šæ¯ä¸ªå—å¯¹åº”ä¸€æ¬¡Modbusè¯»æ“ä½œ
 typedef struct {
-    uint8_t slave_addr;      // ´ÓÕ¾µØÖ·£¨Êµ¼Ê´«¸ĞÆ÷µÄµØÖ·£©
-    uint16_t start_reg;      // ÆğÊ¼¼Ä´æÆ÷µØÖ·£¨ÔÚ´«¸ĞÆ÷ÖĞµÄµØÖ·£©
-    uint8_t reg_count;       // ¼Ä´æÆ÷ÊıÁ¿
-    uint16_t status_start;   // ¶ÔÓ¦×´Ì¬»º´æµÄÆğÊ¼Ë÷Òı
+    uint8_t slave_addr;      // ä»ç«™åœ°å€ï¼ˆå®é™…ä¼ æ„Ÿå™¨çš„åœ°å€ï¼‰
+    uint16_t start_reg;      // èµ·å§‹å¯„å­˜å™¨åœ°å€ï¼ˆåœ¨ä¼ æ„Ÿå™¨ä¸­çš„åœ°å€ï¼‰
+    uint8_t reg_count;       // å¯„å­˜å™¨æ•°é‡
+    uint16_t status_start;   // å¯¹åº”çŠ¶æ€ç¼“å­˜çš„èµ·å§‹ç´¢å¼•
 } PollBlock;
 
-// ÂÖÑ¯¿éÊı×é£¨¸ù¾İÊµ¼ÊÓ²¼şĞŞ¸Ä´ÓÕ¾µØÖ·ºÍ¼Ä´æÆ÷¶ÔÓ¦¹ØÏµ£©
+// è½®è¯¢å—æ•°ç»„ï¼ˆæ ¹æ®å®é™…ç¡¬ä»¶ä¿®æ”¹ä»ç«™åœ°å€å’Œå¯„å­˜å™¨å¯¹åº”å…³ç³»ï¼‰
 static const PollBlock poll_blocks[] = 
 {
-    {0x0e, 0x00, 1, REG_RAINFALL},          //  ½µÓêÁ¿    
-    {0x0f, 0x00, 1, REG_WIND_SPEED},        //  ·çËÙ 
-		{0x16, 0x00, 1, REG_CABIN_TEMP},        //  ²Õ		
+    {0x0e, 0x00, 1, REG_RAINFALL},          //  é™é›¨é‡    
+    {0x0f, 0x00, 1, REG_WIND_SPEED},        //  é£é€Ÿ 
+		{0x16, 0x00, 1, REG_CABIN_TEMP},        //  èˆ±		
 };
 #define POLL_BLOCK_COUNT (sizeof(poll_blocks) / sizeof(poll_blocks[0]))
 
-// ¾²Ì¬±äÁ¿
-static uint8_t current_block = 0;          // µ±Ç°´¦ÀíµÄ¿éË÷Òı
-static uint32_t last_poll_time = 0;        // ÉÏÒ»ÂÖ½áÊøÊ±¼ä´Á
-static uint8_t polling_active = 0;         // ÊÇ·ñÕıÔÚÂÖÑ¯
-static volatile uint8_t master_busy = 0;   // Ö÷Õ¾×ÜÏßÃ¦±êÖ¾£¨ÓÃÓÚ´ÓÕ¾µÈ´ı£©
+// é™æ€å˜é‡
+static uint8_t current_block = 0;          // å½“å‰å¤„ç†çš„å—ç´¢å¼•
+static uint32_t last_poll_time = 0;        // ä¸Šä¸€è½®ç»“æŸæ—¶é—´æˆ³
+static uint8_t polling_active = 0;         // æ˜¯å¦æ­£åœ¨è½®è¯¢
+static volatile uint8_t master_busy = 0;   // ä¸»ç«™æ€»çº¿å¿™æ ‡å¿—ï¼ˆç”¨äºä»ç«™ç­‰å¾…ï¼‰
 
 
 
-// ÂÖÑ¯¼ÆÊıÆ÷£¬ÓÃÓÚ·ÖÊ±¶ÁÈ¡²»Í¬´«¸ĞÆ÷£¨±ÜÃâ×ÜÏß³åÍ»£©
+// è½®è¯¢è®¡æ•°å™¨ï¼Œç”¨äºåˆ†æ—¶è¯»å–ä¸åŒä¼ æ„Ÿå™¨ï¼ˆé¿å…æ€»çº¿å†²çªï¼‰
 static uint8_t poll_step = 0;
 
 void MasterPolling_Init(void)
 {
-    // ³õÊ¼»¯´®¿ÚµÈ£¨ÈôĞèÒª£©
+    // åˆå§‹åŒ–ä¸²å£ç­‰ï¼ˆè‹¥éœ€è¦ï¼‰
 }
 
 void MasterBusy_Acquire(void)
@@ -51,16 +51,16 @@ void MasterBusy_Release(void)
 
 uint8_t MasterPolling_IsBusy(void)
 {
-    return master_busy;   // Ô­×Ó²Ù×÷£¬ÎŞĞèÁÙ½çÇø
+    return master_busy;   // åŸå­æ“ä½œï¼Œæ— éœ€ä¸´ç•ŒåŒº
 }
 
 void MasterPolling_Task(void)
 {
     uint32_t now = GetTick();
 
-		if (Sequence_IsBusy()) return;  // ĞòÁĞÖ´ĞĞÊ±ÔİÍ£Ö÷Õ¾ÂÖÑ¯
+		if (Sequence_IsBusy()) return;  // åºåˆ—æ‰§è¡Œæ—¶æš‚åœä¸»ç«™è½®è¯¢
 	
-    // Èç¹û²»ÔÚÂÖÑ¯ÖĞ£¬ÇÒ¾àÀëÉÏ´Î½áÊø³¬¹ı5Ãë£¬Ôò¿ªÊ¼ĞÂµÄÒ»ÂÖ
+    // å¦‚æœä¸åœ¨è½®è¯¢ä¸­ï¼Œä¸”è·ç¦»ä¸Šæ¬¡ç»“æŸè¶…è¿‡5ç§’ï¼Œåˆ™å¼€å§‹æ–°çš„ä¸€è½®
     if (!polling_active && (now - last_poll_time >= 5000)) {
         polling_active = 1;
         current_block = 0;
@@ -68,28 +68,28 @@ void MasterPolling_Task(void)
 
     if (polling_active) {
         const PollBlock *block = &poll_blocks[current_block];
-        uint16_t read_buf[8];   // ×ã¹»ÈİÄÉ×î´ó¿é³¤¶È£¨Ä¿Ç°×î´ó5£©
+        uint16_t read_buf[8];   // è¶³å¤Ÿå®¹çº³æœ€å¤§å—é•¿åº¦ï¼ˆç›®å‰æœ€å¤§5ï¼‰
         uint8_t ret;
 
-        // ÉèÖÃ×ÜÏßÃ¦±êÖ¾
+        // è®¾ç½®æ€»çº¿å¿™æ ‡å¿—
         master_busy = 1;
 
         ret = Modbus_03_ReadHoldReg(block->slave_addr, block->start_reg, block->reg_count, read_buf);
 
-        // Çå³ı×ÜÏßÃ¦±êÖ¾
+        // æ¸…é™¤æ€»çº¿å¿™æ ‡å¿—
         master_busy = 0;
 
         if (ret == 0) {
-            // ¶ÁÈ¡³É¹¦£¬¸üĞÂ»º´æ
+            // è¯»å–æˆåŠŸï¼Œæ›´æ–°ç¼“å­˜
             StatusRegs_UpdateBatch(block->status_start, read_buf, block->reg_count);
         } else {
-            // ¶ÁÈ¡Ê§°Ü£¬¿ÉÌí¼ÓÈÕÖ¾£¨ÕâÀïºöÂÔ£©
+            // è¯»å–å¤±è´¥ï¼Œå¯æ·»åŠ æ—¥å¿—ï¼ˆè¿™é‡Œå¿½ç•¥ï¼‰
         }
 
         current_block++;
         if (current_block >= POLL_BLOCK_COUNT) {
-            polling_active = 0;          // ±¾ÂÖ½áÊø
-            last_poll_time = now;         // ¼ÇÂ¼½áÊøÊ±¼ä
+            polling_active = 0;          // æœ¬è½®ç»“æŸ
+            last_poll_time = now;         // è®°å½•ç»“æŸæ—¶é—´
         }
     }
 }

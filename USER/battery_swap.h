@@ -3,26 +3,26 @@
 
 #include <stdint.h>
 
-/* µç³Ø²ÖÊıÁ¿ */
+/* ç”µæ± ä»“æ•°é‡ */
 #define BAY_COUNT           3
 
-/* Flash´æ´¢µØÖ·£¨Ê¹ÓÃFLASHÄ©Î²ÇøÓò£© */
-#define FLASH_SIZE      (16UL * 1024UL * 1024UL)   // 16M ×Ö½Ú
-/* ´æ´¢µØÖ·Ö±½ÓÊ¹ÓÃºê¼ÆËã */
+/* Flashå­˜å‚¨åœ°å€ï¼ˆä½¿ç”¨FLASHæœ«å°¾åŒºåŸŸï¼‰ */
+#define FLASH_SIZE      (16UL * 1024UL * 1024UL)   // 16M å­—èŠ‚
+/* å­˜å‚¨åœ°å€ç›´æ¥ä½¿ç”¨å®è®¡ç®— */
 #define SWAP_STATE_ADDR (FLASH_SIZE - 512)
 
-/* ×´Ì¬½á¹¹Ìå */
+/* çŠ¶æ€ç»“æ„ä½“ */
 typedef struct {
-    uint8_t empty_bay;      // µ±Ç°¿Õ²Ö±àºÅ (1~3)
-//    uint8_t magic;          // Ğ£Ñé×Ö½Ú£¬¹Ì¶¨Îª0x5A
+    uint8_t empty_bay;      // å½“å‰ç©ºä»“ç¼–å· (1~3)
+//    uint8_t magic;          // æ ¡éªŒå­—èŠ‚ï¼Œå›ºå®šä¸º0x5A
 } Swapstate;
 
-/* º¯ÊıÉùÃ÷ */
-void SwapState_Init(void);              // ³õÊ¼»¯£¬¶ÁÈ¡Flash»òÉèÖÃÄ¬ÈÏ
-void SwapState_Save(void);              // ±£´æµ±Ç°×´Ì¬µ½Flash
-uint8_t SwapState_GetEmptyBay(void);    // »ñÈ¡µ±Ç°¿Õ²ÖºÅ
-void SwapState_SetEmptyBay(uint8_t bay); // ÉèÖÃ¿Õ²ÖºÅ²¢±£´æ
-void BatterySwap_Perform(void);         // Ö´ĞĞÒ»´Î»»µç²Ù×÷£¨ÓÉÍâ²¿´¥·¢£©
+/* å‡½æ•°å£°æ˜ */
+void SwapState_Init(void);              // åˆå§‹åŒ–ï¼Œè¯»å–Flashæˆ–è®¾ç½®é»˜è®¤
+void SwapState_Save(void);              // ä¿å­˜å½“å‰çŠ¶æ€åˆ°Flash
+uint8_t SwapState_GetEmptyBay(void);    // è·å–å½“å‰ç©ºä»“å·
+void SwapState_SetEmptyBay(uint8_t bay); // è®¾ç½®ç©ºä»“å·å¹¶ä¿å­˜
+void BatterySwap_Perform(void);         // æ‰§è¡Œä¸€æ¬¡æ¢ç”µæ“ä½œï¼ˆç”±å¤–éƒ¨è§¦å‘ï¼‰
 uint8_t UpdateEmptyBay(void);
 void SwapState_TrySave(void);
 

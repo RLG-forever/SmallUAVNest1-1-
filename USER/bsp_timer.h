@@ -3,41 +3,41 @@
 
 #include "stm32f4xx.h"
 #include "project.h"
-/* Ñ¡ÔñÓ²¼ş¶¨Ê±Æ÷£ºÊ¹ÓÃ TIM2£¨32Î»¶¨Ê±Æ÷£¬¿ÉÖ§³Ö½Ï³¤¶¨Ê±£©*/
+/* é€‰æ‹©ç¡¬ä»¶å®šæ—¶å™¨ï¼šä½¿ç”¨ TIM2ï¼ˆ32ä½å®šæ—¶å™¨ï¼Œå¯æ”¯æŒè¾ƒé•¿å®šæ—¶ï¼‰*/
 #define USE_TIM2
 //#define USE_TIM3
 //#define USE_TIM4
 //#define USE_TIM5
 
-/* Èí¼ş¶¨Ê±Æ÷ÊıÁ¿£¨Èç¹ûÄú»¹ĞèÒªÈí¼ş¶¨Ê±Æ÷£©*/
+/* è½¯ä»¶å®šæ—¶å™¨æ•°é‡ï¼ˆå¦‚æœæ‚¨è¿˜éœ€è¦è½¯ä»¶å®šæ—¶å™¨ï¼‰*/
 #define TMR_COUNT    10
 
-/* ¶¨Ê±Æ÷Ä£Ê½ */
-#define TMR_ONCE_MODE   0   // µ¥´ÎÄ£Ê½
-#define TMR_AUTO_MODE   1   // ×Ô¶¯ÖØ×°Ä£Ê½
+/* å®šæ—¶å™¨æ¨¡å¼ */
+#define TMR_ONCE_MODE   0   // å•æ¬¡æ¨¡å¼
+#define TMR_AUTO_MODE   1   // è‡ªåŠ¨é‡è£…æ¨¡å¼
 
-/* Èí¼ş¶¨Ê±Æ÷½á¹¹Ìå£¨Èç¹ûĞèÒª£©*/
+/* è½¯ä»¶å®šæ—¶å™¨ç»“æ„ä½“ï¼ˆå¦‚æœéœ€è¦ï¼‰*/
 typedef struct {
-    volatile uint8_t  Mode;      // Ä£Ê½
-    volatile uint8_t  Flag;      // ³¬Ê±±êÖ¾
-    volatile uint32_t Count;     // µ±Ç°¼ÆÊıÖµ
-    volatile uint32_t PreLoad;   // ÖØ×°ÔØÖµ
+    volatile uint8_t  Mode;      // æ¨¡å¼
+    volatile uint8_t  Flag;      // è¶…æ—¶æ ‡å¿—
+    volatile uint32_t Count;     // å½“å‰è®¡æ•°å€¼
+    volatile uint32_t PreLoad;   // é‡è£…è½½å€¼
 } SOFT_TMR;
 
-/* Ó²¼ş¶¨Ê±Æ÷³õÊ¼»¯ */
+/* ç¡¬ä»¶å®šæ—¶å™¨åˆå§‹åŒ– */
 void bsp_InitHardTimer(void);
 
-/* Æô¶¯Ò»¸öÓ²¼ş¶¨Ê±Æ÷£¨µ¥´Î£¬Î¢Ãë¼¶£© 
-   _CC       : ²¶»ñ±È½ÏÍ¨µÀ£¨1~4£©£¬Í¨³£Ê¹ÓÃ1
-   _uiTimeOut: ³¬Ê±Ê±¼ä£¬µ¥Î»Î¢Ãë£¨×î´óÔ¼65ms for 16Î»¶¨Ê±Æ÷£¬32Î»¶¨Ê±Æ÷¿É¸ü´ó£©
-   _pCallBack: ³¬Ê±»Øµ÷º¯Êı
+/* å¯åŠ¨ä¸€ä¸ªç¡¬ä»¶å®šæ—¶å™¨ï¼ˆå•æ¬¡ï¼Œå¾®ç§’çº§ï¼‰ 
+   _CC       : æ•è·æ¯”è¾ƒé€šé“ï¼ˆ1~4ï¼‰ï¼Œé€šå¸¸ä½¿ç”¨1
+   _uiTimeOut: è¶…æ—¶æ—¶é—´ï¼Œå•ä½å¾®ç§’ï¼ˆæœ€å¤§çº¦65ms for 16ä½å®šæ—¶å™¨ï¼Œ32ä½å®šæ—¶å™¨å¯æ›´å¤§ï¼‰
+   _pCallBack: è¶…æ—¶å›è°ƒå‡½æ•°
 */
 void bsp_StartHardTimer(uint8_t _CC, uint32_t _uiTimeOut, void (*_pCallBack)(void));
 
-/* ÏµÍ³µÎ´ğ³õÊ¼»¯£¨1msÖĞ¶Ï£¬ÓÃÓÚÈí¼ş¶¨Ê±Æ÷ºÍGetTick£©*/
+/* ç³»ç»Ÿæ»´ç­”åˆå§‹åŒ–ï¼ˆ1msä¸­æ–­ï¼Œç”¨äºè½¯ä»¶å®šæ—¶å™¨å’ŒGetTickï¼‰*/
 void bsp_InitSysTick(void);
 
-/* Èí¼ş¶¨Ê±Æ÷Ïà¹Øº¯Êı£¨Èç¹ûĞèÒª£©*/
+/* è½¯ä»¶å®šæ—¶å™¨ç›¸å…³å‡½æ•°ï¼ˆå¦‚æœéœ€è¦ï¼‰*/
 void bsp_StartTimer(uint8_t _id, uint32_t _period);
 uint8_t bsp_CheckTimer(uint8_t _id);
 void bsp_StopTimer(uint8_t _id);

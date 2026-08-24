@@ -12,11 +12,11 @@ It may not be reproduced or disclosed to third party without prior to authorisat
 ===================================================================================*/
 #ifndef __USART_H
 #define __USART_H
-#define USART_REC_LEN  			1  	//¶¨Òå×î´ó½ÓÊÕ×Ö½ÚÊı 200
-#define EN_USART1_RX 			1		//Ê¹ÄÜ£¨1£©/½ûÖ¹£¨0£©´®¿Ú1½ÓÊÕ  	
-extern unsigned char  USART_RX_BUF[USART_REC_LEN]; //½ÓÊÕ»º³å,×î´óUSART_REC_LEN¸ö×Ö½Ú.Ä©×Ö½ÚÎª»»ĞĞ·û 
-extern unsigned short USART_RX_STA;         		//½ÓÊÕ×´Ì¬±ê¼Ç	
-//Èç¹ûÏë´®¿ÚÖĞ¶Ï½ÓÊÕ£¬Çë²»Òª×¢ÊÍÒÔÏÂºê¶¨Òå
+#define USART_REC_LEN  			1  	//å®šä¹‰æœ€å¤§æ¥æ”¶å­—èŠ‚æ•° 200
+#define EN_USART1_RX 			1		//ä½¿èƒ½ï¼ˆ1ï¼‰/ç¦æ­¢ï¼ˆ0ï¼‰ä¸²å£1æ¥æ”¶  	
+extern unsigned char  USART_RX_BUF[USART_REC_LEN]; //æ¥æ”¶ç¼“å†²,æœ€å¤§USART_REC_LENä¸ªå­—èŠ‚.æœ«å­—èŠ‚ä¸ºæ¢è¡Œç¬¦ 
+extern unsigned short USART_RX_STA;         		//æ¥æ”¶çŠ¶æ€æ ‡è®°	
+//å¦‚æœæƒ³ä¸²å£ä¸­æ–­æ¥æ”¶ï¼Œè¯·ä¸è¦æ³¨é‡Šä»¥ä¸‹å®å®šä¹‰
 void CnfgrUsart(unsigned long bound);
 // void USART3_IRQHandler(void); 
 extern  unsigned char i;
