@@ -1,0 +1,29 @@
+# Keil build output and intermediate files
+OBJ/
+*.o
+*.d
+*.crf
+*.lst
+*.axf
+*.hex
+*.map
+*.sct
+*.lnp
+*.htm
+
+# Keil user/session/debug caches
+*.uvoptx
+*.uvguix*
+*.uvgui.*
+*.bak
+JLinkLog.txt
+
+# Local editor and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.log
