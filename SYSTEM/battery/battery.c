@@ -6,7 +6,7 @@
 void RemoveBattery(void)
 {
 	  int battery_step = 0;  // 0:初始状态
-		
+
 		while(1)
    {
 				switch(battery_step)
@@ -248,7 +248,7 @@ void RemoveBattery(void)
 									  tmr.TIMER_4_100MS = 130;    // 启动定时器4
 								}
 								break;
-								
+
 						case 30: // 31：等待定时器4超时，电机1启动
 								if(tmr.TIMER_4_100MS == 0) {
 									  battery_step = 31;          // 进入下一步
@@ -263,54 +263,48 @@ void RemoveBattery(void)
 				// 添加适当延时避免CPU占用过高
 				delay_ms(10);
    }
-}	
-	
+}
+
 
 void Battery1(void)
 {
   	//电机1初始速度
-		uint8_t motor_num1 = 3;   // 寄存器地址  
+		uint8_t motor_num1 = 3;   // 寄存器地址
 		uint16_t motor_cmd1 = MOTOR1_RUN; // 速度30000（0x7530）
 		uint8_t ctrl_ret1 = Motor_Control(MOTOR1_SLAVE_ADDR, motor_num1, motor_cmd1);//指令发送返回值
-		master_state = MASTER_IDLE;
-		timeout_cnt = 0; // 同时重置超时计数器
 }
 
 void Battery2(void)
 {
   	//电机2初始速度
 		uint8_t motor_num1 = 4; //行程低位寄存器地址
-		uint16_t motor_cmd1 = Speed; 
+		uint16_t motor_cmd1 = MOTOR2_SPEED_VALUE;
 		uint8_t ctrl_ret1 = Motor_Control(MOTOR2_SLAVE_ADDR, motor_num1, motor_cmd1);
-		master_state = MASTER_IDLE;
-		timeout_cnt = 0; // 同时重置超时计数器
 }
 
 void Battery3(void)
 {
-//2.电机2前进 
+//2.电机2前进
 		uint8_t Reg_num = 2;   // 寄存器数量
 		uint16_t slave2_cmds[Reg_num];//寄存器指令
 		// 初始化数组（避免脏数据）
 		memset(slave2_cmds, 0, sizeof(slave2_cmds));
-		if(Reg_num >= 2) 
+		if(Reg_num >= 2)
 		{
-				slave2_cmds[0] = Pulse_num1;            // 寄存器1：高位
-				slave2_cmds[1] = Pulse_num2;            // 寄存器2：低位			
+				slave2_cmds[0] = MOTOR_PRESET_PULSE_01;            // 寄存器1：高位
+				slave2_cmds[1] = MOTOR_PRESET_PULSE_02;            // 寄存器2：低位
 //				printf("赋值后：slave1_cmds[2] = 0x%04X\n", slave1_cmds[2]); // 确认赋值成功
 		} else
 		{
 				// Reg_num不足时的容错处理（比如清空数组）
 				memset(slave2_cmds, 0, sizeof(slave2_cmds));
 		}
-		if(master_state != MASTER_IDLE) 
+		if (ModbusMaster_IsBusy())
 		{
-				master_state = MASTER_IDLE;
-				timeout_cnt = 0;
 				printf("强制重置主站状态为空闲\r\n");
 				fflush(stdout);
 		}
-		uint8_t ctrl_ret2 = Motor_Batch_Control(MOTOR2_SLAVE_ADDR, MOTOR2_CTRL_REG3, Reg_num, slave2_cmds);// 指令发送返回值 
+		uint8_t ctrl_ret2 = Motor_Batch_Control(MOTOR2_SLAVE_ADDR, MOTOR2_CTRL_REG3, Reg_num, slave2_cmds);// 指令发送返回值
 		// 前进指令结果判断
     switch(ctrl_ret2)
     {
@@ -331,8 +325,6 @@ void Battery3(void)
             printf("错误：上升指令发送异常\r\n");
             break;
     }
-		master_state = MASTER_IDLE;
-		timeout_cnt = 0; // 同时重置超时计数器
 }
 
 void Battery4(void)
@@ -340,7 +332,7 @@ void Battery4(void)
   	//3.电机1下降设置
 		uint8_t motor_num1 = 2;  //圈数
 		uint16_t motor_cmd1 = MOTOR1_deLengthRun; //下降方向和圈数值设置
-		uint8_t ctrl_ret1 = Motor_Control(MOTOR1_SLAVE_ADDR, motor_num1, motor_cmd1);// 指令发送返回值 
+		uint8_t ctrl_ret1 = Motor_Control(MOTOR1_SLAVE_ADDR, motor_num1, motor_cmd1);// 指令发送返回值
 		// 下降指令结果判断
     switch(ctrl_ret1)
     {
@@ -361,8 +353,6 @@ void Battery4(void)
             printf("错误：上升指令发送异常\r\n");
             break;
     }
-		master_state = MASTER_IDLE;
-		timeout_cnt = 0; // 同时重置超时计数器
 }
 
 void Battery5(void)
@@ -370,7 +360,7 @@ void Battery5(void)
   	//4.电机1启动
 		uint8_t motor_num1 = 1;  //启停
 		uint16_t motor_cmd1 = MOTOR1_deRUN; //启动
-		uint8_t ctrl_ret1 = Motor_Control(MOTOR1_SLAVE_ADDR, motor_num1, motor_cmd1);// 指令发送返回值 
+		uint8_t ctrl_ret1 = Motor_Control(MOTOR1_SLAVE_ADDR, motor_num1, motor_cmd1);// 指令发送返回值
 		switch(ctrl_ret1)
     {
         case 0:
@@ -390,10 +380,8 @@ void Battery5(void)
             printf("错误：上升指令发送异常\r\n");
             break;
     }
-		master_state = MASTER_IDLE;
-		timeout_cnt = 0; // 同时重置超时计数器
-}  	
-		
+}
+
 void Battery6(void)
 {
   			//5.电机2前进
@@ -402,20 +390,18 @@ void Battery6(void)
 	  uint16_t slave2_cmds[Reg_num];//寄存器指令
 		// 初始化数组（避免脏数据）
 		memset(slave2_cmds, 0, sizeof(slave2_cmds));
-		if(Reg_num >= 2) 
+		if(Reg_num >= 2)
 		{
-				slave2_cmds[0] = Pulse_num3;            // 寄存器1：高位
-				slave2_cmds[1] = Pulse_num4;            // 寄存器2：低位			
+				slave2_cmds[0] = MOTOR_PRESET_PULSE_03;            // 寄存器1：高位
+				slave2_cmds[1] = MOTOR_PRESET_PULSE_04;            // 寄存器2：低位
 //				printf("赋值后：slave1_cmds[2] = 0x%04X\n", slave1_cmds[2]); // 确认赋值成功
 		} else
 		{
 				// Reg_num不足时的容错处理（比如清空数组）
 				memset(slave2_cmds, 0, sizeof(slave2_cmds));
 		}
-		if(master_state != MASTER_IDLE) 
+		if (ModbusMaster_IsBusy())
 		{
-				master_state = MASTER_IDLE;
-				timeout_cnt = 0;
 				printf("强制重置主站状态为空闲\r\n");
 				fflush(stdout);
 		}
@@ -440,10 +426,8 @@ void Battery6(void)
             printf("错误：上升指令发送异常\r\n");
             break;
     }
-		master_state = MASTER_IDLE;
-		timeout_cnt = 0; // 同时重置超时计数器
-}		
-		
+}
+
 void Battery7(void)
 {
   	//6.电机1上升设置
@@ -470,10 +454,8 @@ void Battery7(void)
             printf("错误：上升指令发送异常\r\n");
             break;
     }
-		master_state = MASTER_IDLE;
-		timeout_cnt = 0; // 同时重置超时计数器
-} 		
-		
+}
+
 void Battery8(void)
 {
   	//7.电机1启动
@@ -499,16 +481,14 @@ void Battery8(void)
             printf("错误：上升指令发送异常\r\n");
             break;
     }
-		master_state = MASTER_IDLE;
-		timeout_cnt = 0; // 同时重置超时计数器
-} 		
-	 
+}
+
 void Battery9(void)
 {
   	//8.电机3夹住电池
 		uint8_t ctrl_ret3;  // 指令发送返回值
 		uint8_t motor_num3 = 2;   // 寄存器地址（夹紧）
-		uint16_t motor_cmd3 = Clamp; // 电机指令：
+		uint16_t motor_cmd3 = MOTOR3_CMD_CLAMP; // 电机指令：
 		ctrl_ret3 = Motor_Control(MOTOR3_SLAVE_ADDR, motor_num3, motor_cmd3);
 		if(ctrl_ret3 == 0)
     {
@@ -518,10 +498,8 @@ void Battery9(void)
     {
         printf("从机3夹紧指令发送失败，错误码：%d\r\n", ctrl_ret3);
     }
-		master_state = MASTER_IDLE;
-		timeout_cnt = 0; // 同时重置超时计数器
-} 		
-		
+}
+
 void Battery10(void)
 {
   	//9.电机2后退
@@ -529,20 +507,18 @@ void Battery10(void)
 	  uint16_t slave2_cmds[Reg_num];//寄存器指令
 		// 初始化数组（避免脏数据）
 		memset(slave2_cmds, 0, sizeof(slave2_cmds));
-		if(Reg_num >= 2) 
+		if(Reg_num >= 2)
 		{
-				slave2_cmds[0] = Pulse_num9;            // 寄存器1：高位
-				slave2_cmds[1] = Pulse_num10;            // 寄存器2：低位			
+				slave2_cmds[0] = MOTOR_PRESET_PULSE_09;            // 寄存器1：高位
+				slave2_cmds[1] = MOTOR_PRESET_PULSE_10;            // 寄存器2：低位
 //				printf("赋值后：slave1_cmds[2] = 0x%04X\n", slave1_cmds[2]); // 确认赋值成功
 		} else
 		{
 				// Reg_num不足时的容错处理（比如清空数组）
 				memset(slave2_cmds, 0, sizeof(slave2_cmds));
 		}
-		if(master_state != MASTER_IDLE) 
+		if (ModbusMaster_IsBusy())
 		{
-				master_state = MASTER_IDLE;
-				timeout_cnt = 0;
 				printf("强制重置主站状态为空闲\r\n");
 				fflush(stdout);
 		}
@@ -567,15 +543,13 @@ void Battery10(void)
             printf("错误：上升指令发送异常\r\n");
             break;
     }
-		master_state = MASTER_IDLE;
-		timeout_cnt = 0; // 同时重置超时计数器
-} 		
-		
+}
+
 void Battery11(void)
 {
   	//10.电机3松开电池
 		uint8_t motor_num3 = 1;   // 寄存器地址（松开）
-		uint16_t motor_cmd3 = Lossen; // 电机指令：
+		uint16_t motor_cmd3 = MOTOR3_CMD_RELEASE; // 电机指令：
 		uint8_t ctrl_ret3 = Motor_Control(MOTOR3_SLAVE_ADDR, motor_num3, motor_cmd3);
 		if(ctrl_ret3 == 0)
     {
@@ -585,10 +559,8 @@ void Battery11(void)
     {
         printf("从机3松开指令发送失败，错误码：%d\r\n", ctrl_ret3);
     }
-		master_state = MASTER_IDLE;
-		timeout_cnt = 0; // 同时重置超时计数器
-} 	
-		
+}
+
 void Battery12(void)
 {
   	//11.电机1下降设置
@@ -615,10 +587,8 @@ void Battery12(void)
             printf("错误：上升指令发送异常\r\n");
             break;
     }
-		master_state = MASTER_IDLE;
-		timeout_cnt = 0; // 同时重置超时计数器
-} 		
-		
+}
+
 void Battery13(void)
 {
   	//12.电机1启动
@@ -644,10 +614,8 @@ void Battery13(void)
             printf("错误：上升指令发送异常\r\n");
             break;
     }
-		master_state = MASTER_IDLE;
-		timeout_cnt = 0; // 同时重置超时计数器		
-} 		
-		
+}
+
 void Battery14(void)
 {
   	//13.电机2后退
@@ -655,20 +623,18 @@ void Battery14(void)
 	  uint16_t slave2_cmds[Reg_num];//寄存器指令
 		// 初始化数组（避免脏数据）
 		memset(slave2_cmds, 0, sizeof(slave2_cmds));
-		if(Reg_num >= 2) 
+		if(Reg_num >= 2)
 		{
-				slave2_cmds[0] = Pulse_num11;            // 寄存器1：高位
-				slave2_cmds[1] = Pulse_num12;            // 寄存器2：低位			
+				slave2_cmds[0] = MOTOR_PRESET_PULSE_11;            // 寄存器1：高位
+				slave2_cmds[1] = MOTOR_PRESET_PULSE_12;            // 寄存器2：低位
 //				printf("赋值后：slave1_cmds[2] = 0x%04X\n", slave1_cmds[2]); // 确认赋值成功
 		} else
 		{
 				// Reg_num不足时的容错处理（比如清空数组）
 				memset(slave2_cmds, 0, sizeof(slave2_cmds));
 		}
-		if(master_state != MASTER_IDLE) 
+		if (ModbusMaster_IsBusy())
 		{
-				master_state = MASTER_IDLE;
-				timeout_cnt = 0;
 				printf("强制重置主站状态为空闲\r\n");
 				fflush(stdout);
 		}
@@ -693,11 +659,9 @@ void Battery14(void)
             printf("错误：上升指令发送异常\r\n");
             break;
     }
-		master_state = MASTER_IDLE;
-		timeout_cnt = 0; // 同时重置超时计数器	
-} 		
-		
-				
+}
+
+
 void Battery15(void)
 {
   	//14.电机1上升设置
@@ -724,10 +688,8 @@ void Battery15(void)
             printf("错误：上升指令发送异常\r\n");
             break;
     }
-		master_state = MASTER_IDLE;
-		timeout_cnt = 0; // 同时重置超时计数器
 }
-		
+
 void Battery16(void)
 {
   	//15.电机1启动
@@ -753,11 +715,9 @@ void Battery16(void)
             printf("错误：上升指令发送异常\r\n");
             break;
     }
-		master_state = MASTER_IDLE;
-		timeout_cnt = 0; // 同时重置超时计数器
-}	
-		
-		
+}
+
+
 void Battery17(void)
 {
   	//16.电机2前进
@@ -765,20 +725,18 @@ void Battery17(void)
 	  uint16_t slave2_cmds[Reg_num];//寄存器指令
 		// 初始化数组（避免脏数据）
 		memset(slave2_cmds, 0, sizeof(slave2_cmds));
-		if(Reg_num >= 2) 
+		if(Reg_num >= 2)
 		{
-				slave2_cmds[0] = Pulse_num5;            // 寄存器1：高位
-				slave2_cmds[1] = Pulse_num6;            // 寄存器2：低位			
+				slave2_cmds[0] = MOTOR_PRESET_PULSE_05;            // 寄存器1：高位
+				slave2_cmds[1] = MOTOR_PRESET_PULSE_06;            // 寄存器2：低位
 //				printf("赋值后：slave1_cmds[2] = 0x%04X\n", slave1_cmds[2]); // 确认赋值成功
 		} else
 		{
 				// Reg_num不足时的容错处理（比如清空数组）
 				memset(slave2_cmds, 0, sizeof(slave2_cmds));
 		}
-		if(master_state != MASTER_IDLE) 
+		if (ModbusMaster_IsBusy())
 		{
-				master_state = MASTER_IDLE;
-				timeout_cnt = 0;
 				printf("强制重置主站状态为空闲\r\n");
 				fflush(stdout);
 		}
@@ -803,10 +761,8 @@ void Battery17(void)
             printf("错误：上升指令发送异常\r\n");
             break;
     }
-		master_state = MASTER_IDLE;
-		timeout_cnt = 0; // 同时重置超时计数器
-}			
-		
+}
+
 void Battery18(void)
 {
   	//17.电机1下降设置
@@ -833,10 +789,8 @@ void Battery18(void)
             printf("错误：上升指令发送异常\r\n");
             break;
     }
-		master_state = MASTER_IDLE;
-		timeout_cnt = 0; // 同时重置超时计数器
-}			
-		
+}
+
 void Battery19(void)
 {
   	//18.电机1启动
@@ -862,10 +816,8 @@ void Battery19(void)
             printf("错误：上升指令发送异常\r\n");
             break;
     }
-		master_state = MASTER_IDLE;
-		timeout_cnt = 0; // 同时重置超时计数器
-}			
-		
+}
+
 void Battery20(void)
 {
   	//19.电机2前进
@@ -873,20 +825,18 @@ void Battery20(void)
 	  uint16_t slave2_cmds[Reg_num];//寄存器指令
 		// 初始化数组（避免脏数据）
 		memset(slave2_cmds, 0, sizeof(slave2_cmds));
-		if(Reg_num >= 2) 
+		if(Reg_num >= 2)
 		{
-				slave2_cmds[0] = Pulse_num3;            // 寄存器1：高位
-				slave2_cmds[1] = Pulse_num4;            // 寄存器2：低位			
+				slave2_cmds[0] = MOTOR_PRESET_PULSE_03;            // 寄存器1：高位
+				slave2_cmds[1] = MOTOR_PRESET_PULSE_04;            // 寄存器2：低位
 //				printf("赋值后：slave1_cmds[2] = 0x%04X\n", slave1_cmds[2]); // 确认赋值成功
 		} else
 		{
 				// Reg_num不足时的容错处理（比如清空数组）
 				memset(slave2_cmds, 0, sizeof(slave2_cmds));
 		}
-		if(master_state != MASTER_IDLE) 
+		if (ModbusMaster_IsBusy())
 		{
-				master_state = MASTER_IDLE;
-				timeout_cnt = 0;
 				printf("强制重置主站状态为空闲\r\n");
 				fflush(stdout);
 		}
@@ -911,10 +861,8 @@ void Battery20(void)
             printf("错误：上升指令发送异常\r\n");
             break;
     }
-		master_state = MASTER_IDLE;
-		timeout_cnt = 0; // 同时重置超时计数器
-}		
-	
+}
+
 void Battery21(void)
 {
   	//20.电机1上升设置
@@ -941,10 +889,8 @@ void Battery21(void)
             printf("错误：上升指令发送异常\r\n");
             break;
     }
-		master_state = MASTER_IDLE;
-		timeout_cnt = 0; // 同时重置超时计数器
 }
-		
+
 void Battery22(void)
 {
   	//21.电机1启动
@@ -970,15 +916,13 @@ void Battery22(void)
             printf("错误：上升指令发送异常\r\n");
             break;
     }
-		master_state = MASTER_IDLE;
-		timeout_cnt = 0; // 同时重置超时计数器
-}			
-		
+}
+
 void Battery23(void)
 {
   	//22.电机3夹紧电池
 		uint8_t motor_num3 = 2;   // 寄存器地址（夹紧）
-		uint16_t motor_cmd3 = Clamp; // 电机指令：
+		uint16_t motor_cmd3 = MOTOR3_CMD_CLAMP; // 电机指令：
 		uint8_t ctrl_ret3 = Motor_Control(MOTOR3_SLAVE_ADDR, motor_num3, motor_cmd3);
 		if(ctrl_ret3 == 0)
     {
@@ -988,10 +932,8 @@ void Battery23(void)
     {
         printf("从机3夹紧指令发送失败，错误码：%d\r\n", ctrl_ret3);
     }
-		master_state = MASTER_IDLE;
-		timeout_cnt = 0; // 同时重置超时计数器
-}			
-		
+}
+
 void Battery24(void)
 {
   	//23.电机2前进
@@ -999,20 +941,18 @@ void Battery24(void)
 	  uint16_t slave2_cmds[Reg_num];//寄存器指令
 		// 初始化数组（避免脏数据）
 		memset(slave2_cmds, 0, sizeof(slave2_cmds));
-		if(Reg_num >= 2) 
+		if(Reg_num >= 2)
 		{
-				slave2_cmds[0] = Pulse_num7;            // 寄存器1：高位
-				slave2_cmds[1] = Pulse_num8;            // 寄存器2：低位			
+				slave2_cmds[0] = MOTOR_PRESET_PULSE_07;            // 寄存器1：高位
+				slave2_cmds[1] = MOTOR_PRESET_PULSE_08;            // 寄存器2：低位
 //				printf("赋值后：slave1_cmds[2] = 0x%04X\n", slave1_cmds[2]); // 确认赋值成功
 		} else
 		{
 				// Reg_num不足时的容错处理（比如清空数组）
 				memset(slave2_cmds, 0, sizeof(slave2_cmds));
 		}
-		if(master_state != MASTER_IDLE) 
+		if (ModbusMaster_IsBusy())
 		{
-				master_state = MASTER_IDLE;
-				timeout_cnt = 0;
 				printf("强制重置主站状态为空闲\r\n");
 				fflush(stdout);
 		}
@@ -1037,15 +977,13 @@ void Battery24(void)
             printf("错误：上升指令发送异常\r\n");
             break;
     }
-		master_state = MASTER_IDLE;
-		timeout_cnt = 0; // 同时重置超时计数器
-}			
-				
+}
+
 void Battery25(void)
 {
   	//24.电机3松开电池
 		uint8_t motor_num3 = 1;   // 寄存器地址（松开）
-		uint16_t motor_cmd3 = Lossen; // 电机指令：
+		uint16_t motor_cmd3 = MOTOR3_CMD_RELEASE; // 电机指令：
 		uint8_t ctrl_ret3 = Motor_Control(MOTOR3_SLAVE_ADDR, motor_num3, motor_cmd3);
 		if(ctrl_ret3 == 0)
     {
@@ -1055,8 +993,6 @@ void Battery25(void)
     {
         printf("从机3松开指令发送失败，错误码：%d\r\n", ctrl_ret3);
     }
-		master_state = MASTER_IDLE;
-		timeout_cnt = 0; // 同时重置超时计数器
 }
 
 void Battery26(void)
@@ -1085,10 +1021,8 @@ void Battery26(void)
             printf("错误：上升指令发送异常\r\n");
             break;
     }
-		master_state = MASTER_IDLE;
-		timeout_cnt = 0; // 同时重置超时计数器
 }
-		
+
 void Battery27(void)
 {
   	//26.电机1启动
@@ -1114,30 +1048,26 @@ void Battery27(void)
             printf("错误：上升指令发送异常\r\n");
             break;
     }
-		master_state = MASTER_IDLE;
-		timeout_cnt = 0; // 同时重置超时计数器
-}		
-		
+}
+
 void Battery28(void)
-{	
+{
 	  //27.电机2后退
 		uint8_t Reg_num = 2;   // 寄存器数量
 	  uint16_t slave2_cmds[Reg_num];//寄存器指令
 		// 初始化数组（避免脏数据）
 		memset(slave2_cmds, 0, sizeof(slave2_cmds));
-		if(Reg_num >= 2) 
+		if(Reg_num >= 2)
 		{
-				slave2_cmds[0] = Pulse_num13;            // 寄存器1：高位
-				slave2_cmds[1] = Pulse_num14;            // 寄存器2：低位			
+				slave2_cmds[0] = MOTOR_PRESET_PULSE_13;            // 寄存器1：高位
+				slave2_cmds[1] = MOTOR_PRESET_PULSE_14;            // 寄存器2：低位
 		} else
 		{
 				// Reg_num不足时的容错处理（比如清空数组）
 				memset(slave2_cmds, 0, sizeof(slave2_cmds));
 		}
-		if(master_state != MASTER_IDLE) 
+		if (ModbusMaster_IsBusy())
 		{
-				master_state = MASTER_IDLE;
-				timeout_cnt = 0;
 				printf("强制重置主站状态为空闲\r\n");
 				fflush(stdout);
 		}
@@ -1162,10 +1092,8 @@ void Battery28(void)
             printf("错误：上升指令发送异常\r\n");
             break;
     }
-		master_state = MASTER_IDLE;
-		timeout_cnt = 0; // 同时重置超时计数器
-}	 
-		
+}
+
 void Battery29(void)
 {
   	//28.电机1上升设置
@@ -1192,10 +1120,8 @@ void Battery29(void)
             printf("错误：上升指令发送异常\r\n");
             break;
     }
-		master_state = MASTER_IDLE;
-		timeout_cnt = 0; // 同时重置超时计数器
-}			
-		
+}
+
 void Battery30(void)
 {
   	//29.电机1启动
@@ -1221,11 +1147,9 @@ void Battery30(void)
             printf("错误：上升指令发送异常\r\n");
             break;
     }
-		master_state = MASTER_IDLE;
-		timeout_cnt = 0; // 同时重置超时计数器
-}	
+}
 
 
 
 
-	
+

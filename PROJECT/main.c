@@ -47,6 +47,43 @@ void SysTickInit(void)
 
 u8 a =8;
 u8 b =0;
+
+/**
+ * @brief 堵转后的非阻塞恢复短任务。
+ *
+ * 首次触发时停止当前序列，随后依次推进 Battery_22、Battery_15 和
+ * LeaveCenter1；每个动作返回 PENDING 时立即让出主循环。
+ */
+static void StallRecovery_Task(void)
+{
+    static uint8_t recovery_step = 0U;
+    uint8_t result;
+
+    if (!MotorMonitor_StallTriggered() && recovery_step == 0U) {
+        return;
+    }
+    if (recovery_step == 0U) {
+        Sequence_ForceStop();
+        recovery_step = 1U;
+    }
+
+    if (recovery_step == 1U) {
+        result = Battery_22();
+    } else if (recovery_step == 2U) {
+        result = Battery_15();
+    } else {
+        result = LeaveCenter1();
+    }
+
+    if (result == MODBUS_RESULT_PENDING || ModbusMaster_IsBusy() || ModbusBatch_IsBusy()) {
+        return;
+    }
+    recovery_step++;
+    if (recovery_step > 3U) {
+        recovery_step = 0U;
+        MotorMonitor_ClearStallTrigger();
+    }
+}
 /*==================================================================================
 Procedure description: main program entry
 Parameter description：none
@@ -65,27 +102,24 @@ int main(void)
 	NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);//设置系统中断优先级分组2
 //	Delayinit(168);    //初始化延时函数
 	uart4_init(9600);//串口调试信息输出printf	
-	RS485_Init(9600);
+	ModbusPort_InitMaster(MODBUS_PORT_DEFAULT_BAUDRATE);
+	ModbusPort_InitSlave(MODBUS_PORT_DEFAULT_BAUDRATE);
 	Relay_Init();
-	AlarmPoll_Init();
 	OutputPortInit();//led灯测试
-	TIM5_Init();
-	Timer4Init();
-	Timer3Init();
+	ModbusPort_InitMasterFrameTimer(MODBUS_PORT_DEFAULT_BAUDRATE);
+	ModbusPort_InitSlaveFrameTimer(MODBUS_PORT_DEFAULT_BAUDRATE);
+	StatusRegs_Init();
+	ModbusSlave_Init(GATEWAY_MODBUS_SLAVE_ADDRESS);
+	GatewayModbus_Init();
+	ModbusMaster_Init();
 	Sequence_Init();
-	bsp_InitTimer();
+	bsp_InitHardTimer();
 	W25QXX_Init();          // 初始化SPI Flash
 	SwapState_Init();   // 从Flash读取空仓号
   __enable_irq();  /* 开启全局中断 */
 	delay_ms(1000);
 //	Motor_Reset(MOTOR1_SLAVE_ADDR, MOTOR1_CTRL_REG1, 8);
 	// 复位前确保主站状态空闲
-	master_state = MASTER_IDLE;
-	timeout_cnt = 0;
-	__disable_irq();
-	Master_RX_CNT = 0;
-	__enable_irq();
-	memset(Master_RX_BUFF, 0, sizeof(Master_RX_BUFF));
 	
 	//GPIO_SetBits(LED_PORT, LED1);
 	
@@ -117,7 +151,7 @@ int main(void)
 	
 
 //	LeaveCenter();
-LeaveCenter2();
+// LeaveCenter2();
 //Battery_2();
 //Battery_6();
 //Center_1();
@@ -135,26 +169,16 @@ LeaveCenter2();
 
 
 //printf("\r\n============= MCU RESET DETECTED =============\r\n");
-static uint8_t step = 0;   // 静态变量，记录当前步骤（每次调用保持状态）
-
 		while(1)
 		{		
-			MasterPolling_Task();   // 主站轮询（5秒周期）
-
-			MODS_Poll();   
+			ModbusMaster_Process();
+			ModbusSlave_Process();
 			Sequence_Process();   	// 处理序列（一键起飞/降落完成）
 			SwapState_TrySave();   // 异步保存
-			//CheckRemoteOffTask();   // 检查定时任务
-			if (stall_triggered) {
-        // 执行复位
-				Sequence_ForceStop(); 
-        Battery_22();
-        Battery_15();
-        LeaveCenter1();
-        stall_triggered = 0;
-			}
-//			PollAndClearMotorAlarms_NonBlocking(); // 非阻塞报警轮询
-//			MotorStallMonitorTask();   
+			// GatewayTasks_Process();
+			StallRecovery_Task();
+			/* 后台轮询优先级最低，避免抢在控制命令之前占用主站总线。 */
+			MasterPolling_Task();
 		}
 }
 

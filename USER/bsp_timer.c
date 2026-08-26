@@ -181,46 +181,6 @@ void bsp_InitHardTimer(void)
 //}
 /*
 *********************************************************************************************************
-*	函 数 名: bsp_InitTimer
-*	功能说明: 配置systick中断，并初始化软件定时器变量
-*	形    参:  无
-*	返 回 值: 无
-*********************************************************************************************************
-*/
-void bsp_InitTimer(void)
-{
-	uint8_t i;
-
-	/* 清零所有的软件定时器 */
-	for (i = 0; i < TMR_COUNT; i++)
-	{
-		s_tTmr[i].Count = 0;
-		s_tTmr[i].PreLoad = 0;
-		s_tTmr[i].Flag = 0;
-		s_tTmr[i].Mode = TMR_ONCE_MODE;	/* 缺省是1次性工作模式 */
-	}
-
-	/*
-		配置systic中断周期为1ms，并启动systick中断。
-
-    	SystemCoreClock 是固件中定义的系统内核时钟，对于STM32F4XX,一般为 168MHz
-
-    	SysTick_Config() 函数的形参表示内核时钟多少个周期后触发一次Systick定时中断.
-	    	-- SystemCoreClock / 1000  表示定时频率为 1000Hz， 也就是定时周期为  1ms
-	    	-- SystemCoreClock / 500   表示定时频率为 500Hz，  也就是定时周期为  2ms
-	    	-- SystemCoreClock / 2000  表示定时频率为 2000Hz， 也就是定时周期为  500us
-
-    	对于常规的应用，我们一般取定时周期1ms。对于低速CPU或者低功耗应用，可以设置定时周期为 10ms
-    */
-//	SysTick_Config(SystemCoreClock / 1000);
-	
-#if defined (USE_TIM2) || defined (USE_TIM3)  || defined (USE_TIM4)	|| defined (USE_TIM5)
-	bsp_InitHardTimer();
-#endif
-}
-
-/*
-*********************************************************************************************************
 *    函数名: bsp_StartHardTimer
 *    功能说明: 启动一个硬件定时器（单次模式）
 *    形    参: _CC         : 比较通道（1~4），通常用1
@@ -257,6 +217,28 @@ void bsp_StartHardTimer(uint8_t _CC, uint32_t _uiTimeOut, void (*_pCallBack)(voi
         TIM_SetCompare4(TIM_HARD, cnt_tar);
         TIM_ClearITPendingBit(TIM_HARD, TIM_IT_CC4);
         TIM_ITConfig(TIM_HARD, TIM_IT_CC4, ENABLE);
+    }
+}
+
+/* 取消单次比较中断，防止已终止的业务流程收到过期定时器回调。 */
+void bsp_StopHardTimer(uint8_t _CC)
+{
+    if (_CC == 1U) {
+        TIM_ITConfig(TIM_HARD, TIM_IT_CC1, DISABLE);
+        TIM_ClearITPendingBit(TIM_HARD, TIM_IT_CC1);
+        s_TIM_CallBack1 = 0;
+    } else if (_CC == 2U) {
+        TIM_ITConfig(TIM_HARD, TIM_IT_CC2, DISABLE);
+        TIM_ClearITPendingBit(TIM_HARD, TIM_IT_CC2);
+        s_TIM_CallBack2 = 0;
+    } else if (_CC == 3U) {
+        TIM_ITConfig(TIM_HARD, TIM_IT_CC3, DISABLE);
+        TIM_ClearITPendingBit(TIM_HARD, TIM_IT_CC3);
+        s_TIM_CallBack3 = 0;
+    } else if (_CC == 4U) {
+        TIM_ITConfig(TIM_HARD, TIM_IT_CC4, DISABLE);
+        TIM_ClearITPendingBit(TIM_HARD, TIM_IT_CC4);
+        s_TIM_CallBack4 = 0;
     }
 }
 

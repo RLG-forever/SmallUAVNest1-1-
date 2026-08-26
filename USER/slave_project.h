@@ -17,7 +17,7 @@
 #include "usart.h"
 #include "tmr.h"
 #include "sys.h"
-#include "modbus.h"
+#include "modbus_master.h"
 
 typedef unsigned char INT8U;
 typedef unsigned short INT16U;

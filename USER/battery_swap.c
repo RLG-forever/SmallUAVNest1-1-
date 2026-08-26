@@ -14,7 +14,7 @@ static uint8_t need_save = 0;   // 保存标志
 /* 初始化：读取Flash，若无效则设为默认值（1号仓空） */
 void SwapState_Init(void)
 {
-		W25QXX_Read((u8*)&g_swap_state, SWAP_STATE_ADDR, sizeof(SwapState));
+		W25QXX_Read((u8*)&g_swap_state, SWAP_STATE_ADDR, sizeof(g_swap_state));
 	
     // 检查魔数和范围
     if (g_swap_state.empty_bay < 1 || g_swap_state.empty_bay > 3) {
@@ -32,7 +32,7 @@ void SwapState_Init(void)
 void SwapState_Save(void)
 {
     printf("开始写 Flash 地址 0x%X\n", SWAP_STATE_ADDR);
-    W25QXX_Write((u8*)&g_swap_state, SWAP_STATE_ADDR, sizeof(SwapState));
+    W25QXX_Write((u8*)&g_swap_state, SWAP_STATE_ADDR, sizeof(g_swap_state));
     printf("Swap state saved: empty_bay=%d\n", g_swap_state.empty_bay);
 }
 
@@ -89,7 +89,6 @@ uint8_t UpdateEmptyBay(void)
 		// 同步更新状态寄存器 0x19，供网关查询
     StatusRegs_Update(REG_RESERVED2, next);
     printf("换电完成，空仓号更新为 %d (待保存)\n", next);
-		master_state = MASTER_IDLE;   // 恢复主站状态
     return 0;
 }
 
@@ -102,7 +101,7 @@ void SwapState_TrySave(void)
 //        printf("TrySave: need_save=%d, master_state=%d, seq_busy=%d\r\n", 
 //               need_save, master_state, Sequence_IsBusy());
     }
-    if (need_save && master_state == MASTER_IDLE && !Sequence_IsBusy()) {
+    if (need_save && !ModbusMaster_IsBusy() && !Sequence_IsBusy()) {
         printf("开始保存 Flash...\n");
         SwapState_Save();
         need_save = 0;

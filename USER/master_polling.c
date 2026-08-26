@@ -1,6 +1,10 @@
-#include "project.h"
+#include "master_polling.h"
 
-#include <string.h>
+#include "modbus_common.h"
+#include "modbus_master.h"
+#include "sequence.h"
+#include "status_regs.h"
+#include "tick.h"
 
 // 轮询块定义：每个块对应一次Modbus读操作
 typedef struct {
@@ -23,73 +27,45 @@ static const PollBlock poll_blocks[] =
 static uint8_t current_block = 0;          // 当前处理的块索引
 static uint32_t last_poll_time = 0;        // 上一轮结束时间戳
 static uint8_t polling_active = 0;         // 是否正在轮询
-static volatile uint8_t master_busy = 0;   // 主站总线忙标志（用于从站等待）
+/* 读缓冲区必须跨主循环保留，因为 0x03 请求会经历多次非阻塞调用。 */
+static uint16_t poll_read_buf[8];
 
 
-
-// 轮询计数器，用于分时读取不同传感器（避免总线冲突）
-static uint8_t poll_step = 0;
-
-void MasterPolling_Init(void)
-{
-    // 初始化串口等（若需要）
-}
-
-void MasterBusy_Acquire(void)
-{
-    ENTER_CRITICAL();
-    master_busy = 1;
-    EXIT_CRITICAL();
-}
-
-void MasterBusy_Release(void)
-{
-    ENTER_CRITICAL();
-    master_busy = 0;
-    EXIT_CRITICAL();
-}
-
-uint8_t MasterPolling_IsBusy(void)
-{
-    return master_busy;   // 原子操作，无需临界区
-}
-
+/**
+ * @brief 分时读取环境传感器的非阻塞轮询任务。
+ * @note  每次调用只推进当前块；一轮结束后等待 5 秒再开始下一轮。
+ */
 void MasterPolling_Task(void)
 {
     uint32_t now = GetTick();
+    const PollBlock *block;
+    uint8_t ret;
 
-		if (Sequence_IsBusy()) return;  // 序列执行时暂停主站轮询
-	
-    // 如果不在轮询中，且距离上次结束超过5秒，则开始新的一轮
-    if (!polling_active && (now - last_poll_time >= 5000)) {
-        polling_active = 1;
-        current_block = 0;
+    if (Sequence_IsBusy()) {
+        return;
+    }
+    if (!polling_active) {
+        if ((now - last_poll_time) < 5000U) {
+            return;
+        }
+        polling_active = 1U;
+        current_block = 0U;
     }
 
-    if (polling_active) {
-        const PollBlock *block = &poll_blocks[current_block];
-        uint16_t read_buf[8];   // 足够容纳最大块长度（目前最大5）
-        uint8_t ret;
+    block = &poll_blocks[current_block];
+    ret = ModbusMaster_03_ReadHoldReg(MODBUS_MASTER_CLIENT_POLLING,
+                                block->slave_addr, block->start_reg,
+                                block->reg_count, poll_read_buf);
+    if (ret == MODBUS_RESULT_PENDING || ret == MODBUS_RESULT_BUSY) {
+        return;
+    }
+    if (ret == MODBUS_RESULT_OK) {
+        StatusRegs_UpdateBatch(block->status_start, poll_read_buf, block->reg_count);
+    }
 
-        // 设置总线忙标志
-        master_busy = 1;
-
-        ret = Modbus_03_ReadHoldReg(block->slave_addr, block->start_reg, block->reg_count, read_buf);
-
-        // 清除总线忙标志
-        master_busy = 0;
-
-        if (ret == 0) {
-            // 读取成功，更新缓存
-            StatusRegs_UpdateBatch(block->status_start, read_buf, block->reg_count);
-        } else {
-            // 读取失败，可添加日志（这里忽略）
-        }
-
-        current_block++;
-        if (current_block >= POLL_BLOCK_COUNT) {
-            polling_active = 0;          // 本轮结束
-            last_poll_time = now;         // 记录结束时间
-        }
+    current_block++;
+    if (current_block >= POLL_BLOCK_COUNT) {
+        polling_active = 0U;
+        last_poll_time = now;
     }
 }

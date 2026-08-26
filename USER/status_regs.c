@@ -1,137 +1,212 @@
-#include "project.h"
+#include "status_regs.h"
+#include "status_service.h"
+
+#include "stm32f4xx.h"
+
+#include <stddef.h>
 #include <string.h>
 
-// ¶¨ÒåÈ«¾ÖÊı×é
-uint16_t status_regs[STATUS_REG_COUNT];
-uint16_t status_cache[STATUS_REG_COUNT];     // »º´æÖµ£¨¹©03¶ÁÈ¡£©
-static volatile uint8_t cache_valid = 0;            // »º´æÊÇ·ñÓĞĞ§
-// ¶¨Òå¿ìÕÕÊı×éºÍ±êÖ¾
+/* çŠ¶æ€å­˜å‚¨å±äºæœ¬æ¨¡å—ï¼Œä¸šåŠ¡ä»£ç åªèƒ½é€šè¿‡å…¬å¼€æ¥å£è®¿é—®ã€‚ */
+static uint16_t status_regs[STATUS_REG_COUNT];
+static uint16_t status_cache[STATUS_REG_COUNT];
 static uint16_t status_snapshot[STATUS_REG_COUNT];
-static volatile uint8_t snapshot_active = 0;
+static volatile uint8_t snapshot_active;
 
+/* ä¿å­˜è¿›å…¥ä¸´ç•ŒåŒºå‰çš„ä¸­æ–­çŠ¶æ€ï¼Œé¿å…åœ¨ä¸­æ–­åŸæœ¬å…³é—­æ—¶è¢«é”™è¯¯åœ°é‡æ–°å¼€å¯ã€‚ */
+static uint32_t StatusRegs_EnterCritical(void)
+{
+    uint32_t primask = __get_PRIMASK();
+
+    __disable_irq();
+    return primask;
+}
+
+static void StatusRegs_ExitCritical(uint32_t primask)
+{
+    if (primask == 0U) {
+        __enable_irq();
+    }
+}
 
 void StatusRegs_Init(void)
 {
-    ENTER_CRITICAL();
+    uint32_t primask = StatusRegs_EnterCritical();
+
     memset(status_regs, 0, sizeof(status_regs));
-    EXIT_CRITICAL();
+    memset(status_cache, 0, sizeof(status_cache));
+    memset(status_snapshot, 0, sizeof(status_snapshot));
+    snapshot_active = 0U;
+    StatusRegs_ExitCritical(primask);
 }
 
 void StatusRegs_Update(StatusRegAddr addr, uint16_t value)
 {
-    if (addr < STATUS_REG_COUNT) {
-        ENTER_CRITICAL();
-        status_regs[addr] = value;
-				status_cache[addr] = value;   // Í¬²½¸üĞÂ»º´æ
-        cache_valid = 1;
-        EXIT_CRITICAL();
+    uint32_t primask;
+
+    if ((uint16_t)addr >= STATUS_REG_COUNT) {
+        return;
     }
+    primask = StatusRegs_EnterCritical();
+    status_regs[addr] = value;
+    status_cache[addr] = value;
+    StatusRegs_ExitCritical(primask);
 }
 
-void StatusRegs_UpdateBatch(uint16_t start_addr, const uint16_t *values, uint8_t count)
+void StatusRegs_UpdateBatch(uint16_t start_addr, const uint16_t *values,
+                            uint8_t count)
 {
-    if (start_addr + count <= STATUS_REG_COUNT) {
-        ENTER_CRITICAL();
-        for (uint8_t i = 0; i < count; i++) {
-            status_regs[start_addr + i] = values[i];
-						status_cache[start_addr + i] = values[i];
-        }
-				cache_valid = 1;
-        EXIT_CRITICAL();
+    uint32_t primask;
+    uint8_t index;
+
+    if (values == NULL || count == 0U || start_addr >= STATUS_REG_COUNT ||
+        count > (uint8_t)(STATUS_REG_COUNT - start_addr)) {
+        return;
     }
+    primask = StatusRegs_EnterCritical();
+    for (index = 0U; index < count; index++) {
+        status_regs[start_addr + index] = values[index];
+        status_cache[start_addr + index] = values[index];
+    }
+    StatusRegs_ExitCritical(primask);
 }
 
 uint16_t StatusRegs_Get(StatusRegAddr addr)
 {
-    uint16_t val = 0;
-    if (addr < STATUS_REG_COUNT) {
-        ENTER_CRITICAL();
-        if (snapshot_active) {
-            val = status_snapshot[addr];   // ¿ìÕÕÄ£Ê½£º·µ»ØĞòÁĞ¿ªÊ¼Ê±µÄÖµ
-        } else {
-            val = status_regs[addr];        // Õı³£Ä£Ê½£º·µ»ØÊµÊ±Öµ
-        }
-        EXIT_CRITICAL();
+    uint32_t primask;
+    uint16_t value = 0U;
+
+    if ((uint16_t)addr >= STATUS_REG_COUNT) {
+        return 0U;
     }
-    return val;
+    primask = StatusRegs_EnterCritical();
+    value = snapshot_active ? status_snapshot[addr] : status_regs[addr];
+    StatusRegs_ExitCritical(primask);
+    return value;
 }
 
-// ÅÄÉãµ±Ç°×´Ì¬¿ìÕÕ£¨¸´ÖÆÕæÊµÖµµ½¿ìÕÕÊı×é£©
 void StatusRegs_TakeSnapshot(void)
 {
+    uint32_t primask = StatusRegs_EnterCritical();
+
     if (!snapshot_active) {
-        ENTER_CRITICAL();
         memcpy(status_snapshot, status_regs, sizeof(status_snapshot));
-        snapshot_active = 1;
-        EXIT_CRITICAL();
+        snapshot_active = 1U;
     }
+    StatusRegs_ExitCritical(primask);
 }
 
-// ÍË³ö¿ìÕÕÄ£Ê½£¬»Ö¸´Õı³£¶ÁÈ¡
 void StatusRegs_ReleaseSnapshot(void)
 {
-    if (snapshot_active) {
-        ENTER_CRITICAL();
-        snapshot_active = 0;
-        EXIT_CRITICAL();
-    }
+    uint32_t primask = StatusRegs_EnterCritical();
+
+    snapshot_active = 0U;
+    StatusRegs_ExitCritical(primask);
 }
 
-// ²éÑ¯ÊÇ·ñ´¦ÓÚ¿ìÕÕÄ£Ê½
 uint8_t StatusRegs_IsSnapshotActive(void)
 {
-    uint8_t active;
-    ENTER_CRITICAL();
-    active = snapshot_active;
-    EXIT_CRITICAL();
+    uint32_t primask = StatusRegs_EnterCritical();
+    uint8_t active = snapshot_active;
+
+    StatusRegs_ExitCritical(primask);
     return active;
 }
 
-// ÅúÁ¿¶ÁÈ¡»º´æÖµµ½×Ö½ÚÊı×é£¨ÓÃÓÚ03ÏìÓ¦£©
-void StatusRegs_GetBatch(uint16_t start_addr, uint8_t count, uint8_t *resp)
+void StatusRegs_GetBatch(uint16_t start_addr, uint8_t count, uint8_t *response)
 {
-    if (start_addr + count > STATUS_REG_COUNT) return;
-    ENTER_CRITICAL();
-    for (uint8_t i = 0; i < count; i++) {
-        uint16_t val = status_cache[start_addr + i];
-        resp[i*2]   = (val >> 8) & 0xFF;
-        resp[i*2+1] = val & 0xFF;
+    uint32_t primask;
+    uint8_t index;
+
+    if (response == NULL || count == 0U || start_addr >= STATUS_REG_COUNT ||
+        count > (uint8_t)(STATUS_REG_COUNT - start_addr)) {
+        return;
     }
-    EXIT_CRITICAL();
+    primask = StatusRegs_EnterCritical();
+    for (index = 0U; index < count; index++) {
+        uint16_t value = status_cache[start_addr + index];
+
+        response[index * 2U] = (uint8_t)(value >> 8);
+        response[index * 2U + 1U] = (uint8_t)value;
+    }
+    StatusRegs_ExitCritical(primask);
 }
 
-/**
- * @brief ÅĞ¶ÏÄÄ¿éµç³ØÔÚÎŞÈË»úÄÚ£¨¼´²»ÔÚ³äµçµÄµç³Ø£©
- * @return µç³Ø±àºÅ£º1,2,3£»0±íÊ¾ÎŞµç³ØÔÚÎŞÈË»úÄÚ
- */
 uint8_t GetBatteryInUAV(void)
 {
-    // ¶ÁÈ¡Èı¿éµç³ØµÄ³äµç×´Ì¬£¨0=³äµçÖĞ£¬1=Î´³äµç£©
     uint16_t bat1_charging = StatusRegs_Get(REG_BAT1_CHARGE_STATE);
     uint16_t bat2_charging = StatusRegs_Get(REG_BAT2_CHARGE_STATE);
     uint16_t bat3_charging = StatusRegs_Get(REG_BAT3_CHARGE_STATE);
+    uint8_t not_charging_count = 0U;
+    uint8_t battery_id = 0U;
 
-    // Í³¼Æ²»ÔÚ³äµçµÄµç³ØÊıÁ¿
-    uint8_t not_charging_count = 0;
-    uint8_t battery_id = 0;
+    if (bat1_charging == 1U) {
+        not_charging_count++;
+        battery_id = 1U;
+    }
+    if (bat2_charging == 1U) {
+        not_charging_count++;
+        battery_id = 2U;
+    }
+    if (bat3_charging == 1U) {
+        not_charging_count++;
+        battery_id = 3U;
+    }
+    return not_charging_count == 1U ? battery_id : 0U;
+}
 
-    if (bat1_charging == 1) {
-        not_charging_count++;
-        battery_id = 1;
+uint16_t StatusService_GetBatteryChargeState(uint8_t battery_index)
+{
+    switch (battery_index) {
+        case 1U: return StatusRegs_Get(REG_BAT1_CHARGE_STATE);
+        case 2U: return StatusRegs_Get(REG_BAT2_CHARGE_STATE);
+        case 3U: return StatusRegs_Get(REG_BAT3_CHARGE_STATE);
+        default: return 0U;
     }
-    if (bat2_charging == 1) {
-        not_charging_count++;
-        battery_id = 2;
-    }
-    if (bat3_charging == 1) {
-        not_charging_count++;
-        battery_id = 3;
-    }
+}
 
-    // Èç¹ûÖ»ÓĞÒ»¿éµç³Ø²»ÔÚ³äµç£¬ÔòËü¾ÍÔÚÎŞÈË»úÀï£»·ñÔò£¨0»ò>1£©ÈÏÎªÎŞµç³Ø»òÒì³££¬·µ»Ø0
-    if (not_charging_count == 1) {
-        return battery_id;
-    } else {
-        return 0;   // ÎŞµç³ØÔÚÎŞÈË»úÄÚ
+uint16_t StatusService_GetUavStatus(void)
+{
+    return StatusRegs_Get(REG_RESERVED4);
+}
+
+void StatusService_SetUavStatus(uint16_t value)
+{
+    StatusRegs_Update(REG_RESERVED4, value);
+}
+
+void StatusService_Update(StatusServiceField field, uint16_t value)
+{
+    switch (field) {
+        case STATUS_FIELD_DOOR:
+            StatusRegs_Update(REG_DOOR_STATE, value);
+            break;
+        case STATUS_FIELD_CENTER_ROD:
+            StatusRegs_Update(REG_CENTER_ROD_STATE, value);
+            break;
+        case STATUS_FIELD_SWAP_MECHANISM:
+            StatusRegs_Update(REG_SWAP_MECH_STATE, value);
+            break;
+        case STATUS_FIELD_FAULT:
+            StatusRegs_Update(REG_FAULT_CODE, value);
+            break;
+        case STATUS_FIELD_NONE:
+        default:
+            break;
     }
+}
+
+void StatusService_TakeSnapshot(void)
+{
+    StatusRegs_TakeSnapshot();
+}
+
+void StatusService_ReleaseSnapshot(void)
+{
+    StatusRegs_ReleaseSnapshot();
+}
+
+void StatusService_GetExternalBatch(uint16_t start_addr, uint8_t count,
+                                    uint8_t *response)
+{
+    StatusRegs_GetBatch(start_addr, count, response);
 }

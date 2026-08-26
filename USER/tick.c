@@ -1,4 +1,6 @@
-#include "project.h"
+#include "tick.h"
+
+#include "stm32f4xx.h"
 
 static volatile uint32_t sys_tick = 0;
 
@@ -10,20 +12,25 @@ void Tick_Increment(void)
 void Tick_Init(void)
 {
 		sys_tick = 0;
-		// ÅäÖÃ SysTick£ºÊ±ÖÓÔ´ÎªÄÚºËÊ±ÖÓ£¨Í¨³£168MHz£©£¬ÖØÔØÖµ = Ê±ÖÓÆµÂÊ / 1000 - 1
-    // Ê¹ÄÜÖĞ¶Ï£¬Ê¹ÄÜ¶¨Ê±Æ÷
+		// é…ç½® SysTickï¼šæ—¶é’Ÿæºä¸ºå†…æ ¸æ—¶é’Ÿï¼ˆé€šå¸¸168MHzï¼‰ï¼Œé‡è½½å€¼ = æ—¶é’Ÿé¢‘ç‡ / 1000 - 1
+    // ä½¿èƒ½ä¸­æ–­ï¼Œä½¿èƒ½å®šæ—¶å™¨
     if (SysTick_Config(SystemCoreClock / 1000)) {
-        // ÅäÖÃÊ§°Ü´¦Àí
+        // é…ç½®å¤±è´¥å¤„ç†
         while (1);
     }
 }
 
 uint32_t GetTick(void)
 {
+    uint32_t primask;
     uint32_t tick;
-    ENTER_CRITICAL();
+
+    primask = __get_PRIMASK();
+    __disable_irq();
     tick = sys_tick;
-    EXIT_CRITICAL();
+    if (primask == 0U) {
+        __enable_irq();
+    }
     return tick;
 }
 

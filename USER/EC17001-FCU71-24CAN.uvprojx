@@ -340,7 +340,7 @@
               <MiscControls></MiscControls>
               <Define>STM32F40_41xxx,USE_STDPERIPH_DRIVER</Define>
               <Undefine></Undefine>
-              <IncludePath>..\CORE;..\SYSTEM\delay;..\SYSTEM\sys;..\SYSTEM\usart;..\PROJECT;..\FWLIB\inc;..\CMSIS\Include;..\SYSTEM\can;..\SYSTEM\diagnose;..\SYSTEM\io;..\SYSTEM\tmr;..\SYSTEM\modbus_slave;..\SYSTEM\input;..\SYSTEM\adc;..\FWLIB\src;..\USER</IncludePath>
+              <IncludePath>..\CORE;..\SYSTEM\delay;..\SYSTEM\sys;..\SYSTEM\usart;..\PROJECT;..\FWLIB\inc;..\CMSIS\Include;..\SYSTEM\can;..\SYSTEM\diagnose;..\SYSTEM\io;..\SYSTEM\tmr;..\SYSTEM\modbus;..\SYSTEM\motor;..\SYSTEM\relay;..\SYSTEM\input;..\SYSTEM\adc;..\FWLIB\src;..\USER</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -465,14 +465,59 @@
               <FilePath>..\SYSTEM\input\input.h</FilePath>
             </File>
             <File>
-              <FileName>modbus.c</FileName>
+              <FileName>modbus_master.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\SYSTEM\modbus_slave\modbus.c</FilePath>
+              <FilePath>..\SYSTEM\modbus\modbus_master.c</FilePath>
             </File>
             <File>
-              <FileName>modbus.h</FileName>
+              <FileName>modbus_port.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\SYSTEM\modbus\modbus_port.c</FilePath>
+            </File>
+            <File>
+              <FileName>modbus_port.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\SYSTEM\modbus_slave\modbus.h</FilePath>
+              <FilePath>..\SYSTEM\modbus\modbus_port.h</FilePath>
+            </File>
+            <File>
+              <FileName>modbus_common.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\SYSTEM\modbus\modbus_common.c</FilePath>
+            </File>
+            <File>
+              <FileName>modbus_common.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\SYSTEM\modbus\modbus_common.h</FilePath>
+            </File>
+            <File>
+              <FileName>motor_service.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\SYSTEM\motor\motor_service.c</FilePath>
+            </File>
+            <File>
+              <FileName>motor_service.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\SYSTEM\motor\motor_service.h</FilePath>
+            </File>
+            <File>
+              <FileName>motor_config.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\SYSTEM\motor\motor_config.h</FilePath>
+            </File>
+            <File>
+              <FileName>relay.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\SYSTEM\relay\relay.c</FilePath>
+            </File>
+            <File>
+              <FileName>relay.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\SYSTEM\relay\relay.h</FilePath>
+            </File>
+            <File>
+              <FileName>modbus_master.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\SYSTEM\modbus\modbus_master.h</FilePath>
             </File>
             <File>
               <FileName>tmr.c</FileName>
@@ -512,12 +557,42 @@
             <File>
               <FileName>modbus_slave.h</FileName>
               <FileType>5</FileType>
-              <FilePath>.\modbus_slave.h</FilePath>
+              <FilePath>..\SYSTEM\modbus\modbus_slave.h</FilePath>
             </File>
             <File>
               <FileName>modbus_slave.c</FileName>
               <FileType>1</FileType>
-              <FilePath>.\modbus_slave.c</FilePath>
+              <FilePath>..\SYSTEM\modbus\modbus_slave.c</FilePath>
+            </File>
+            <File>
+              <FileName>gateway_modbus.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\gateway_modbus.c</FilePath>
+            </File>
+            <File>
+              <FileName>gateway_modbus.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\gateway_modbus.h</FilePath>
+            </File>
+            <File>
+              <FileName>gateway_commands.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\gateway_commands.c</FilePath>
+            </File>
+            <File>
+              <FileName>gateway_commands.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\gateway_commands.h</FilePath>
+            </File>
+            <File>
+              <FileName>gateway_tasks.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\gateway_tasks.c</FilePath>
+            </File>
+            <File>
+              <FileName>gateway_tasks.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\gateway_tasks.h</FilePath>
             </File>
             <File>
               <FileName>tick.h</FileName>

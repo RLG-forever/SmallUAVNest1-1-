@@ -28,6 +28,7 @@
   */
 
 /* Includes ------------------------------------------------------------------*/
+#include "tick.h"
 #include "stm32f4xx_it.h"
  
 extern void SysTick_ISR(void);

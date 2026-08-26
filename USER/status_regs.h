@@ -2,10 +2,6 @@
 #define STATUS_REGS_H
 
 #include <stdint.h>
-// 临界区保护（根据RTOS或裸机实现）
-// 此处使用简单的开关中断，若使用FreeRTOS可用taskENTER_CRITICAL()
-#define ENTER_CRITICAL()   __disable_irq()
-#define EXIT_CRITICAL()    __enable_irq()
 
 // 寄存器总数（0x00 ~ 0x1B 共28个）
 #define STATUS_REG_COUNT  28
@@ -42,8 +38,6 @@ typedef enum {
 		REG_RESERVED4,						// 备用  存储0x60的值
 } StatusRegAddr;
 
-// 全局状态寄存器数组（由主站更新，从站读取）
-extern uint16_t status_regs[STATUS_REG_COUNT];
 // 初始化状态寄存器
 void StatusRegs_Init(void);
 // 更新某个寄存器的值（带临界区保护）

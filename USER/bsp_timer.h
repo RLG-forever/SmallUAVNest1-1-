@@ -2,7 +2,6 @@
 #define __BSP_TIMER_H
 
 #include "stm32f4xx.h"
-#include "project.h"
 /* 选择硬件定时器：使用 TIM2（32位定时器，可支持较长定时）*/
 #define USE_TIM2
 //#define USE_TIM3
@@ -33,6 +32,8 @@ void bsp_InitHardTimer(void);
    _pCallBack: 超时回调函数
 */
 void bsp_StartHardTimer(uint8_t _CC, uint32_t _uiTimeOut, void (*_pCallBack)(void));
+/* 取消指定比较通道的单次硬件定时器。 */
+void bsp_StopHardTimer(uint8_t _CC);
 
 /* 系统滴答初始化（1ms中断，用于软件定时器和GetTick）*/
 void bsp_InitSysTick(void);

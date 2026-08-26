@@ -3,13 +3,6 @@
 
 #include <stdint.h>
 
-void MasterPolling_Init(void);   // ³õÊ¼»¯Ö÷Õ¾ÂÖÑ¯
-void MasterPolling_Task(void);   // Ö÷Õ¾ÂÖÑ¯ÈÎÎñ£¬ÖÜÆÚĞÔµ÷ÓÃ£¬ÀıÈçÃ¿100ms
-// »ñÈ¡Ö÷Õ¾×ÜÏßÃ¦×´Ì¬£¨ÓÃÓÚ´ÓÕ¾µÈ´ı£©
-uint8_t MasterPolling_IsBusy(void);
-// Õ¼ÓÃÖ÷Õ¾×ÜÏß£¨´ÓÕ¾Ğ´ÃüÁîÇ°µ÷ÓÃ£©
-void MasterBusy_Acquire(void);
-// ÊÍ·ÅÖ÷Õ¾×ÜÏß£¨´ÓÕ¾Ğ´ÃüÁîºóµ÷ÓÃ£©
-void MasterBusy_Release(void);
+void MasterPolling_Task(void);   // ä¸»ç«™è½®è¯¢ä»»åŠ¡ï¼Œå‘¨æœŸæ€§è°ƒç”¨ï¼Œä¾‹å¦‚æ¯100ms
 
 #endif

@@ -2,6 +2,24 @@
 #define SEQUENCE_H
 
 #include <stdint.h>
+#include "status_service.h"
+
+#define UAV_CONTROLLER_SLAVE          0x14U
+#define UAV_POWER_CTRL_REG            0x0001U
+#define UAV_POWER_ON_VALUE            0x0001U
+#define UAV_POWER_MODE2_VALUE         0x0002U
+
+#define CHARGER_SLAVE                 0x13U
+#define CHARGER_POWER_CTRL_REG        0x0000U
+#define CHARGER_POWER_ON_VALUE        0x0001U
+#define CHARGER_POWER_OFF_VALUE       0x0000U
+
+#define AIR_CONDITIONER_SLAVE         0x0DU
+#define AIR_POWER_CTRL_REG            0x002FU
+#define AIR_POWER_ON_VALUE            0x0001U
+#define AIR_POWER_OFF_VALUE           0x0000U
+#define AIR_COOLING_STOP_TEMP_REG     0x0000U
+#define AIR_HEATING_STOP_TEMP_REG     0x0002U
 
 
 // 居中目标位置（示例值，需根据实际测量）
@@ -42,15 +60,26 @@ typedef enum {
 		SEQ_ID_OPENDR1,         // 打开舱门
 } SeqId;
 
+/* Sequence_Start 的明确返回结果，调用者不应再通过全局状态猜测。 */
+typedef enum {
+    SEQ_START_OK = 0,          /* 已成功创建并启动序列 */
+    SEQ_START_BUSY,            /* 已有序列正在运行 */
+    SEQ_START_INVALID_ID,      /* 序列 ID 不受支持 */
+    SEQ_START_MASTER_BUSY      /* 主站事务或电机批处理仍被占用 */
+} SequenceStartResult;
 
-// 步骤函数类型：返回0成功，非0失败
+
+/* 步骤函数可返回 ModbusResult；需要显式重试时返回 STEP_RESULT_RETRY。 */
 typedef uint8_t (*StepFunc)(void);
+
+/* 独立于 ModbusResult，避免将通信错误误解释为动作重试。 */
+#define STEP_RESULT_RETRY 0x80U
 
 // 步骤定义
 typedef struct {
     StepFunc func;      // 执行该步骤的函数
     uint32_t wait_ms;   // 执行后等待时间（毫秒）
-		uint16_t update_addr;    // 完成后要更新的寄存器地址，0xFFFF表示不更新
+        StatusServiceField update_field; // 完成后更新的业务状态字段
     uint16_t update_value;   // 更新值
 } StepDef;
 
@@ -58,7 +87,7 @@ typedef struct {
 void Sequence_Init(void);
 
 // 启动指定序列（由从站回调调用）
-void Sequence_Start(SeqId id);
+SequenceStartResult Sequence_Start(SeqId id);
 
 // 查询是否有序列正在执行
 uint8_t Sequence_IsBusy(void);
