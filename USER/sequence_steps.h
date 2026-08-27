@@ -1,5 +1,20 @@
-#ifndef MOTOR_CONFIG_H
-#define MOTOR_CONFIG_H
+#ifndef SEQUENCE_STEPS_H
+#define SEQUENCE_STEPS_H
+
+#include <stdint.h>
+#include "status_regs.h"
+
+typedef uint8_t (*StepFunc)(void);
+
+#define STEP_RESULT_RETRY 0x80U
+
+typedef struct {
+    StepFunc run;
+    uint32_t post_delay_ms;
+    StatusRegAddr completion_reg;
+    uint16_t completion_value;
+} StepDef;
+
 
 /* 电机设备地址、寄存器、命令值和动作预置参数。 */
 // 1. 电机标识（区分不同电机）
@@ -188,5 +203,129 @@
 #define MOTOR12_DOWN      0x0044  // 下降
 #define MOTOR12_STOP      0x0055  // 停止
 
+
+
+/* 非电机设备的 Modbus 地址和控制参数。 */
+#define UAV_CONTROLLER_SLAVE          0x14U
+#define UAV_POWER_CTRL_REG            0x0001U
+#define UAV_POWER_ON_VALUE            0x0001U
+#define UAV_POWER_MODE2_VALUE         0x0002U
+
+#define CHARGER_SLAVE                 0x13U
+#define CHARGER_POWER_CTRL_REG        0x0000U
+#define CHARGER_POWER_ON_VALUE        0x0001U
+#define CHARGER_POWER_OFF_VALUE       0x0000U
+
+#define AIR_CONDITIONER_SLAVE         0x0DU
+#define AIR_POWER_CTRL_REG            0x002FU
+#define AIR_POWER_ON_VALUE            0x0001U
+#define AIR_POWER_OFF_VALUE           0x0000U
+#define AIR_COOLING_STOP_TEMP_REG     0x0000U
+#define AIR_HEATING_STOP_TEMP_REG     0x0002U
+
+uint8_t Motor1Up1(void);
+uint8_t Motor2Forward(void);
+uint8_t Motor3Clamp(void);
+uint8_t Motor2Back(void);
+uint8_t Motor1Down1(void);
+uint8_t Motor3Lossen(void);
+uint8_t Motor1Up2(void);
+uint8_t Motor1Up3(void);
+uint8_t CloseCenter1(void);
+uint8_t CloseCenter2(void);
+uint8_t FlyForward(void);
+uint8_t FlyBack(void);
+uint8_t RelayCtrl(void);
+
+uint8_t Center_1(void);
+uint8_t Center_2(void);
+uint8_t LeaveCenter(void);
+uint8_t LeaveCenter1(void);
+uint8_t LeaveCenter2(void);
+
+uint8_t Battery_1(void);
+uint8_t Battery_2(void);
+uint8_t Battery_3(void);
+uint8_t Battery_4(void);
+uint8_t Battery_5(void);
+uint8_t Battery_6(void);
+uint8_t Battery_7(void);
+uint8_t Battery_8(void);
+uint8_t Battery_9(void);
+uint8_t Battery_10(void);
+uint8_t Battery_11(void);
+uint8_t Battery_12(void);
+uint8_t Battery_13(void);
+uint8_t Battery_14(void);
+uint8_t Battery_15(void);
+uint8_t Battery_16(void);
+uint8_t Battery_17(void);
+uint8_t Battery_18(void);
+uint8_t Battery_19(void);
+uint8_t Battery_20(void);
+uint8_t Battery_21(void);
+uint8_t Battery_22(void);
+uint8_t Battery_23(void);
+uint8_t Battery_24(void);
+uint8_t Battery_25(void);
+uint8_t Battery_26(void);
+uint8_t Battery_27(void);
+uint8_t Battery_28(void);
+uint8_t Battery_29(void);
+
+uint8_t OpenDr(void);
+uint8_t CloseDr(void);
+uint8_t StopDr(void);
+uint8_t CheckAndCloseDoor(void);
+uint8_t OpenAC(void);
+uint8_t CloseAC(void);
+
+/* Read-only sequence step tables. */
+extern const StepDef opendr1_steps[];
+extern const StepDef opendr_steps[];
+extern const StepDef closedr_steps[];
+extern const StepDef openfly_steps[];
+extern const StepDef closefly_steps[];
+extern const StepDef takeoff_steps_1[];
+extern const StepDef takeoff_steps_2[];
+extern const StepDef takeoff_steps_3[];
+extern const StepDef landing_steps_1[];
+extern const StepDef landing_steps_2[];
+extern const StepDef landing_steps_3[];
+extern const StepDef closecenter_steps[];
+extern const StepDef leavecenter_steps[];
+extern const StepDef loadbattery_steps_1[];
+extern const StepDef loadbattery_steps_2[];
+extern const StepDef loadbattery_steps_3[];
+extern const StepDef downbattery_steps_1[];
+extern const StepDef downbattery_steps_2[];
+extern const StepDef downbattery_steps_3[];
+extern const StepDef recovery_with_battery_steps[];
+extern const StepDef recovery_without_battery_steps[];
+
+extern const uint8_t OPENDR1_STEP_COUNT;
+extern const uint8_t OPENDR_STEP_COUNT;
+extern const uint8_t CLOSEDR_STEP_COUNT;
+extern const uint8_t OPENFLY_STEP_COUNT;
+extern const uint8_t CLOSEFLY_STEP_COUNT;
+extern const uint8_t TAKEOFF_STEPS_1_COUNT;
+extern const uint8_t TAKEOFF_STEPS_2_COUNT;
+extern const uint8_t TAKEOFF_STEPS_3_COUNT;
+extern const uint8_t LANDING_STEPS_1_COUNT;
+extern const uint8_t LANDING_STEPS_2_COUNT;
+extern const uint8_t LANDING_STEPS_3_COUNT;
+extern const uint8_t CLOSECENTER_STEP_COUNT;
+extern const uint8_t LEAVECENTER_STEP_COUNT;
+extern const uint8_t LOADBATTERY_STEPS_1_COUNT;
+extern const uint8_t LOADBATTERY_STEPS_2_COUNT;
+extern const uint8_t LOADBATTERY_STEPS_3_COUNT;
+extern const uint8_t DOWNBATTERY_STEPS_1_COUNT;
+extern const uint8_t DOWNBATTERY_STEPS_2_COUNT;
+extern const uint8_t DOWNBATTERY_STEPS_3_COUNT;
+extern const uint8_t RECOVERY_WITH_BATTERY_COUNT;
+extern const uint8_t RECOVERY_WITHOUT_BATTERY_COUNT;
+
+const uint8_t *SequenceSteps_GetMotorList(uint8_t sequence_id,
+                                          uint8_t step_index);
 
 #endif

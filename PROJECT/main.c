@@ -63,7 +63,7 @@ static void StallRecovery_Task(void)
         return;
     }
     if (recovery_step == 0U) {
-        Sequence_ForceStop();
+        Sequence_Stop();
         recovery_step = 1U;
     }
 
@@ -109,8 +109,8 @@ int main(void)
 	ModbusPort_InitMasterFrameTimer(MODBUS_PORT_DEFAULT_BAUDRATE);
 	ModbusPort_InitSlaveFrameTimer(MODBUS_PORT_DEFAULT_BAUDRATE);
 	StatusRegs_Init();
-	ModbusSlave_Init(GATEWAY_MODBUS_SLAVE_ADDRESS);
-	GatewayModbus_Init();
+	ModbusSlave_Init(GATEWAY_SERVICE_MODBUS_ADDRESS);
+	GatewayService_Init();
 	ModbusMaster_Init();
 	Sequence_Init();
 	bsp_InitHardTimer();
@@ -174,8 +174,8 @@ int main(void)
 			ModbusMaster_Process();
 			ModbusSlave_Process();
 			Sequence_Process();   	// 处理序列（一键起飞/降落完成）
-			SwapState_TrySave();   // 异步保存
-			// GatewayTasks_Process();
+			GatewayService_Process();
+			SwapState_TrySave();   // 延迟保存（Flash 写入过程仍为同步执行）
 			StallRecovery_Task();
 			/* 后台轮询优先级最低，避免抢在控制命令之前占用主站总线。 */
 			MasterPolling_Task();

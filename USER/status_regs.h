@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 // 寄存器总数（0x00 ~ 0x1B 共28个）
-#define STATUS_REG_COUNT  28
+#define STATUS_REG_COUNT  28U
 
 // 寄存器地址枚举
 typedef enum {
@@ -37,6 +37,8 @@ typedef enum {
 		REG_RESERVED3,						// 备用
 		REG_RESERVED4,						// 备用  存储0x60的值
 } StatusRegAddr;
+
+#define STATUS_REG_NONE ((StatusRegAddr)0xFFU)
 
 // 初始化状态寄存器
 void StatusRegs_Init(void);

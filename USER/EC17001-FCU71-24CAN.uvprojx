@@ -490,19 +490,14 @@
               <FilePath>..\SYSTEM\modbus\modbus_common.h</FilePath>
             </File>
             <File>
-              <FileName>motor_service.c</FileName>
+              <FileName>motor_control.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\SYSTEM\motor\motor_service.c</FilePath>
+              <FilePath>..\SYSTEM\motor\motor_control.c</FilePath>
             </File>
             <File>
-              <FileName>motor_service.h</FileName>
+              <FileName>motor_control.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\SYSTEM\motor\motor_service.h</FilePath>
-            </File>
-            <File>
-              <FileName>motor_config.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\SYSTEM\motor\motor_config.h</FilePath>
+              <FilePath>..\SYSTEM\motor\motor_control.h</FilePath>
             </File>
             <File>
               <FileName>relay.c</FileName>
@@ -565,34 +560,14 @@
               <FilePath>..\SYSTEM\modbus\modbus_slave.c</FilePath>
             </File>
             <File>
-              <FileName>gateway_modbus.c</FileName>
+              <FileName>gateway_service.c</FileName>
               <FileType>1</FileType>
-              <FilePath>.\gateway_modbus.c</FilePath>
+              <FilePath>.\gateway_service.c</FilePath>
             </File>
             <File>
-              <FileName>gateway_modbus.h</FileName>
+              <FileName>gateway_service.h</FileName>
               <FileType>5</FileType>
-              <FilePath>.\gateway_modbus.h</FilePath>
-            </File>
-            <File>
-              <FileName>gateway_commands.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>.\gateway_commands.c</FilePath>
-            </File>
-            <File>
-              <FileName>gateway_commands.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>.\gateway_commands.h</FilePath>
-            </File>
-            <File>
-              <FileName>gateway_tasks.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>.\gateway_tasks.c</FilePath>
-            </File>
-            <File>
-              <FileName>gateway_tasks.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>.\gateway_tasks.h</FilePath>
+              <FilePath>.\gateway_service.h</FilePath>
             </File>
             <File>
               <FileName>tick.h</FileName>
@@ -613,6 +588,16 @@
               <FileName>sequence.c</FileName>
               <FileType>1</FileType>
               <FilePath>.\sequence.c</FilePath>
+            </File>
+            <File>
+              <FileName>sequence_steps.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\sequence_steps.h</FilePath>
+            </File>
+            <File>
+              <FileName>sequence_steps.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\sequence_steps.c</FilePath>
             </File>
             <File>
               <FileName>bsp_timer.h</FileName>

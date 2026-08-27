@@ -1,5 +1,4 @@
 #include "status_regs.h"
-#include "status_service.h"
 
 #include "stm32f4xx.h"
 
@@ -152,61 +151,4 @@ uint8_t GetBatteryInUAV(void)
         battery_id = 3U;
     }
     return not_charging_count == 1U ? battery_id : 0U;
-}
-
-uint16_t StatusService_GetBatteryChargeState(uint8_t battery_index)
-{
-    switch (battery_index) {
-        case 1U: return StatusRegs_Get(REG_BAT1_CHARGE_STATE);
-        case 2U: return StatusRegs_Get(REG_BAT2_CHARGE_STATE);
-        case 3U: return StatusRegs_Get(REG_BAT3_CHARGE_STATE);
-        default: return 0U;
-    }
-}
-
-uint16_t StatusService_GetUavStatus(void)
-{
-    return StatusRegs_Get(REG_RESERVED4);
-}
-
-void StatusService_SetUavStatus(uint16_t value)
-{
-    StatusRegs_Update(REG_RESERVED4, value);
-}
-
-void StatusService_Update(StatusServiceField field, uint16_t value)
-{
-    switch (field) {
-        case STATUS_FIELD_DOOR:
-            StatusRegs_Update(REG_DOOR_STATE, value);
-            break;
-        case STATUS_FIELD_CENTER_ROD:
-            StatusRegs_Update(REG_CENTER_ROD_STATE, value);
-            break;
-        case STATUS_FIELD_SWAP_MECHANISM:
-            StatusRegs_Update(REG_SWAP_MECH_STATE, value);
-            break;
-        case STATUS_FIELD_FAULT:
-            StatusRegs_Update(REG_FAULT_CODE, value);
-            break;
-        case STATUS_FIELD_NONE:
-        default:
-            break;
-    }
-}
-
-void StatusService_TakeSnapshot(void)
-{
-    StatusRegs_TakeSnapshot();
-}
-
-void StatusService_ReleaseSnapshot(void)
-{
-    StatusRegs_ReleaseSnapshot();
-}
-
-void StatusService_GetExternalBatch(uint16_t start_addr, uint8_t count,
-                                    uint8_t *response)
-{
-    StatusRegs_GetBatch(start_addr, count, response);
 }

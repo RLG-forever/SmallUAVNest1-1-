@@ -1,26 +1,139 @@
-#include "gateway_modbus.h"
+#include "gateway_service.h"
 
-#include "gateway_commands.h"
-#include "gateway_tasks.h"
 #include "modbus_common.h"
 #include "modbus_master.h"
 #include "modbus_slave.h"
-#include "motor_service.h"
+#include "motor_control.h"
 #include "sequence.h"
-#include "status_service.h"
+#include "sequence_steps.h"
+#include "status_regs.h"
 #include "tick.h"
 
 #include <stddef.h>
 
 #define GATEWAY_DUPLICATE_WINDOW_MS       5000U
 #define GATEWAY_REMOTE_OFF_DELAY_MS       (30UL * 60UL * 1000UL)
+
+typedef enum {
+    GATEWAY_CMD_OPEN_DOOR = 0x0030U,
+    GATEWAY_CMD_CLOSE_DOOR = 0x0031U,
+    GATEWAY_CMD_CLOSE_CENTER = 0x0032U,
+    GATEWAY_CMD_LEAVE_CENTER = 0x0033U,
+    GATEWAY_CMD_LIFT_UP = 0x0034U,
+    GATEWAY_CMD_LIFT_DOWN = 0x0035U,
+    GATEWAY_CMD_LOAD_BATTERY = 0x0036U,
+    GATEWAY_CMD_UNLOAD_BATTERY = 0x0037U,
+    GATEWAY_CMD_TAKEOFF = 0x0038U,
+    GATEWAY_CMD_OPEN_DOOR_ALT = 0x0039U, //与GATEWAY_CMD_OPEN_DOOR业务逻辑重复
+    GATEWAY_CMD_LANDING = 0x0040U, 
+    GATEWAY_CMD_PAUSE = 0x0041U,
+    GATEWAY_CMD_RESUME = 0x0042U,
+    GATEWAY_CMD_CANCEL = 0x0043U,
+    GATEWAY_CMD_OPEN_UP = 0x0044U, //与GATEWAY_CMD_OPEN_DOOR业务逻辑重复
+    GATEWAY_CMD_CLOSE_DOWN = 0x0045U,
+    GATEWAY_CMD_CHARGER_ON = 0x0048U,
+    GATEWAY_CMD_CHARGER_OFF = 0x0049U,
+    GATEWAY_CMD_OPEN_FLY = 0x0050U,
+    GATEWAY_CMD_CLOSE_FLY = 0x0051U,
+    GATEWAY_CMD_UAV_POWER_ON = 0x0052U,
+    GATEWAY_CMD_UAV_POWER_MODE2 = 0x0053U,
+    GATEWAY_CMD_COOLING_STOP_TEMP = 0x0054U,
+    GATEWAY_CMD_HEATING_STOP_TEMP = 0x0055U,
+    GATEWAY_CMD_UAV_STATUS = 0x0060U
+} GatewayCommandRegister;
+
+typedef struct {
+    MotorControlTarget target;
+} GatewayCommandTarget;
+
+typedef struct {
+    uint16_t gateway_register;
+    GatewayCommandTarget target;
+} GatewayCommandMapEntry;
+
+static const GatewayCommandMapEntry command_map[] = {
+    {GATEWAY_CMD_LIFT_UP,   {MOTOR_CONTROL_TARGET_LIFT_UP}},
+    {GATEWAY_CMD_LIFT_DOWN, {MOTOR_CONTROL_TARGET_LIFT_DOWN}}
+};
+
 static uint8_t wait_open_fly;
 static uint8_t takeoff_power_ready;
 static uint16_t last_write_register = 0xFFFFU;
 static uint16_t last_write_value = 0xFFFFU;
 static uint32_t last_write_time;
+static uint32_t remote_off_deadline;
+static uint8_t remote_off_pending;
+static uint8_t remote_off_command_active;
 
-static uint8_t GatewayModbus_StartSequence(SeqId id)
+static uint8_t GatewayService_FindTarget(uint16_t gateway_register,
+                                         GatewayCommandTarget *target)
+{
+    uint16_t index;
+
+    if (target == NULL) {
+        return 0U;
+    }
+    for (index = 0U;
+         index < (uint16_t)(sizeof(command_map) / sizeof(command_map[0]));
+         index++) {
+        if (command_map[index].gateway_register == gateway_register) {
+            *target = command_map[index].target;
+            return 1U;
+        }
+    }
+    return 0U;
+}
+
+void GatewayService_ScheduleRemotePowerOff(uint32_t delay_ms)
+{
+    remote_off_deadline = GetTick() + delay_ms;
+    remote_off_pending = 1U;
+}
+
+void GatewayService_CancelRemotePowerOff(void)
+{
+    remote_off_pending = 0U;
+}
+
+void GatewayService_Process(void)
+{
+    uint8_t result;
+
+    if (remote_off_command_active) {
+        result = ModbusMaster_06_WriteSingleReg(
+            MODBUS_MASTER_CLIENT_GATEWAY_TASK,
+            MOTOR14_SLAVE_ADDR, 0x0001U, 0x0001U);
+        if (result == MODBUS_RESULT_PENDING) {
+            return;
+        }
+        if (result == MODBUS_RESULT_BUSY) {
+            remote_off_command_active = 0U;
+            return;
+        }
+        remote_off_command_active = 0U;
+        remote_off_pending = 0U;
+        return;
+    }
+
+    if (!remote_off_pending || Sequence_IsBusy() ||
+        (int32_t)(GetTick() - remote_off_deadline) < 0) {
+        return;
+    }
+
+    result = ModbusMaster_06_WriteSingleReg(MODBUS_MASTER_CLIENT_GATEWAY_TASK,
+                                            MOTOR14_SLAVE_ADDR,
+                                            0x0001U, 0x0001U);
+    if (result == MODBUS_RESULT_PENDING) {
+        remote_off_command_active = 1U;
+        return;
+    }
+    if (result == MODBUS_RESULT_BUSY) {
+        return;
+    }
+    remote_off_pending = 0U;
+}
+
+static uint8_t GatewayService_StartSequence(SeqId id)
 {
     SequenceStartResult result = Sequence_Start(id);
 
@@ -33,8 +146,9 @@ static uint8_t GatewayModbus_StartSequence(SeqId id)
     return MODBUS_RESULT_PARAM;
 }
 
-static uint8_t GatewayModbus_IsRecentDuplicate(uint16_t register_address,
-                                               uint16_t value)
+/* 检测是否是在时间窗口内重复的指令 */
+static uint8_t GatewayService_IsRecentDuplicate(uint16_t register_address,
+                                                uint16_t value)
 {
     return register_address == last_write_register &&
            value == last_write_value &&
@@ -42,8 +156,8 @@ static uint8_t GatewayModbus_IsRecentDuplicate(uint16_t register_address,
                GATEWAY_DUPLICATE_WINDOW_MS;
 }
 
-static void GatewayModbus_RecordCompletedWrite(uint16_t register_address,
-                                               uint16_t value)
+static void GatewayService_RecordCompletedWrite(uint16_t register_address,
+                                                uint16_t value)
 {
     last_write_register = register_address;
     last_write_value = value;
@@ -51,34 +165,34 @@ static void GatewayModbus_RecordCompletedWrite(uint16_t register_address,
 }
 
 /* 执行单个网关寄存器命令，不负责编码从站应答。 */
-static uint8_t GatewayModbus_ExecuteWrite(uint16_t register_address,
-                                         uint16_t value)
+static uint8_t GatewayService_ExecuteWrite(uint16_t register_address,
+                                          uint16_t value)
 {
     GatewayCommandTarget target;
     uint8_t result = MODBUS_RESULT_PARAM;
 
-    if (GatewayModbus_IsRecentDuplicate(register_address, value)) {
+    if (GatewayService_IsRecentDuplicate(register_address, value)) {
         return MODBUS_RESULT_OK;
     }
 
     switch (register_address) {
         case GATEWAY_CMD_OPEN_DOOR:
-            result = GatewayModbus_StartSequence(SEQ_ID_OPENDR);
+            result = GatewayService_StartSequence(SEQ_ID_OPENDR);
             break;
         case GATEWAY_CMD_CLOSE_DOOR:
-            result = GatewayModbus_StartSequence(SEQ_ID_CLOSEDR);
+            result = GatewayService_StartSequence(SEQ_ID_CLOSEDR);
             break;
         case GATEWAY_CMD_CLOSE_CENTER:
-            result = GatewayModbus_StartSequence(SEQ_ID_CLOSECENTER);
+            result = GatewayService_StartSequence(SEQ_ID_CLOSECENTER);
             break;
         case GATEWAY_CMD_LEAVE_CENTER:
-            result = GatewayModbus_StartSequence(SEQ_ID_LEAVECENTER);
+            result = GatewayService_StartSequence(SEQ_ID_LEAVECENTER);
             break;
         case GATEWAY_CMD_LOAD_BATTERY:
-            result = GatewayModbus_StartSequence(SEQ_ID_LOADBATTERY);
+            result = GatewayService_StartSequence(SEQ_ID_LOADBATTERY);
             break;
         case GATEWAY_CMD_UNLOAD_BATTERY:
-            result = GatewayModbus_StartSequence(SEQ_ID_DOWNBATTERY);
+            result = GatewayService_StartSequence(SEQ_ID_DOWNBATTERY);
             break;
         case GATEWAY_CMD_PAUSE:
             Sequence_Pause();
@@ -89,27 +203,28 @@ static uint8_t GatewayModbus_ExecuteWrite(uint16_t register_address,
             result = MODBUS_RESULT_OK;
             break;
         case GATEWAY_CMD_CANCEL:
-            Sequence_Cancel();
+            Sequence_Stop();
             result = MODBUS_RESULT_OK;
             break;
         case GATEWAY_CMD_OPEN_DOOR_ALT:
         case GATEWAY_CMD_OPEN_UP:
-            result = GatewayModbus_StartSequence(SEQ_ID_OPENDR1);
+            result = GatewayService_StartSequence(SEQ_ID_OPENDR1);
             break;
         case GATEWAY_CMD_CLOSE_DOWN:
-            result = GatewayModbus_StartSequence(SEQ_ID_CLOSEDOWN);
+            result = GatewayService_StartSequence(SEQ_ID_CLOSEDOWN);
             break;
         case GATEWAY_CMD_OPEN_FLY:
-            result = GatewayModbus_StartSequence(SEQ_ID_OPENFLY);
+            result = GatewayService_StartSequence(SEQ_ID_OPENFLY);
             break;
         case GATEWAY_CMD_CLOSE_FLY:
-            result = GatewayModbus_StartSequence(SEQ_ID_CLOSEFLY);
+            result = GatewayService_StartSequence(SEQ_ID_CLOSEFLY);
             break;
 
         case GATEWAY_CMD_TAKEOFF:
         {
-            uint16_t uav_status = StatusService_GetUavStatus();
+            uint16_t uav_status = StatusRegs_Get(REG_RESERVED4);
 
+            GatewayService_CancelRemotePowerOff();
             if (uav_status == 0U && !takeoff_power_ready) {
                 result = ModbusMaster_06_WriteSingleReg(
                     MODBUS_MASTER_CLIENT_GATEWAY,
@@ -125,7 +240,7 @@ static uint8_t GatewayModbus_ExecuteWrite(uint16_t register_address,
                 wait_open_fly = 1U;
                 result = MODBUS_RESULT_OK;
             } else {
-                result = GatewayModbus_StartSequence(SEQ_ID_TAKEOFF);
+                result = GatewayService_StartSequence(SEQ_ID_TAKEOFF);
                 if (result == MODBUS_RESULT_OK) {
                     takeoff_power_ready = 0U;
                 }
@@ -134,9 +249,9 @@ static uint8_t GatewayModbus_ExecuteWrite(uint16_t register_address,
         }
 
         case GATEWAY_CMD_LANDING:
-            result = GatewayModbus_StartSequence(SEQ_ID_LANDING);
+            result = GatewayService_StartSequence(SEQ_ID_LANDING);
             if (result == MODBUS_RESULT_OK) {
-                GatewayTasks_ScheduleRemotePowerOff(
+                GatewayService_ScheduleRemotePowerOff(
                     GATEWAY_REMOTE_OFF_DELAY_MS);
             }
             break;
@@ -185,12 +300,12 @@ static uint8_t GatewayModbus_ExecuteWrite(uint16_t register_address,
             break;
 
         case GATEWAY_CMD_UAV_STATUS:
-            StatusService_SetUavStatus(value);
+            StatusRegs_Update(REG_RESERVED4, value);
             if (value == 2U) {
                 wait_open_fly = 0U;
                 result = MODBUS_RESULT_OK;
             } else if (value == 1U && wait_open_fly && !Sequence_IsBusy()) {
-                result = GatewayModbus_StartSequence(SEQ_ID_TAKEOFF);
+                result = GatewayService_StartSequence(SEQ_ID_TAKEOFF);
                 if (result == MODBUS_RESULT_OK) {
                     wait_open_fly = 0U;
                 }
@@ -200,27 +315,27 @@ static uint8_t GatewayModbus_ExecuteWrite(uint16_t register_address,
             break;
 
         default:
-            if (GatewayCommands_FindTarget(register_address, &target)) {
-                result = MotorService_WriteTarget(target.target, value);
+            if (GatewayService_FindTarget(register_address, &target)) {
+                result = MotorControl_WriteTarget(target.target, value);
             }
             break;
     }
 
     if (result == MODBUS_RESULT_OK) {
-        GatewayModbus_RecordCompletedWrite(register_address, value);
+        GatewayService_RecordCompletedWrite(register_address, value);
     }
     return result;
 }
 
-static uint8_t GatewayModbus_Handle03(const ModbusSlaveRequest *request)
+static uint8_t GatewayService_Handle03(const ModbusSlaveRequest *request)
 {
     uint16_t start_register = request->start_register;
     uint16_t register_count = request->register_count;
-    uint8_t response[3U + STATUS_SERVICE_EXTERNAL_REGISTER_COUNT * 2U];
+    uint8_t response[3U + STATUS_REG_COUNT * 2U];
 
     if (register_count == 0U ||
-        start_register >= STATUS_SERVICE_EXTERNAL_REGISTER_COUNT ||
-        register_count > (uint16_t)(STATUS_SERVICE_EXTERNAL_REGISTER_COUNT -
+        start_register >= STATUS_REG_COUNT ||
+        register_count > (uint16_t)(STATUS_REG_COUNT -
                                     start_register)) {
         return ModbusSlave_SendException(request, 0x02U) != 0U;
     }
@@ -228,16 +343,15 @@ static uint8_t GatewayModbus_Handle03(const ModbusSlaveRequest *request)
     response[0] = request->address;
     response[1] = 0x03U;
     response[2] = (uint8_t)(register_count * 2U);
-    StatusService_GetExternalBatch(start_register, (uint8_t)register_count,
-                                   &response[3]);
+    StatusRegs_GetBatch(start_register, (uint8_t)register_count, &response[3]);
     return ModbusSlave_SendFrame(response,
                                  3U + register_count * 2U) != 0U;
 }
 
-static uint8_t GatewayModbus_Handle06(const ModbusSlaveRequest *request)
+static uint8_t GatewayService_Handle06(const ModbusSlaveRequest *request)
 {
-    uint8_t result = GatewayModbus_ExecuteWrite(request->start_register,
-                                                request->value);
+    uint8_t result = GatewayService_ExecuteWrite(request->start_register,
+                                                 request->value);
 
     if (result == MODBUS_RESULT_PENDING || result == MODBUS_RESULT_BUSY) {
         return 1U;
@@ -249,7 +363,7 @@ static uint8_t GatewayModbus_Handle06(const ModbusSlaveRequest *request)
 }
 
 /* 每次主循环只执行 0x10 请求中的一个寄存器，避免阻塞其他任务。 */
-static uint8_t GatewayModbus_Handle10(const ModbusSlaveRequest *request)
+static uint8_t GatewayService_Handle10(const ModbusSlaveRequest *request)
 {
     static uint16_t index;
     static uint8_t active;
@@ -264,7 +378,7 @@ static uint8_t GatewayModbus_Handle10(const ModbusSlaveRequest *request)
 
     register_address = (uint16_t)(request->start_register + index);
     value = Modbus_GetU16BE(&request->write_data[index * 2U]);
-    result = GatewayModbus_ExecuteWrite(register_address, value);
+    result = GatewayService_ExecuteWrite(register_address, value);
     if (result == MODBUS_RESULT_PENDING || result == MODBUS_RESULT_BUSY) {
         return 1U;
     }
@@ -284,12 +398,12 @@ static uint8_t GatewayModbus_Handle10(const ModbusSlaveRequest *request)
     return ModbusSlave_SendWriteAck(request) != 0U;
 }
 
-void GatewayModbus_Init(void)
+void GatewayService_Init(void)
 {
     const ModbusSlaveHandlers handlers = {
-        GatewayModbus_Handle03,
-        GatewayModbus_Handle06,
-        GatewayModbus_Handle10
+        GatewayService_Handle03,
+        GatewayService_Handle06,
+        GatewayService_Handle10
     };
 
     wait_open_fly = 0U;
