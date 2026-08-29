@@ -3,11 +3,13 @@
 #include "modbus_common.h"
 #include "stm32f4xx.h"
 #include "tick.h"
+#include "debug_log.h"
 #include <string.h>
 
 #define MODBUS_MASTER_MAX_RETRIES  3U
 #define MODBUS_MASTER_RETRY_GAP_MS 5U
-#define MODBUS_MASTER_SEND_TIMEOUT_MS 100U
+#define MODBUS_MASTER_SEND_MARGIN_MS 20U
+#define MODBUS_MASTER_BITS_PER_CHAR  10U
 #define MODBUS_MASTER_TIMEOUT_MS   500U
 
 /* 主站内部状态不对外暴露，调用方通过 ModbusMaster_IsBusy() 查询。 */
@@ -54,6 +56,40 @@ static uint8_t Master_RX_BUFF[MODBUS_RTU_MAX_ADU_LENGTH];
 
 static ModbusMasterTransaction master_transaction;
 static volatile uint8_t master_tx_done;
+
+/* 按 Modbus 调试工具常用格式打印完整 RTU 发送帧。 */
+static void ModbusMaster_LogTxFrame(const uint8_t *frame, uint16_t length)
+{
+    uint16_t index;
+
+    if (g_project_debug_enabled == 0U) {
+        return;
+    }
+
+    printf("[DEBUG][MODBUS] TX frame (%u bytes):",
+           (unsigned int)length);
+    for (index = 0U; index < length; index++) {
+        printf(" %02X", (unsigned int)frame[index]);
+    }
+    printf("\r\n");
+}
+
+/* Print a completed receive frame from task context, never from the ISR. */
+static void ModbusMaster_LogRxFrame(const uint8_t *frame, uint16_t length)
+{
+    uint16_t index;
+
+    if (g_project_debug_enabled == 0U) {
+        return;
+    }
+
+    printf("[DEBUG][MODBUS] RX frame (%u bytes):",
+           (unsigned int)length);
+    for (index = 0U; index < length; index++) {
+        printf(" %02X", (unsigned int)frame[index]);
+    }
+    printf("\r\n");
+}
 
 static void ModbusMaster_OnRxByte(uint8_t data)
 {
@@ -156,14 +192,40 @@ static void ModbusMaster_BuildFrame(void)
 
 static void ModbusMaster_RetryOrFinish(uint8_t result);
 
+/*
+ * Start the deadline when the RTU port is actually started.  This excludes
+ * blocking debug output and allows long 0x10 frames to finish at 9600 baud.
+ */
+static uint32_t ModbusMaster_GetSendTimeoutMs(uint16_t frame_len)
+{
+    uint32_t wire_time_ms;
+
+    wire_time_ms = ((uint32_t)frame_len * MODBUS_MASTER_BITS_PER_CHAR *
+                    1000UL + MODBUS_PORT_DEFAULT_BAUDRATE - 1UL) /
+                   MODBUS_PORT_DEFAULT_BAUDRATE;
+    return wire_time_ms + MODBUS_MASTER_SEND_MARGIN_MS;
+}
+
 static void ModbusMaster_StartAttempt(void)
 {
     ModbusMaster_ResetRx();
     master_transaction.attempts++;
     master_transaction.phase = MASTER_TXN_SENDING;
-    master_transaction.deadline = GetTick() + MODBUS_MASTER_SEND_TIMEOUT_MS;
     master_state = MASTER_SENDING;
     master_tx_done = 0U;
+    LOG_DEBUG("MODBUS", "attempt %u: client=%u, slave=0x%02X, fn=0x%02X, reg=0x%04X, count=%u\r\n",
+              (unsigned int)master_transaction.attempts,
+              (unsigned int)master_transaction.client,
+              (unsigned int)master_transaction.slave,
+              (unsigned int)master_transaction.function,
+              (unsigned int)master_transaction.start_reg,
+              (unsigned int)master_transaction.reg_num);
+    ModbusMaster_LogTxFrame(master_transaction.frame,
+                            master_transaction.frame_len);
+    /* 在打印日志结束后计算超时时间，同时根据发送的字节数计算超时时间，防止超时误判*/
+    master_transaction.deadline =
+        GetTick() +
+        ModbusMaster_GetSendTimeoutMs(master_transaction.frame_len);
     if (ModbusPort_MasterSend(master_transaction.frame,
                               master_transaction.frame_len) != 0U) {
         ModbusMaster_RetryOrFinish(MODBUS_RESULT_BUSY);
@@ -175,12 +237,32 @@ static void ModbusMaster_SetResult(uint8_t result)
     master_transaction.result = result;
     master_transaction.phase = MASTER_TXN_RESULT;
     master_state = result == MODBUS_RESULT_OK ? MASTER_RESP_OK : MASTER_RESP_ERR;
+    if (result == MODBUS_RESULT_OK) {
+        LOG_DEBUG("MODBUS", "transaction completed: slave=0x%02X, fn=0x%02X, reg=0x%04X, attempts=%u\r\n",
+                  (unsigned int)master_transaction.slave,
+                  (unsigned int)master_transaction.function,
+                  (unsigned int)master_transaction.start_reg,
+                  (unsigned int)master_transaction.attempts);
+    } else {
+        LOG_ERROR("MODBUS", "transaction failed: slave=0x%02X, fn=0x%02X, reg=0x%04X, attempts=%u, result=%u\r\n",
+                  (unsigned int)master_transaction.slave,
+                  (unsigned int)master_transaction.function,
+                  (unsigned int)master_transaction.start_reg,
+                  (unsigned int)master_transaction.attempts,
+                  (unsigned int)result);
+    }
     ModbusMaster_ResetRx();
 }
 
 static void ModbusMaster_RetryOrFinish(uint8_t result)
 {
     if (master_transaction.attempts < MODBUS_MASTER_MAX_RETRIES) {
+        LOG_WARN("MODBUS", "retry scheduled: slave=0x%02X, fn=0x%02X, attempt=%u/%u, result=%u\r\n",
+                 (unsigned int)master_transaction.slave,
+                 (unsigned int)master_transaction.function,
+                 (unsigned int)master_transaction.attempts,
+                 (unsigned int)MODBUS_MASTER_MAX_RETRIES,
+                 (unsigned int)result);
         master_transaction.phase = MASTER_TXN_RETRY_WAIT;
         master_transaction.deadline = GetTick() + MODBUS_MASTER_RETRY_GAP_MS;
         master_state = MASTER_RETRY_WAIT;
@@ -251,6 +333,7 @@ void ModbusMaster_Init(void)
                                   ModbusMaster_OnFrameEnd,
                                   ModbusMaster_OnTxDone);
     ModbusMaster_ResetRx();
+    LOG_INFO("MODBUS", "master initialized\r\n");
 }
 
 /* 必须在主循环中高频调用，用于推进超时与重试状态机。 */
@@ -273,6 +356,7 @@ void ModbusMaster_Process(void)
             break;
         case MASTER_TXN_WAITING:
             if (Master_FrameFlag) {
+                ModbusMaster_LogRxFrame(Master_RX_BUFF, Master_RX_CNT);
                 result = ModbusMaster_ValidateResponse();
                 if (result == MODBUS_RESULT_OK || result == MODBUS_RESULT_EXCEPTION) {
                     ModbusMaster_SetResult(result);
@@ -300,6 +384,12 @@ uint8_t ModbusMaster_IsBusy(void)
 
 void ModbusMaster_Cancel(void)
 {
+    if (master_transaction.phase != MASTER_TXN_FREE) {
+        LOG_WARN("MODBUS", "transaction canceled: slave=0x%02X, fn=0x%02X, reg=0x%04X\r\n",
+                 (unsigned int)master_transaction.slave,
+                 (unsigned int)master_transaction.function,
+                 (unsigned int)master_transaction.start_reg);
+    }
     ModbusPort_MasterCancel();
     master_tx_done = 0U;
     memset(&master_transaction, 0, sizeof(master_transaction));
@@ -342,6 +432,10 @@ static uint8_t ModbusMaster_Submit(ModbusMasterClient client,
     } else if (function == 0x10U) {
         memcpy(master_transaction.write_data, write_data, reg_num * sizeof(uint16_t));
     }
+    LOG_DEBUG("MODBUS", "transaction submitted: client=%u, slave=0x%02X, fn=0x%02X, reg=0x%04X, count=%u\r\n",
+              (unsigned int)client, (unsigned int)slave,
+              (unsigned int)function, (unsigned int)start_reg,
+              (unsigned int)reg_num);
     ModbusMaster_BuildFrame();
     ModbusMaster_StartAttempt();
     return MODBUS_RESULT_PENDING;
@@ -352,7 +446,12 @@ uint8_t ModbusMaster_03_ReadHoldReg(ModbusMasterClient client,
                                    uint16_t reg_num, uint16_t *read_buff)
 {
     if (read_buff == NULL || slave_addr == 0U || slave_addr > 247U ||
-        reg_num == 0U || reg_num > 125U) return MODBUS_RESULT_PARAM;
+        reg_num == 0U || reg_num > 125U) {
+        LOG_ERROR("MODBUS", "invalid 03 request: slave=0x%02X, reg=0x%04X, count=%u\r\n",
+                  (unsigned int)slave_addr, (unsigned int)start_reg,
+                  (unsigned int)reg_num);
+        return MODBUS_RESULT_PARAM;
+    }
     return ModbusMaster_Submit(client, slave_addr, 0x03U,
                               start_reg, reg_num, NULL, read_buff);
 }
@@ -361,7 +460,11 @@ uint8_t ModbusMaster_06_WriteSingleReg(ModbusMasterClient client,
                                       uint8_t slave_addr, uint16_t reg_addr,
                                       uint16_t reg_data)
 {
-    if (slave_addr == 0U || slave_addr > 247U) return MODBUS_RESULT_PARAM;
+    if (slave_addr == 0U || slave_addr > 247U) {
+        LOG_ERROR("MODBUS", "invalid 06 request: slave=0x%02X, reg=0x%04X\r\n",
+                  (unsigned int)slave_addr, (unsigned int)reg_addr);
+        return MODBUS_RESULT_PARAM;
+    }
     return ModbusMaster_Submit(client, slave_addr, 0x06U,
                               reg_addr, 1U, &reg_data, NULL);
 }
@@ -372,7 +475,12 @@ uint8_t ModbusMaster_10_WriteMultiReg(ModbusMasterClient client,
                                      const uint16_t *write_buff)
 {
     if (write_buff == NULL || slave_addr == 0U || slave_addr > 247U ||
-        reg_num == 0U || reg_num > 123U) return MODBUS_RESULT_PARAM;
+        reg_num == 0U || reg_num > 123U) {
+        LOG_ERROR("MODBUS", "invalid 10 request: slave=0x%02X, reg=0x%04X, count=%u\r\n",
+                  (unsigned int)slave_addr, (unsigned int)start_reg,
+                  (unsigned int)reg_num);
+        return MODBUS_RESULT_PARAM;
+    }
     return ModbusMaster_Submit(client, slave_addr, 0x10U,
                               start_reg, reg_num, write_buff, NULL);
 }

@@ -13,6 +13,7 @@ not be reproduced or disclosed to third party without prior to authorisation
 #ifndef __PROJECT_H
 #define	__PROJECT_H
 #include <stdio.h>	
+#include "debug_log.h"
 
 #include "stm32f4xx.h" 
 #include "STM103REG.h"

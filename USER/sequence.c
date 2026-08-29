@@ -6,7 +6,7 @@
 #include "battery_swap.h"
 #include "relay.h"
 #include "tick.h"
-#include <stdio.h>
+#include "debug_log.h"
 #include <string.h>
 
 #define SEQUENCE_STEP_RETRY_LIMIT 2U
@@ -48,6 +48,10 @@ static uint8_t Sequence_IsTimeReached(uint32_t now, uint32_t deadline)
 
 static void Sequence_Finish(SequenceResult result)
 {
+    LOG_INFO("SEQUENCE", "finished: id=%u, step=%u, result=%u\r\n",
+             (unsigned int)seq_runner.id,
+             (unsigned int)seq_runner.current_index,
+             (unsigned int)result);
     seq_runner.id = SEQ_ID_INVALID;
     seq_runner.steps = NULL;
     seq_runner.step_count = 0U;
@@ -73,11 +77,12 @@ static void Sequence_CompleteCurrentStep(void)
     seq_runner.delay_deadline = 0U;
 
     if (seq_runner.current_index >= seq_runner.step_count) {
-        printf("Sequence completed\r\n");
         Sequence_Finish(SEQUENCE_RESULT_SUCCESS);
     } else {
         seq_runner.state = SEQUENCE_STATE_RUNNING;
-        printf("Sequence advances to step %d\r\n", seq_runner.current_index);
+        LOG_DEBUG("SEQUENCE", "advance to step %u/%u\r\n",
+                  (unsigned int)seq_runner.current_index,
+                  (unsigned int)seq_runner.step_count);
     }
 }
 
@@ -90,7 +95,9 @@ void Sequence_Pause(void)
     
     seq_runner.resume_state = seq_runner.state;
     seq_runner.state = SEQUENCE_STATE_PAUSED;
-    printf("Sequence paused\r\n");
+    LOG_INFO("SEQUENCE", "paused: id=%u, step=%u\r\n",
+             (unsigned int)seq_runner.id,
+             (unsigned int)seq_runner.current_index);
 }
 
 void Sequence_Resume(void)
@@ -106,7 +113,9 @@ void Sequence_Resume(void)
     }
 
     seq_runner.resume_state = SEQUENCE_STATE_IDLE;
-    printf("Sequence resumed\r\n");
+    LOG_INFO("SEQUENCE", "resumed: id=%u, step=%u\r\n",
+             (unsigned int)seq_runner.id,
+             (unsigned int)seq_runner.current_index);
 }
 
 void Sequence_Init(void)
@@ -116,6 +125,7 @@ void Sequence_Init(void)
     seq_runner.state = SEQUENCE_STATE_IDLE;
     seq_runner.resume_state = SEQUENCE_STATE_IDLE;
     seq_runner.last_result = SEQUENCE_RESULT_NONE;
+    LOG_INFO("SEQUENCE", "initialized\r\n");
 }
 
 uint8_t Sequence_IsBusy(void)
@@ -125,18 +135,22 @@ uint8_t Sequence_IsBusy(void)
 SequenceStartResult Sequence_Start(SeqId id)
 {
     if (Sequence_IsBusy()) {
-        printf("序列已在执行中，忽略新请求\r\n");
+        LOG_WARN("SEQUENCE", "start rejected: busy, requested_id=%u\r\n",
+                 (unsigned int)id);
         return SEQ_START_BUSY;
     }
 
     if (MotorControl_IsBusy()) {
+        LOG_WARN("SEQUENCE", "start rejected: motor busy, requested_id=%u\r\n",
+                 (unsigned int)id);
         return SEQ_START_MASTER_BUSY;
     }
 
 		// 获取当前空仓号（1~3）
     uint8_t empty_bay = SwapState_GetEmptyBay();
     if (empty_bay < 1 || empty_bay > 3) {
-        printf("Invalid empty bay %d; using bay 1\n", empty_bay);
+        LOG_WARN("SEQUENCE", "invalid empty bay %u; using bay 1\r\n",
+                 (unsigned int)empty_bay);
         empty_bay = 1;
     }
     uint8_t index = empty_bay - 1; // 数组索引
@@ -145,27 +159,27 @@ SequenceStartResult Sequence_Start(SeqId id)
 				case SEQ_ID_OPENDR1:
 						seq_runner.steps = opendr1_steps;
 						seq_runner.step_count = OPENDR1_STEP_COUNT;
-						printf("打开舱门序列\r\n");
+						LOG_INFO("SEQUENCE", "open-door sequence selected\r\n");
 				break;
 				case SEQ_ID_OPENDR:
 						seq_runner.steps = opendr_steps;
 						seq_runner.step_count = OPENDR_STEP_COUNT;
-						printf("打开舱门序列\r\n");
+						LOG_INFO("SEQUENCE", "open-door sequence selected\r\n");
 				break;
 				case SEQ_ID_CLOSEDR:
 						seq_runner.steps = closedr_steps;
 						seq_runner.step_count = CLOSEDR_STEP_COUNT;
-						printf("关闭舱门序列\r\n");
+						LOG_INFO("SEQUENCE", "close-door sequence selected\r\n");
 				break;
 			  case SEQ_ID_CLOSECENTER:
 						seq_runner.steps = closecenter_steps;
 						seq_runner.step_count = CLOSECENTER_STEP_COUNT;
-						printf("居中杆居中序列\r\n");
+						LOG_INFO("SEQUENCE", "centering sequence selected\r\n");
 				break;
 				case SEQ_ID_LEAVECENTER:
 						seq_runner.steps = leavecenter_steps;
 						seq_runner.step_count = LEAVECENTER_STEP_COUNT;
-						printf("居中杆释放序列\r\n");
+						LOG_INFO("SEQUENCE", "release-center sequence selected\r\n");
 				break;
 				case SEQ_ID_LOADBATTERY:
 				{
@@ -173,7 +187,8 @@ SequenceStartResult Sequence_Start(SeqId id)
                         const uint8_t counts[] = {LOADBATTERY_STEPS_1_COUNT, LOADBATTERY_STEPS_2_COUNT, LOADBATTERY_STEPS_3_COUNT};
                         seq_runner.steps = array[index];
                         seq_runner.step_count = counts[index];
-                        printf("启动装电池序列，空仓=%d\n", empty_bay);
+                        LOG_INFO("SEQUENCE", "load-battery sequence selected: bay=%u\r\n",
+                                 (unsigned int)empty_bay);
                         break;
 				}
 				case SEQ_ID_DOWNBATTERY:
@@ -182,7 +197,8 @@ SequenceStartResult Sequence_Start(SeqId id)
                     const uint8_t counts[] = {DOWNBATTERY_STEPS_1_COUNT, DOWNBATTERY_STEPS_2_COUNT, DOWNBATTERY_STEPS_3_COUNT};
                     seq_runner.steps = array[index];
                     seq_runner.step_count = counts[index];
-                    printf("启动下电池序列，空仓=%d\n", empty_bay);
+                    LOG_INFO("SEQUENCE", "unload-battery sequence selected: bay=%u\r\n",
+                             (unsigned int)empty_bay);
                 break;
 				}
                 case SEQ_ID_TAKEOFF:
@@ -191,7 +207,8 @@ SequenceStartResult Sequence_Start(SeqId id)
                         const uint8_t counts[] = {TAKEOFF_STEPS_1_COUNT, TAKEOFF_STEPS_2_COUNT, TAKEOFF_STEPS_3_COUNT};
                         seq_runner.steps = array[index];
                         seq_runner.step_count = counts[index];
-                        printf("Starting takeoff sequence; bay=%d\n", empty_bay);
+                        LOG_INFO("SEQUENCE", "takeoff sequence selected: bay=%u\r\n",
+                                 (unsigned int)empty_bay);
                 break;
 				}
                 case SEQ_ID_LANDING:
@@ -200,18 +217,19 @@ SequenceStartResult Sequence_Start(SeqId id)
                     const uint8_t counts[] = {LANDING_STEPS_1_COUNT, LANDING_STEPS_2_COUNT, LANDING_STEPS_3_COUNT};
                     seq_runner.steps = array[index];
                     seq_runner.step_count = counts[index];
-                    printf("Starting landing sequence; bay=%d\n", empty_bay);
+                    LOG_INFO("SEQUENCE", "landing sequence selected: bay=%u\r\n",
+                             (unsigned int)empty_bay);
                 break;
 				}
 				case SEQ_ID_OPENFLY:
                     seq_runner.steps = openfly_steps;
                     seq_runner.step_count = OPENFLY_STEP_COUNT;
-                    printf("飞机开机完成序列\r\n");
+                    LOG_INFO("SEQUENCE", "open-fly sequence selected\r\n");
                 break;
 				case SEQ_ID_CLOSEFLY:
                     seq_runner.steps = closefly_steps;
                     seq_runner.step_count = CLOSEFLY_STEP_COUNT;
-                    printf("飞机关机完成序列\r\n");
+                    LOG_INFO("SEQUENCE", "close-fly sequence selected\r\n");
                 break;
 
 //        case SEQ_ID_RECOVERY:
@@ -230,6 +248,8 @@ SequenceStartResult Sequence_Start(SeqId id)
 //						printf("关门及/平台下降序列\r\n");
 //				break;
         default:
+            LOG_ERROR("SEQUENCE", "invalid sequence id=%u\r\n",
+                      (unsigned int)id);
             return SEQ_START_INVALID_ID;
     }
 		// ========== 拍摄状态快照 ==========
@@ -242,6 +262,9 @@ SequenceStartResult Sequence_Start(SeqId id)
     seq_runner.last_result = SEQUENCE_RESULT_NONE;
     seq_runner.delay_deadline = 0U;
     seq_runner.current_step_retry_count = 0U;   // 重置重试计数
+    LOG_INFO("SEQUENCE", "started: id=%u, bay=%u, steps=%u\r\n",
+             (unsigned int)id, (unsigned int)empty_bay,
+             (unsigned int)seq_runner.step_count);
     return SEQ_START_OK;
 }
 
@@ -265,8 +288,9 @@ static void Sequence_ExecuteCurrentStep(void)
         if (step->post_delay_ms > 0U) {
             seq_runner.delay_deadline = GetTick() + step->post_delay_ms;
             seq_runner.state = SEQUENCE_STATE_WAITING;
-            printf("Step %d completed; waiting %d ms\r\n",
-                   seq_runner.current_index, step->post_delay_ms);
+            LOG_DEBUG("SEQUENCE", "step %u completed; delay=%lu ms\r\n",
+                      (unsigned int)seq_runner.current_index,
+                      (unsigned long)step->post_delay_ms);
         } else {
             Sequence_CompleteCurrentStep();
         }
@@ -276,22 +300,23 @@ static void Sequence_ExecuteCurrentStep(void)
     if (ret == STEP_RESULT_RETRY) {
         if (seq_runner.current_step_retry_count < SEQUENCE_STEP_RETRY_LIMIT) {
             seq_runner.current_step_retry_count++;
-            printf("Retrying step %d: %d/%d\r\n",
-                   seq_runner.current_index,
-                   seq_runner.current_step_retry_count,
-                   SEQUENCE_STEP_RETRY_LIMIT);
+            LOG_WARN("SEQUENCE", "retry step %u: %u/%u\r\n",
+                     (unsigned int)seq_runner.current_index,
+                     (unsigned int)seq_runner.current_step_retry_count,
+                     (unsigned int)SEQUENCE_STEP_RETRY_LIMIT);
             return;
         }
 
         StatusRegs_Update(REG_FAULT_CODE, 0x00FFU);
-        printf("Step %d retry limit reached\r\n",
-               seq_runner.current_index);
+        LOG_ERROR("SEQUENCE", "step %u retry limit reached\r\n",
+                  (unsigned int)seq_runner.current_index);
         Sequence_Finish(SEQUENCE_RESULT_RETRY_EXHAUSTED);
         return;
     }
 
-    printf("Step %d failed with result %d\r\n",
-           seq_runner.current_index, ret);
+    LOG_ERROR("SEQUENCE", "step %u failed: result=%u\r\n",
+              (unsigned int)seq_runner.current_index,
+              (unsigned int)ret);
     Sequence_Finish(SEQUENCE_RESULT_ACTION_FAILED);
 }
 void Sequence_Process(void)
@@ -349,11 +374,11 @@ SequenceStartResult Sequence_StartRecovery(void)
     if (HasOldBatteryInUAV()) {
         seq_runner.steps = recovery_with_battery_steps;
         seq_runner.step_count = RECOVERY_WITH_BATTERY_COUNT;
-        printf("Starting recovery sequence with battery\r\n");
+        LOG_INFO("SEQUENCE", "starting recovery with battery\r\n");
     } else {
         seq_runner.steps = recovery_without_battery_steps;
         seq_runner.step_count = RECOVERY_WITHOUT_BATTERY_COUNT;
-        printf("Starting recovery sequence without battery\r\n");
+        LOG_INFO("SEQUENCE", "starting recovery without battery\r\n");
     }
 
     StatusRegs_TakeSnapshot();

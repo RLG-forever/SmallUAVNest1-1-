@@ -293,7 +293,7 @@ void Battery3(void)
 		{
 				slave2_cmds[0] = MOTOR_PRESET_PULSE_01;            // 寄存器1：高位
 				slave2_cmds[1] = MOTOR_PRESET_PULSE_02;            // 寄存器2：低位
-//				printf("赋值后：slave1_cmds[2] = 0x%04X\n", slave1_cmds[2]); // 确认赋值成功
+//				LOG_DEBUG("LEGACY_BATTERY", "赋值后：slave1_cmds[2] = 0x%04X\n", slave1_cmds[2]); // 确认赋值成功
 		} else
 		{
 				// Reg_num不足时的容错处理（比如清空数组）
@@ -301,7 +301,7 @@ void Battery3(void)
 		}
 		if (ModbusMaster_IsBusy())
 		{
-				printf("强制重置主站状态为空闲\r\n");
+				LOG_DEBUG("LEGACY_BATTERY", "强制重置主站状态为空闲\r\n");
 				fflush(stdout);
 		}
 		uint8_t ctrl_ret2 = Motor_Batch_Control(MOTOR2_SLAVE_ADDR, MOTOR2_CTRL_REG3, Reg_num, slave2_cmds);// 指令发送返回值
@@ -309,20 +309,20 @@ void Battery3(void)
     switch(ctrl_ret2)
     {
         case 0:
-            printf("上升指令发送成功，电机开始运行\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "上升指令发送成功，电机开始运行\r\n");
             break;
         case 1:
-            printf("错误：电机编号非法或主站非空闲（上升指令未发送）\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：电机编号非法或主站非空闲（上升指令未发送）\r\n");
             // 直接退出，避免执行停止指令
             while(1) { delay_ms(1000); }
         case 2:
-            printf("警告：上升指令超时，但电机可能已运行\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "警告：上升指令超时，但电机可能已运行\r\n");
             break;
         case 3:
-            printf("错误：上升指令响应内容不匹配\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：上升指令响应内容不匹配\r\n");
             break;
         default:
-            printf("错误：上升指令发送异常\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：上升指令发送异常\r\n");
             break;
     }
 }
@@ -337,20 +337,20 @@ void Battery4(void)
     switch(ctrl_ret1)
     {
         case 0:
-            printf("上升指令发送成功，电机开始运行\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "上升指令发送成功，电机开始运行\r\n");
             break;
         case 1:
-            printf("错误：电机编号非法或主站非空闲（上升指令未发送）\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：电机编号非法或主站非空闲（上升指令未发送）\r\n");
             // 直接退出，避免执行停止指令
             while(1) { delay_ms(1000); }
         case 2:
-            printf("警告：上升指令超时，但电机可能已运行\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "警告：上升指令超时，但电机可能已运行\r\n");
             break;
         case 3:
-            printf("错误：上升指令响应内容不匹配\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：上升指令响应内容不匹配\r\n");
             break;
         default:
-            printf("错误：上升指令发送异常\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：上升指令发送异常\r\n");
             break;
     }
 }
@@ -364,20 +364,20 @@ void Battery5(void)
 		switch(ctrl_ret1)
     {
         case 0:
-            printf("上升指令发送成功，电机开始运行\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "上升指令发送成功，电机开始运行\r\n");
             break;
         case 1:
-            printf("错误：电机编号非法或主站非空闲（上升指令未发送）\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：电机编号非法或主站非空闲（上升指令未发送）\r\n");
             // 直接退出，避免执行停止指令
             while(1) { delay_ms(1000); }
         case 2:
-            printf("警告：上升指令超时，但电机可能已运行\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "警告：上升指令超时，但电机可能已运行\r\n");
             break;
         case 3:
-            printf("错误：上升指令响应内容不匹配\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：上升指令响应内容不匹配\r\n");
             break;
         default:
-            printf("错误：上升指令发送异常\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：上升指令发送异常\r\n");
             break;
     }
 }
@@ -394,7 +394,7 @@ void Battery6(void)
 		{
 				slave2_cmds[0] = MOTOR_PRESET_PULSE_03;            // 寄存器1：高位
 				slave2_cmds[1] = MOTOR_PRESET_PULSE_04;            // 寄存器2：低位
-//				printf("赋值后：slave1_cmds[2] = 0x%04X\n", slave1_cmds[2]); // 确认赋值成功
+//				LOG_DEBUG("LEGACY_BATTERY", "赋值后：slave1_cmds[2] = 0x%04X\n", slave1_cmds[2]); // 确认赋值成功
 		} else
 		{
 				// Reg_num不足时的容错处理（比如清空数组）
@@ -402,7 +402,7 @@ void Battery6(void)
 		}
 		if (ModbusMaster_IsBusy())
 		{
-				printf("强制重置主站状态为空闲\r\n");
+				LOG_DEBUG("LEGACY_BATTERY", "强制重置主站状态为空闲\r\n");
 				fflush(stdout);
 		}
 		uint8_t ctrl_ret2 = Motor_Batch_Control(MOTOR2_SLAVE_ADDR, MOTOR2_CTRL_REG3, Reg_num, slave2_cmds);
@@ -410,20 +410,20 @@ void Battery6(void)
     switch(ctrl_ret2)
     {
         case 0:
-            printf("上升指令发送成功，电机开始运行\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "上升指令发送成功，电机开始运行\r\n");
             break;
         case 1:
-            printf("错误：电机编号非法或主站非空闲（上升指令未发送）\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：电机编号非法或主站非空闲（上升指令未发送）\r\n");
             // 直接退出，避免执行停止指令
             while(1) { delay_ms(1000); }
         case 2:
-            printf("警告：上升指令超时，但电机可能已运行\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "警告：上升指令超时，但电机可能已运行\r\n");
             break;
         case 3:
-            printf("错误：上升指令响应内容不匹配\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：上升指令响应内容不匹配\r\n");
             break;
         default:
-            printf("错误：上升指令发送异常\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：上升指令发送异常\r\n");
             break;
     }
 }
@@ -438,20 +438,20 @@ void Battery7(void)
     switch(ctrl_ret1)
     {
         case 0:
-            printf("上升指令发送成功，电机开始运行\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "上升指令发送成功，电机开始运行\r\n");
             break;
         case 1:
-            printf("错误：电机编号非法或主站非空闲（上升指令未发送）\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：电机编号非法或主站非空闲（上升指令未发送）\r\n");
             // 直接退出，避免执行停止指令
             while(1) { delay_ms(1000); }
         case 2:
-            printf("警告：上升指令超时，但电机可能已运行\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "警告：上升指令超时，但电机可能已运行\r\n");
             break;
         case 3:
-            printf("错误：上升指令响应内容不匹配\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：上升指令响应内容不匹配\r\n");
             break;
         default:
-            printf("错误：上升指令发送异常\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：上升指令发送异常\r\n");
             break;
     }
 }
@@ -465,20 +465,20 @@ void Battery8(void)
 		switch(ctrl_ret1)
     {
         case 0:
-            printf("上升指令发送成功，电机开始运行\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "上升指令发送成功，电机开始运行\r\n");
             break;
         case 1:
-            printf("错误：电机编号非法或主站非空闲（上升指令未发送）\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：电机编号非法或主站非空闲（上升指令未发送）\r\n");
             // 直接退出，避免执行停止指令
             while(1) { delay_ms(1000); }
         case 2:
-            printf("警告：上升指令超时，但电机可能已运行\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "警告：上升指令超时，但电机可能已运行\r\n");
             break;
         case 3:
-            printf("错误：上升指令响应内容不匹配\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：上升指令响应内容不匹配\r\n");
             break;
         default:
-            printf("错误：上升指令发送异常\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：上升指令发送异常\r\n");
             break;
     }
 }
@@ -488,15 +488,15 @@ void Battery9(void)
   	//8.电机3夹住电池
 		uint8_t ctrl_ret3;  // 指令发送返回值
 		uint8_t motor_num3 = 2;   // 寄存器地址（夹紧）
-		uint16_t motor_cmd3 = MOTOR3_CMD_CLAMP; // 电机指令：
-		ctrl_ret3 = Motor_Control(MOTOR3_SLAVE_ADDR, motor_num3, motor_cmd3);
+		uint16_t motor_cmd3 = MOTOR_CLAMP_CMD_CLAMP; // 电机指令：
+		ctrl_ret3 = Motor_Control(MOTOR_CLAMP_SLAVE_ADDR, motor_num3, motor_cmd3);
 		if(ctrl_ret3 == 0)
     {
-        printf("从机3夹紧指令发送成功！\r\n");
+        LOG_DEBUG("LEGACY_BATTERY", "从机3夹紧指令发送成功！\r\n");
     }
     else
     {
-        printf("从机3夹紧指令发送失败，错误码：%d\r\n", ctrl_ret3);
+        LOG_DEBUG("LEGACY_BATTERY", "从机3夹紧指令发送失败，错误码：%d\r\n", ctrl_ret3);
     }
 }
 
@@ -511,7 +511,7 @@ void Battery10(void)
 		{
 				slave2_cmds[0] = MOTOR_PRESET_PULSE_09;            // 寄存器1：高位
 				slave2_cmds[1] = MOTOR_PRESET_PULSE_10;            // 寄存器2：低位
-//				printf("赋值后：slave1_cmds[2] = 0x%04X\n", slave1_cmds[2]); // 确认赋值成功
+//				LOG_DEBUG("LEGACY_BATTERY", "赋值后：slave1_cmds[2] = 0x%04X\n", slave1_cmds[2]); // 确认赋值成功
 		} else
 		{
 				// Reg_num不足时的容错处理（比如清空数组）
@@ -519,7 +519,7 @@ void Battery10(void)
 		}
 		if (ModbusMaster_IsBusy())
 		{
-				printf("强制重置主站状态为空闲\r\n");
+				LOG_DEBUG("LEGACY_BATTERY", "强制重置主站状态为空闲\r\n");
 				fflush(stdout);
 		}
 		uint8_t ctrl_ret2 = Motor_Batch_Control(MOTOR2_SLAVE_ADDR, MOTOR2_CTRL_REG2, Reg_num, slave2_cmds);
@@ -527,20 +527,20 @@ void Battery10(void)
     switch(ctrl_ret2)
     {
         case 0:
-            printf("上升指令发送成功，电机开始运行\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "上升指令发送成功，电机开始运行\r\n");
             break;
         case 1:
-            printf("错误：电机编号非法或主站非空闲（上升指令未发送）\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：电机编号非法或主站非空闲（上升指令未发送）\r\n");
             // 直接退出，避免执行停止指令
             while(1) { delay_ms(1000); }
         case 2:
-            printf("警告：上升指令超时，但电机可能已运行\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "警告：上升指令超时，但电机可能已运行\r\n");
             break;
         case 3:
-            printf("错误：上升指令响应内容不匹配\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：上升指令响应内容不匹配\r\n");
             break;
         default:
-            printf("错误：上升指令发送异常\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：上升指令发送异常\r\n");
             break;
     }
 }
@@ -549,15 +549,15 @@ void Battery11(void)
 {
   	//10.电机3松开电池
 		uint8_t motor_num3 = 1;   // 寄存器地址（松开）
-		uint16_t motor_cmd3 = MOTOR3_CMD_RELEASE; // 电机指令：
-		uint8_t ctrl_ret3 = Motor_Control(MOTOR3_SLAVE_ADDR, motor_num3, motor_cmd3);
+		uint16_t motor_cmd3 = MOTOR_CLAMP_CMD_RELEASE; // 电机指令：
+		uint8_t ctrl_ret3 = Motor_Control(MOTOR_CLAMP_SLAVE_ADDR, motor_num3, motor_cmd3);
 		if(ctrl_ret3 == 0)
     {
-        printf("从机3松开指令发送成功！\r\n");
+        LOG_DEBUG("LEGACY_BATTERY", "从机3松开指令发送成功！\r\n");
     }
     else
     {
-        printf("从机3松开指令发送失败，错误码：%d\r\n", ctrl_ret3);
+        LOG_DEBUG("LEGACY_BATTERY", "从机3松开指令发送失败，错误码：%d\r\n", ctrl_ret3);
     }
 }
 
@@ -571,20 +571,20 @@ void Battery12(void)
     switch(ctrl_ret1)
     {
         case 0:
-            printf("上升指令发送成功，电机开始运行\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "上升指令发送成功，电机开始运行\r\n");
             break;
         case 1:
-            printf("错误：电机编号非法或主站非空闲（上升指令未发送）\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：电机编号非法或主站非空闲（上升指令未发送）\r\n");
             // 直接退出，避免执行停止指令
             while(1) { delay_ms(1000); }
         case 2:
-            printf("警告：上升指令超时，但电机可能已运行\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "警告：上升指令超时，但电机可能已运行\r\n");
             break;
         case 3:
-            printf("错误：上升指令响应内容不匹配\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：上升指令响应内容不匹配\r\n");
             break;
         default:
-            printf("错误：上升指令发送异常\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：上升指令发送异常\r\n");
             break;
     }
 }
@@ -598,20 +598,20 @@ void Battery13(void)
 		switch(ctrl_ret1)
     {
         case 0:
-            printf("上升指令发送成功，电机开始运行\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "上升指令发送成功，电机开始运行\r\n");
             break;
         case 1:
-            printf("错误：电机编号非法或主站非空闲（上升指令未发送）\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：电机编号非法或主站非空闲（上升指令未发送）\r\n");
             // 直接退出，避免执行停止指令
             while(1) { delay_ms(1000); }
         case 2:
-            printf("警告：上升指令超时，但电机可能已运行\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "警告：上升指令超时，但电机可能已运行\r\n");
             break;
         case 3:
-            printf("错误：上升指令响应内容不匹配\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：上升指令响应内容不匹配\r\n");
             break;
         default:
-            printf("错误：上升指令发送异常\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：上升指令发送异常\r\n");
             break;
     }
 }
@@ -627,7 +627,7 @@ void Battery14(void)
 		{
 				slave2_cmds[0] = MOTOR_PRESET_PULSE_11;            // 寄存器1：高位
 				slave2_cmds[1] = MOTOR_PRESET_PULSE_12;            // 寄存器2：低位
-//				printf("赋值后：slave1_cmds[2] = 0x%04X\n", slave1_cmds[2]); // 确认赋值成功
+//				LOG_DEBUG("LEGACY_BATTERY", "赋值后：slave1_cmds[2] = 0x%04X\n", slave1_cmds[2]); // 确认赋值成功
 		} else
 		{
 				// Reg_num不足时的容错处理（比如清空数组）
@@ -635,7 +635,7 @@ void Battery14(void)
 		}
 		if (ModbusMaster_IsBusy())
 		{
-				printf("强制重置主站状态为空闲\r\n");
+				LOG_DEBUG("LEGACY_BATTERY", "强制重置主站状态为空闲\r\n");
 				fflush(stdout);
 		}
 		uint8_t ctrl_ret2 = Motor_Batch_Control(MOTOR2_SLAVE_ADDR, MOTOR2_CTRL_REG2, Reg_num, slave2_cmds);
@@ -643,20 +643,20 @@ void Battery14(void)
     switch(ctrl_ret2)
     {
         case 0:
-            printf("上升指令发送成功，电机开始运行\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "上升指令发送成功，电机开始运行\r\n");
             break;
         case 1:
-            printf("错误：电机编号非法或主站非空闲（上升指令未发送）\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：电机编号非法或主站非空闲（上升指令未发送）\r\n");
             // 直接退出，避免执行停止指令
             while(1) { delay_ms(1000); }
         case 2:
-            printf("警告：上升指令超时，但电机可能已运行\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "警告：上升指令超时，但电机可能已运行\r\n");
             break;
         case 3:
-            printf("错误：上升指令响应内容不匹配\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：上升指令响应内容不匹配\r\n");
             break;
         default:
-            printf("错误：上升指令发送异常\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：上升指令发送异常\r\n");
             break;
     }
 }
@@ -672,20 +672,20 @@ void Battery15(void)
     switch(ctrl_ret1)
     {
         case 0:
-            printf("上升指令发送成功，电机开始运行\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "上升指令发送成功，电机开始运行\r\n");
             break;
         case 1:
-            printf("错误：电机编号非法或主站非空闲（上升指令未发送）\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：电机编号非法或主站非空闲（上升指令未发送）\r\n");
             // 直接退出，避免执行停止指令
             while(1) { delay_ms(1000); }
         case 2:
-            printf("警告：上升指令超时，但电机可能已运行\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "警告：上升指令超时，但电机可能已运行\r\n");
             break;
         case 3:
-            printf("错误：上升指令响应内容不匹配\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：上升指令响应内容不匹配\r\n");
             break;
         default:
-            printf("错误：上升指令发送异常\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：上升指令发送异常\r\n");
             break;
     }
 }
@@ -699,20 +699,20 @@ void Battery16(void)
 		switch(ctrl_ret1)
     {
         case 0:
-            printf("上升指令发送成功，电机开始运行\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "上升指令发送成功，电机开始运行\r\n");
             break;
         case 1:
-            printf("错误：电机编号非法或主站非空闲（上升指令未发送）\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：电机编号非法或主站非空闲（上升指令未发送）\r\n");
             // 直接退出，避免执行停止指令
             while(1) { delay_ms(1000); }
         case 2:
-            printf("警告：上升指令超时，但电机可能已运行\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "警告：上升指令超时，但电机可能已运行\r\n");
             break;
         case 3:
-            printf("错误：上升指令响应内容不匹配\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：上升指令响应内容不匹配\r\n");
             break;
         default:
-            printf("错误：上升指令发送异常\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：上升指令发送异常\r\n");
             break;
     }
 }
@@ -729,7 +729,7 @@ void Battery17(void)
 		{
 				slave2_cmds[0] = MOTOR_PRESET_PULSE_05;            // 寄存器1：高位
 				slave2_cmds[1] = MOTOR_PRESET_PULSE_06;            // 寄存器2：低位
-//				printf("赋值后：slave1_cmds[2] = 0x%04X\n", slave1_cmds[2]); // 确认赋值成功
+//				LOG_DEBUG("LEGACY_BATTERY", "赋值后：slave1_cmds[2] = 0x%04X\n", slave1_cmds[2]); // 确认赋值成功
 		} else
 		{
 				// Reg_num不足时的容错处理（比如清空数组）
@@ -737,7 +737,7 @@ void Battery17(void)
 		}
 		if (ModbusMaster_IsBusy())
 		{
-				printf("强制重置主站状态为空闲\r\n");
+				LOG_DEBUG("LEGACY_BATTERY", "强制重置主站状态为空闲\r\n");
 				fflush(stdout);
 		}
 		uint8_t ctrl_ret2 = Motor_Batch_Control(MOTOR2_SLAVE_ADDR, MOTOR2_CTRL_REG3, Reg_num, slave2_cmds);
@@ -745,20 +745,20 @@ void Battery17(void)
     switch(ctrl_ret2)
     {
         case 0:
-            printf("上升指令发送成功，电机开始运行\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "上升指令发送成功，电机开始运行\r\n");
             break;
         case 1:
-            printf("错误：电机编号非法或主站非空闲（上升指令未发送）\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：电机编号非法或主站非空闲（上升指令未发送）\r\n");
             // 直接退出，避免执行停止指令
             while(1) { delay_ms(1000); }
         case 2:
-            printf("警告：上升指令超时，但电机可能已运行\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "警告：上升指令超时，但电机可能已运行\r\n");
             break;
         case 3:
-            printf("错误：上升指令响应内容不匹配\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：上升指令响应内容不匹配\r\n");
             break;
         default:
-            printf("错误：上升指令发送异常\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：上升指令发送异常\r\n");
             break;
     }
 }
@@ -773,20 +773,20 @@ void Battery18(void)
     switch(ctrl_ret1)
     {
         case 0:
-            printf("上升指令发送成功，电机开始运行\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "上升指令发送成功，电机开始运行\r\n");
             break;
         case 1:
-            printf("错误：电机编号非法或主站非空闲（上升指令未发送）\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：电机编号非法或主站非空闲（上升指令未发送）\r\n");
             // 直接退出，避免执行停止指令
             while(1) { delay_ms(1000); }
         case 2:
-            printf("警告：上升指令超时，但电机可能已运行\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "警告：上升指令超时，但电机可能已运行\r\n");
             break;
         case 3:
-            printf("错误：上升指令响应内容不匹配\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：上升指令响应内容不匹配\r\n");
             break;
         default:
-            printf("错误：上升指令发送异常\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：上升指令发送异常\r\n");
             break;
     }
 }
@@ -800,20 +800,20 @@ void Battery19(void)
 		switch(ctrl_ret1)
     {
         case 0:
-            printf("上升指令发送成功，电机开始运行\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "上升指令发送成功，电机开始运行\r\n");
             break;
         case 1:
-            printf("错误：电机编号非法或主站非空闲（上升指令未发送）\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：电机编号非法或主站非空闲（上升指令未发送）\r\n");
             // 直接退出，避免执行停止指令
             while(1) { delay_ms(1000); }
         case 2:
-            printf("警告：上升指令超时，但电机可能已运行\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "警告：上升指令超时，但电机可能已运行\r\n");
             break;
         case 3:
-            printf("错误：上升指令响应内容不匹配\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：上升指令响应内容不匹配\r\n");
             break;
         default:
-            printf("错误：上升指令发送异常\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：上升指令发送异常\r\n");
             break;
     }
 }
@@ -829,7 +829,7 @@ void Battery20(void)
 		{
 				slave2_cmds[0] = MOTOR_PRESET_PULSE_03;            // 寄存器1：高位
 				slave2_cmds[1] = MOTOR_PRESET_PULSE_04;            // 寄存器2：低位
-//				printf("赋值后：slave1_cmds[2] = 0x%04X\n", slave1_cmds[2]); // 确认赋值成功
+//				LOG_DEBUG("LEGACY_BATTERY", "赋值后：slave1_cmds[2] = 0x%04X\n", slave1_cmds[2]); // 确认赋值成功
 		} else
 		{
 				// Reg_num不足时的容错处理（比如清空数组）
@@ -837,7 +837,7 @@ void Battery20(void)
 		}
 		if (ModbusMaster_IsBusy())
 		{
-				printf("强制重置主站状态为空闲\r\n");
+				LOG_DEBUG("LEGACY_BATTERY", "强制重置主站状态为空闲\r\n");
 				fflush(stdout);
 		}
 		uint8_t ctrl_ret2 = Motor_Batch_Control(MOTOR2_SLAVE_ADDR, MOTOR2_CTRL_REG3, Reg_num, slave2_cmds);
@@ -845,20 +845,20 @@ void Battery20(void)
     switch(ctrl_ret2)
     {
         case 0:
-            printf("上升指令发送成功，电机开始运行\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "上升指令发送成功，电机开始运行\r\n");
             break;
         case 1:
-            printf("错误：电机编号非法或主站非空闲（上升指令未发送）\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：电机编号非法或主站非空闲（上升指令未发送）\r\n");
             // 直接退出，避免执行停止指令
             while(1) { delay_ms(1000); }
         case 2:
-            printf("警告：上升指令超时，但电机可能已运行\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "警告：上升指令超时，但电机可能已运行\r\n");
             break;
         case 3:
-            printf("错误：上升指令响应内容不匹配\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：上升指令响应内容不匹配\r\n");
             break;
         default:
-            printf("错误：上升指令发送异常\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：上升指令发送异常\r\n");
             break;
     }
 }
@@ -873,20 +873,20 @@ void Battery21(void)
     switch(ctrl_ret1)
     {
         case 0:
-            printf("上升指令发送成功，电机开始运行\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "上升指令发送成功，电机开始运行\r\n");
             break;
         case 1:
-            printf("错误：电机编号非法或主站非空闲（上升指令未发送）\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：电机编号非法或主站非空闲（上升指令未发送）\r\n");
             // 直接退出，避免执行停止指令
             while(1) { delay_ms(1000); }
         case 2:
-            printf("警告：上升指令超时，但电机可能已运行\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "警告：上升指令超时，但电机可能已运行\r\n");
             break;
         case 3:
-            printf("错误：上升指令响应内容不匹配\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：上升指令响应内容不匹配\r\n");
             break;
         default:
-            printf("错误：上升指令发送异常\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：上升指令发送异常\r\n");
             break;
     }
 }
@@ -900,20 +900,20 @@ void Battery22(void)
 		switch(ctrl_ret1)
     {
         case 0:
-            printf("上升指令发送成功，电机开始运行\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "上升指令发送成功，电机开始运行\r\n");
             break;
         case 1:
-            printf("错误：电机编号非法或主站非空闲（上升指令未发送）\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：电机编号非法或主站非空闲（上升指令未发送）\r\n");
             // 直接退出，避免执行停止指令
             while(1) { delay_ms(1000); }
         case 2:
-            printf("警告：上升指令超时，但电机可能已运行\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "警告：上升指令超时，但电机可能已运行\r\n");
             break;
         case 3:
-            printf("错误：上升指令响应内容不匹配\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：上升指令响应内容不匹配\r\n");
             break;
         default:
-            printf("错误：上升指令发送异常\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：上升指令发送异常\r\n");
             break;
     }
 }
@@ -922,15 +922,15 @@ void Battery23(void)
 {
   	//22.电机3夹紧电池
 		uint8_t motor_num3 = 2;   // 寄存器地址（夹紧）
-		uint16_t motor_cmd3 = MOTOR3_CMD_CLAMP; // 电机指令：
-		uint8_t ctrl_ret3 = Motor_Control(MOTOR3_SLAVE_ADDR, motor_num3, motor_cmd3);
+		uint16_t motor_cmd3 = MOTOR_CLAMP_CMD_CLAMP; // 电机指令：
+		uint8_t ctrl_ret3 = Motor_Control(MOTOR_CLAMP_SLAVE_ADDR, motor_num3, motor_cmd3);
 		if(ctrl_ret3 == 0)
     {
-        printf("从机3夹紧指令发送成功！\r\n");
+        LOG_DEBUG("LEGACY_BATTERY", "从机3夹紧指令发送成功！\r\n");
     }
     else
     {
-        printf("从机3夹紧指令发送失败，错误码：%d\r\n", ctrl_ret3);
+        LOG_DEBUG("LEGACY_BATTERY", "从机3夹紧指令发送失败，错误码：%d\r\n", ctrl_ret3);
     }
 }
 
@@ -945,7 +945,7 @@ void Battery24(void)
 		{
 				slave2_cmds[0] = MOTOR_PRESET_PULSE_07;            // 寄存器1：高位
 				slave2_cmds[1] = MOTOR_PRESET_PULSE_08;            // 寄存器2：低位
-//				printf("赋值后：slave1_cmds[2] = 0x%04X\n", slave1_cmds[2]); // 确认赋值成功
+//				LOG_DEBUG("LEGACY_BATTERY", "赋值后：slave1_cmds[2] = 0x%04X\n", slave1_cmds[2]); // 确认赋值成功
 		} else
 		{
 				// Reg_num不足时的容错处理（比如清空数组）
@@ -953,7 +953,7 @@ void Battery24(void)
 		}
 		if (ModbusMaster_IsBusy())
 		{
-				printf("强制重置主站状态为空闲\r\n");
+				LOG_DEBUG("LEGACY_BATTERY", "强制重置主站状态为空闲\r\n");
 				fflush(stdout);
 		}
 		uint8_t ctrl_ret2 = Motor_Batch_Control(MOTOR2_SLAVE_ADDR, MOTOR2_CTRL_REG3, Reg_num, slave2_cmds);
@@ -961,20 +961,20 @@ void Battery24(void)
     switch(ctrl_ret2)
     {
         case 0:
-            printf("上升指令发送成功，电机开始运行\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "上升指令发送成功，电机开始运行\r\n");
             break;
         case 1:
-            printf("错误：电机编号非法或主站非空闲（上升指令未发送）\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：电机编号非法或主站非空闲（上升指令未发送）\r\n");
             // 直接退出，避免执行停止指令
             while(1) { delay_ms(1000); }
         case 2:
-            printf("警告：上升指令超时，但电机可能已运行\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "警告：上升指令超时，但电机可能已运行\r\n");
             break;
         case 3:
-            printf("错误：上升指令响应内容不匹配\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：上升指令响应内容不匹配\r\n");
             break;
         default:
-            printf("错误：上升指令发送异常\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：上升指令发送异常\r\n");
             break;
     }
 }
@@ -983,15 +983,15 @@ void Battery25(void)
 {
   	//24.电机3松开电池
 		uint8_t motor_num3 = 1;   // 寄存器地址（松开）
-		uint16_t motor_cmd3 = MOTOR3_CMD_RELEASE; // 电机指令：
-		uint8_t ctrl_ret3 = Motor_Control(MOTOR3_SLAVE_ADDR, motor_num3, motor_cmd3);
+		uint16_t motor_cmd3 = MOTOR_CLAMP_CMD_RELEASE; // 电机指令：
+		uint8_t ctrl_ret3 = Motor_Control(MOTOR_CLAMP_SLAVE_ADDR, motor_num3, motor_cmd3);
 		if(ctrl_ret3 == 0)
     {
-        printf("从机3松开指令发送成功！\r\n");
+        LOG_DEBUG("LEGACY_BATTERY", "从机3松开指令发送成功！\r\n");
     }
     else
     {
-        printf("从机3松开指令发送失败，错误码：%d\r\n", ctrl_ret3);
+        LOG_DEBUG("LEGACY_BATTERY", "从机3松开指令发送失败，错误码：%d\r\n", ctrl_ret3);
     }
 }
 
@@ -1005,20 +1005,20 @@ void Battery26(void)
     switch(ctrl_ret1)
     {
         case 0:
-            printf("上升指令发送成功，电机开始运行\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "上升指令发送成功，电机开始运行\r\n");
             break;
         case 1:
-            printf("错误：电机编号非法或主站非空闲（上升指令未发送）\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：电机编号非法或主站非空闲（上升指令未发送）\r\n");
             // 直接退出，避免执行停止指令
             while(1) { delay_ms(1000); }
         case 2:
-            printf("警告：上升指令超时，但电机可能已运行\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "警告：上升指令超时，但电机可能已运行\r\n");
             break;
         case 3:
-            printf("错误：上升指令响应内容不匹配\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：上升指令响应内容不匹配\r\n");
             break;
         default:
-            printf("错误：上升指令发送异常\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：上升指令发送异常\r\n");
             break;
     }
 }
@@ -1032,20 +1032,20 @@ void Battery27(void)
 		switch(ctrl_ret1)
     {
         case 0:
-            printf("上升指令发送成功，电机开始运行\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "上升指令发送成功，电机开始运行\r\n");
             break;
         case 1:
-            printf("错误：电机编号非法或主站非空闲（上升指令未发送）\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：电机编号非法或主站非空闲（上升指令未发送）\r\n");
             // 直接退出，避免执行停止指令
             while(1) { delay_ms(1000); }
         case 2:
-            printf("警告：上升指令超时，但电机可能已运行\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "警告：上升指令超时，但电机可能已运行\r\n");
             break;
         case 3:
-            printf("错误：上升指令响应内容不匹配\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：上升指令响应内容不匹配\r\n");
             break;
         default:
-            printf("错误：上升指令发送异常\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：上升指令发送异常\r\n");
             break;
     }
 }
@@ -1068,7 +1068,7 @@ void Battery28(void)
 		}
 		if (ModbusMaster_IsBusy())
 		{
-				printf("强制重置主站状态为空闲\r\n");
+				LOG_DEBUG("LEGACY_BATTERY", "强制重置主站状态为空闲\r\n");
 				fflush(stdout);
 		}
 		uint8_t ctrl_ret2 = Motor_Batch_Control(MOTOR2_SLAVE_ADDR, MOTOR2_CTRL_REG2, Reg_num, slave2_cmds);
@@ -1076,20 +1076,20 @@ void Battery28(void)
     switch(ctrl_ret2)
     {
         case 0:
-            printf("上升指令发送成功，电机开始运行\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "上升指令发送成功，电机开始运行\r\n");
             break;
         case 1:
-            printf("错误：电机编号非法或主站非空闲（上升指令未发送）\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：电机编号非法或主站非空闲（上升指令未发送）\r\n");
             // 直接退出，避免执行停止指令
             while(1) { delay_ms(1000); }
         case 2:
-            printf("警告：上升指令超时，但电机可能已运行\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "警告：上升指令超时，但电机可能已运行\r\n");
             break;
         case 3:
-            printf("错误：上升指令响应内容不匹配\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：上升指令响应内容不匹配\r\n");
             break;
         default:
-            printf("错误：上升指令发送异常\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：上升指令发送异常\r\n");
             break;
     }
 }
@@ -1104,20 +1104,20 @@ void Battery29(void)
     switch(ctrl_ret1)
     {
         case 0:
-            printf("上升指令发送成功，电机开始运行\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "上升指令发送成功，电机开始运行\r\n");
             break;
         case 1:
-            printf("错误：电机编号非法或主站非空闲（上升指令未发送）\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：电机编号非法或主站非空闲（上升指令未发送）\r\n");
             // 直接退出，避免执行停止指令
             while(1) { delay_ms(1000); }
         case 2:
-            printf("警告：上升指令超时，但电机可能已运行\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "警告：上升指令超时，但电机可能已运行\r\n");
             break;
         case 3:
-            printf("错误：上升指令响应内容不匹配\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：上升指令响应内容不匹配\r\n");
             break;
         default:
-            printf("错误：上升指令发送异常\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：上升指令发送异常\r\n");
             break;
     }
 }
@@ -1131,20 +1131,20 @@ void Battery30(void)
 		switch(ctrl_ret1)
     {
         case 0:
-            printf("上升指令发送成功，电机开始运行\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "上升指令发送成功，电机开始运行\r\n");
             break;
         case 1:
-            printf("错误：电机编号非法或主站非空闲（上升指令未发送）\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：电机编号非法或主站非空闲（上升指令未发送）\r\n");
             // 直接退出，避免执行停止指令
             while(1) { delay_ms(1000); }
         case 2:
-            printf("警告：上升指令超时，但电机可能已运行\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "警告：上升指令超时，但电机可能已运行\r\n");
             break;
         case 3:
-            printf("错误：上升指令响应内容不匹配\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：上升指令响应内容不匹配\r\n");
             break;
         default:
-            printf("错误：上升指令发送异常\r\n");
+            LOG_DEBUG("LEGACY_BATTERY", "错误：上升指令发送异常\r\n");
             break;
     }
 }

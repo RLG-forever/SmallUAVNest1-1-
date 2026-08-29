@@ -5,6 +5,7 @@
 #include "sequence.h"
 #include "status_regs.h"
 #include "tick.h"
+#include "debug_log.h"
 
 // 轮询块定义：每个块对应一次Modbus读操作
 typedef struct {
@@ -61,6 +62,15 @@ void MasterPolling_Task(void)
     }
     if (ret == MODBUS_RESULT_OK) {
         StatusRegs_UpdateBatch(block->status_start, poll_read_buf, block->reg_count);
+        LOG_DEBUG("POLL", "sensor updated: slave=0x%02X, status_reg=%u, value=%u\r\n",
+                  (unsigned int)block->slave_addr,
+                  (unsigned int)block->status_start,
+                  (unsigned int)poll_read_buf[0]);
+    } else {
+        LOG_WARN("POLL", "sensor read failed: slave=0x%02X, reg=0x%04X, result=%u\r\n",
+                 (unsigned int)block->slave_addr,
+                 (unsigned int)block->start_reg,
+                 (unsigned int)ret);
     }
 
     current_block++;

@@ -286,9 +286,9 @@ not be reproduced or disclosed to third party without prior to authorisation
 #define MOTOR2_RR()   GPIO_ResetBits(OPORTC, OPORTC_PIN);	GPIO_SetBits(OPORTD, OPORTD_PIN);	
 #define MOTOR2_STOP() GPIO_ResetBits(OPORTC, OPORTC_PIN);	GPIO_ResetBits(OPORTD, OPORTD_PIN);
 
-#define MOTOR3_FR()   GPIO_ResetBits(OPORTF, OPORTF_PIN);	GPIO_SetBits(OPORTE, OPORTE_PIN);	
-#define MOTOR3_RR()   GPIO_ResetBits(OPORTE, OPORTE_PIN);	GPIO_SetBits(OPORTF, OPORTF_PIN);	
-#define MOTOR3_STOP() GPIO_ResetBits(OPORTE, OPORTE_PIN);	GPIO_ResetBits(OPORTF, OPORTF_PIN);
+#define MOTOR_CLAMP_FR()   GPIO_ResetBits(OPORTF, OPORTF_PIN);	GPIO_SetBits(OPORTE, OPORTE_PIN);
+#define MOTOR_CLAMP_RR()   GPIO_ResetBits(OPORTE, OPORTE_PIN);	GPIO_SetBits(OPORTF, OPORTF_PIN);
+#define MOTOR_CLAMP_STOP() GPIO_ResetBits(OPORTE, OPORTE_PIN);	GPIO_ResetBits(OPORTF, OPORTF_PIN);
 
 #define MOTOR4_FR()   GPIO_ResetBits(OPORTI, OPORTI_PIN);	GPIO_SetBits(OPORTH, OPORTH_PIN);	
 #define MOTOR4_RR()   GPIO_ResetBits(OPORTH, OPORTH_PIN);	GPIO_SetBits(OPORTI, OPORTI_PIN);	

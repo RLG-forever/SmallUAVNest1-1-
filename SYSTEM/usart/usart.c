@@ -343,7 +343,7 @@ void USART3_IRQHandler(void)                	//串口1中断服务程序
 //									}
 //									if(lim.uFMotorCRREnable == 1)
 //									{		
-//									 MOTOR3_FR();
+//									 MOTOR_CLAMP_FR();
 //									 lim.uFMotorCSt = 1;
 //									}
 //									 lim.uFMotorAEnable = 1;
@@ -369,7 +369,7 @@ void USART3_IRQHandler(void)                	//串口1中断服务程序
 //									
 //									if(lim.uFMotorCEnable == 1)
 //									{	
-//										MOTOR3_RR();
+//										MOTOR_CLAMP_RR();
 //										lim.uFMotorCSt = 2;
 //										
 //									}
@@ -548,7 +548,7 @@ void USART3_IRQHandler(void)                	//串口1中断服务程序
 //			  if(lim.uFMotorASt == 1|| lim.uFMotorASt == 2)
 //			  {
 //			      MOTOR1_STOP();
-//					  //MOTOR3_STOP();
+//					  //MOTOR_CLAMP_STOP();
 //			 		  lim.uFMotorASt = 0;
 //					GPIO_ResetBits(OPORT01, OPORT01_PIN);
 //			  }
@@ -556,7 +556,7 @@ void USART3_IRQHandler(void)                	//串口1中断服务程序
 //			  if(lim.uFMotorCSt == 1|| lim.uFMotorCSt == 2)
 //			  {
 //			      //MOTOR1_STOP();
-//					  MOTOR3_STOP();
+//					  MOTOR_CLAMP_STOP();
 //			 		  lim.uFMotorCSt = 0;
 //					GPIO_ResetBits(OPORT01, OPORT01_PIN);
 //			  }
@@ -599,7 +599,7 @@ void USART3_IRQHandler(void)                	//串口1中断服务程序
 //			  }
 //			  
 ////						   for(testI = 0;testI<10;testI++)
-////			printf("\r\n%d :%d ",testI,RS485_RX_BUFF[testI]);
+////			LOG_DEBUG("USART", "\r\n%d :%d ",testI,RS485_RX_BUFF[testI]);
 //    }
 //}
 U8 TX_CheckSum(U8 *buf, U8 len) //buf为数组，len为数组长度
@@ -631,7 +631,7 @@ u8 NRF24L01_RxProcess(u8 *rxbuf)
 								}
 								if(lim.uFMotorCRREnable == 1)
 								{		
-									 MOTOR3_FR();
+									 MOTOR_CLAMP_FR();
 									 lim.uFMotorCSt = 1;
 								}
 								lim.uFMotorAEnable = 1;
@@ -655,7 +655,7 @@ u8 NRF24L01_RxProcess(u8 *rxbuf)
 									
 									if(lim.uFMotorCEnable == 1)
 									{	
-										MOTOR3_RR();
+										MOTOR_CLAMP_RR();
 										lim.uFMotorCSt = 2;
 										
 									}
@@ -847,7 +847,7 @@ void WirelessCommProcess(u8 *rxbuf)
 	  u8 ucCheckSumValue = 0;
 		
 //	   ucRecvCCDataLenth = CC1101_Rx_Packet(rxbuf);
-	   printf("\r\n%d,%d,%d",rxbuf[0],rxbuf[1],ucRecvCCDataLenth);//lmc.iMHallcnt wRMtrCurrent
+	   LOG_DEBUG("USART", "\r\n%d,%d,%d",rxbuf[0],rxbuf[1],ucRecvCCDataLenth);//lmc.iMHallcnt wRMtrCurrent
 		if(4 == ucRecvCCDataLenth && rxbuf[3] == TX_CheckSum(rxbuf,3) && rxbuf[0] == 0xbb && rxbuf[2] == 0xcc)
 	  {
         switch(rxbuf[1])
@@ -862,7 +862,7 @@ void WirelessCommProcess(u8 *rxbuf)
 								}
 								if(lim.uFMotorCRREnable == 1)
 								{		
-									 MOTOR3_FR();
+									 MOTOR_CLAMP_FR();
 									 lim.uFMotorCSt = 1;
 								}
 								lim.uFMotorAEnable = 1;
@@ -887,7 +887,7 @@ void WirelessCommProcess(u8 *rxbuf)
 									
 									if(lim.uFMotorCEnable == 1)
 									{	
-										MOTOR3_RR();
+										MOTOR_CLAMP_RR();
 										lim.uFMotorCSt = 2;
 										
 									}

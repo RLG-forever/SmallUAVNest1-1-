@@ -1,6 +1,7 @@
 #include "battery_swap.h"
 #include "w25qxx.h"      // 包含SPI Flash读写函数
 #include "project.h"
+#include "debug_log.h"
 #include <stdint.h>   // 提供uint8_t/uint16_t等固定宽度整数类型
 #include <string.h>   // 提供memset函数声明
 
@@ -22,18 +23,21 @@ void SwapState_Init(void)
         g_swap_state.empty_bay = 1;
 //        g_swap_state.magic = 0x5A;
 //        SwapState_Save();   // 保存到Flash
-        printf("Swap state invalid, set default empty_bay=1\n");
+        LOG_WARN("SWAP", "invalid saved state; default empty_bay=1\r\n");
     } else {
-        printf("Swap state loaded from Flash: empty_bay=%d\n", g_swap_state.empty_bay);
+        LOG_INFO("SWAP", "state loaded: empty_bay=%u\r\n",
+                 (unsigned int)g_swap_state.empty_bay);
     }
 }
 
 /* 保存状态到Flash（自动擦除所在扇区） */
 void SwapState_Save(void)
 {
-    printf("开始写 Flash 地址 0x%X\n", SWAP_STATE_ADDR);
+    LOG_INFO("SWAP", "saving state: flash_addr=0x%lX\r\n",
+             (unsigned long)SWAP_STATE_ADDR);
     W25QXX_Write((u8*)&g_swap_state, SWAP_STATE_ADDR, sizeof(g_swap_state));
-    printf("Swap state saved: empty_bay=%d\n", g_swap_state.empty_bay);
+    LOG_INFO("SWAP", "state saved: empty_bay=%u\r\n",
+             (unsigned int)g_swap_state.empty_bay);
 }
 
 /* 获取当前空仓号 */
@@ -45,7 +49,10 @@ uint8_t SwapState_GetEmptyBay(void)
 /* 设置空仓号并保存 */
 void SwapState_SetEmptyBay(uint8_t bay)
 {
-    if (bay < 1 || bay > 3) return;
+    if (bay < 1 || bay > 3) {
+        LOG_ERROR("SWAP", "invalid empty bay=%u\r\n", (unsigned int)bay);
+        return;
+    }
     g_swap_state.empty_bay = bay;
     SwapState_Save();
 }
@@ -56,8 +63,8 @@ void BatterySwap_Perform(void)
     uint8_t empty_bay = g_swap_state.empty_bay;
     uint8_t next_bay = (empty_bay % 3) + 1;  // 下一个仓号（循环）
 
-    printf("=== Battery Swap Start ===\n");
-    printf("Current empty bay: %d, next bay to take: %d\n", empty_bay, next_bay);
+    LOG_INFO("SWAP", "manual swap started: empty_bay=%u, next_bay=%u\r\n",
+             (unsigned int)empty_bay, (unsigned int)next_bay);
 
     // 1. 从无人机取下电池（假设无人机当前电池来自上一个仓）
     //    这里调用底层电机控制函数，例如：TakeBatteryFromUAV();
@@ -68,15 +75,14 @@ void BatterySwap_Perform(void)
     //    例如：LoadBatteryToUAV();
 
     // 模拟操作（实际应调用真实电机控制）
-    printf("Step 1: Take battery from UAV\n");
-    printf("Step 2: Put battery to bay %d\n", empty_bay);
-    printf("Step 3: Take battery from bay %d and load to UAV\n", next_bay);
+    LOG_DEBUG("SWAP", "manual swap simulated actions started\r\n");
 
     // 更新空仓号：新的空仓就是刚刚取出的仓（next_bay），因为该仓电池已被取出
     g_swap_state.empty_bay = next_bay;
     SwapState_Save();
 
-    printf("=== Swap completed, new empty bay: %d ===\n", next_bay);
+    LOG_INFO("SWAP", "manual swap completed: empty_bay=%u\r\n",
+             (unsigned int)next_bay);
 }
 
 // 用于序列步骤表，更新空仓号并保存到Flash
@@ -88,7 +94,8 @@ uint8_t UpdateEmptyBay(void)
     need_save = 1;
 		// 同步更新状态寄存器 0x19，供网关查询
     StatusRegs_Update(REG_RESERVED2, next);
-    printf("换电完成，空仓号更新为 %d (待保存)\n", next);
+    LOG_INFO("SWAP", "empty bay updated: value=%u, save pending\r\n",
+             (unsigned int)next);
     return 0;
 }
 
@@ -102,9 +109,9 @@ void SwapState_TrySave(void)
 //               need_save, master_state, Sequence_IsBusy());
     }
     if (need_save && !ModbusMaster_IsBusy() && !Sequence_IsBusy()) {
-        printf("开始保存 Flash...\n");
+        LOG_INFO("SWAP", "deferred flash save started\r\n");
         SwapState_Save();
         need_save = 0;
-        printf("Flash 保存完成\n");
+        LOG_INFO("SWAP", "deferred flash save completed\r\n");
     }
 }

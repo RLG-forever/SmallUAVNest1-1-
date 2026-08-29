@@ -1,0 +1,21 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Keil: Build Project (F5)",
+            "type": "node-terminal",
+            "request": "launch",
+            "preLaunchTask": "Keil: Build",
+            "command": "powershell.exe -NoProfile -Command \"Write-Host 'Keil build completed successfully.'\"",
+            "cwd": "${workspaceFolder}\\USER"
+        },
+        {
+            "name": "Keil: Rebuild Project",
+            "type": "node-terminal",
+            "request": "launch",
+            "preLaunchTask": "Keil: Rebuild",
+            "command": "powershell.exe -NoProfile -Command \"Write-Host 'Keil rebuild completed successfully.'\"",
+            "cwd": "${workspaceFolder}\\USER"
+        }
+    ]
+}

@@ -1,0 +1,104 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Keil: Build",
+            "type": "shell",
+            "command": "powershell.exe",
+            "args": [
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                "${workspaceFolder}\\.vscode\\keil-build.ps1",
+                "-Action",
+                "Build"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}\\USER"
+            },
+            "problemMatcher": {
+                "owner": "keil-armcc",
+                "fileLocation": [
+                    "relative",
+                    "${workspaceFolder}\\USER"
+                ],
+                "pattern": {
+                    "regexp": "^(.+)\\((\\d+)\\):\\s+(warning|error):\\s+(.*)$",
+                    "file": 1,
+                    "line": 2,
+                    "severity": 3,
+                    "message": 4
+                }
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "clear": true
+            }
+        },
+        {
+            "label": "Keil: Rebuild",
+            "type": "shell",
+            "command": "powershell.exe",
+            "args": [
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                "${workspaceFolder}\\.vscode\\keil-build.ps1",
+                "-Action",
+                "Rebuild"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}\\USER"
+            },
+            "problemMatcher": {
+                "owner": "keil-armcc",
+                "fileLocation": [
+                    "relative",
+                    "${workspaceFolder}\\USER"
+                ],
+                "pattern": {
+                    "regexp": "^(.+)\\((\\d+)\\):\\s+(warning|error):\\s+(.*)$",
+                    "file": 1,
+                    "line": 2,
+                    "severity": 3,
+                    "message": 4
+                }
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "clear": true
+            }
+        },
+        {
+            "label": "Keil: Clean",
+            "type": "shell",
+            "command": "powershell.exe",
+            "args": [
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                "${workspaceFolder}\\.vscode\\keil-build.ps1",
+                "-Action",
+                "Clean"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}\\USER"
+            },
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "clear": true
+            }
+        }
+    ]
+}

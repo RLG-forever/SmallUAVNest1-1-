@@ -81,7 +81,7 @@ u8 SPI1_ReadWriteByte(u8 TxData)
 	uint32_t timeout = 0xFFFFF;
   while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_TXE) == RESET){
 			if (--timeout == 0) {
-					printf("SPI TX timeout\n");
+					LOG_ERROR("SPI", "SPI TX timeout\n");
 					return 0xFF;
 			}
 	}//等待发送区空  
@@ -90,7 +90,7 @@ u8 SPI1_ReadWriteByte(u8 TxData)
 	timeout = 0xFFFFF;
   while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_RXNE) == RESET){
 				if (--timeout == 0) {
-					printf("SPI TX timeout\n");
+					LOG_ERROR("SPI", "SPI TX timeout\n");
 					return 0xFF;
 				}
 	} //等待接收完一个byte  

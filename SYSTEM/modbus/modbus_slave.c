@@ -3,6 +3,7 @@
 #include "modbus_common.h"
 #include "modbus_port.h"
 #include "stm32f4xx.h"
+#include "debug_log.h"
 
 #include <stddef.h>
 #include <string.h>
@@ -11,6 +12,7 @@
 static uint8_t slave_rx_buffer[MODBUS_RTU_MAX_ADU_LENGTH];
 static volatile uint16_t slave_rx_count;
 static volatile uint8_t slave_frame_ready;
+static uint8_t slave_request_logged;
 static uint8_t slave_address;
 static ModbusSlaveHandlers slave_handlers;
 
@@ -44,6 +46,7 @@ static void ModbusSlave_ResetFrame(void)
     __disable_irq();
     slave_rx_count = 0U;
     slave_frame_ready = 0U;
+    slave_request_logged = 0U;
     if (primask == 0U) {
         __enable_irq();
     }
@@ -56,7 +59,10 @@ void ModbusSlave_Init(uint8_t address)
     memset(&slave_handlers, 0, sizeof(slave_handlers));
     slave_rx_count = 0U;
     slave_frame_ready = 0U;
+    slave_request_logged = 0U;
     ModbusPort_SetSlaveCallbacks(ModbusSlave_OnRxByte, ModbusSlave_OnFrameEnd);
+    LOG_INFO("MODBUS_SLAVE", "initialized: address=0x%02X\r\n",
+             (unsigned int)slave_address);
 }
 
 void ModbusSlave_RegisterHandlers(const ModbusSlaveHandlers *handlers)
@@ -177,6 +183,8 @@ void ModbusSlave_Process(void)
     frame_length = slave_rx_count;
     if (frame_length < 4U ||
         Modbus_CRC16(slave_rx_buffer, frame_length) != 0U) {
+        LOG_WARN("MODBUS_SLAVE", "invalid frame: length=%u\r\n",
+                 (unsigned int)frame_length);
         ModbusSlave_ResetFrame();
         return;
     }
@@ -187,6 +195,9 @@ void ModbusSlave_Process(void)
 
     exception_code = ModbusSlave_ParseRequest(&request, frame_length);
     if (exception_code != 0U) {
+        LOG_ERROR("MODBUS_SLAVE", "request parse failed: fn=0x%02X, exception=0x%02X\r\n",
+                  (unsigned int)request.function,
+                  (unsigned int)exception_code);
         if (ModbusSlave_SendException(&request, exception_code) != 0U) {
             return;
         }
@@ -202,10 +213,21 @@ void ModbusSlave_Process(void)
         handler = slave_handlers.handle10;
     }
 
+    if (!slave_request_logged) {
+        LOG_DEBUG("MODBUS_SLAVE", "request: fn=0x%02X, reg=0x%04X, count=%u\r\n",
+                  (unsigned int)request.function,
+                  (unsigned int)request.start_register,
+                  (unsigned int)request.register_count);
+        slave_request_logged = 1U;
+    }
+
     if (handler != NULL) {
         pending = handler(&request);
     } else if (ModbusSlave_SendException(&request, 0x01U) != 0U) {
         pending = 1U;
+    } else {
+        LOG_ERROR("MODBUS_SLAVE", "unsupported function: fn=0x%02X\r\n",
+                  (unsigned int)request.function);
     }
 
     if (!pending) {

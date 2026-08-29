@@ -8,6 +8,7 @@
 #include "sequence_steps.h"
 #include "status_regs.h"
 #include "tick.h"
+#include "debug_log.h"
 
 #include <stddef.h>
 
@@ -88,10 +89,15 @@ void GatewayService_ScheduleRemotePowerOff(uint32_t delay_ms)
 {
     remote_off_deadline = GetTick() + delay_ms;
     remote_off_pending = 1U;
+    LOG_INFO("GATEWAY", "remote power-off scheduled: delay=%lu ms\r\n",
+             (unsigned long)delay_ms);
 }
 
 void GatewayService_CancelRemotePowerOff(void)
 {
+    if (remote_off_pending || remote_off_command_active) {
+        LOG_INFO("GATEWAY", "remote power-off canceled\r\n");
+    }
     remote_off_pending = 0U;
 }
 
@@ -108,10 +114,17 @@ void GatewayService_Process(void)
         }
         if (result == MODBUS_RESULT_BUSY) {
             remote_off_command_active = 0U;
+            LOG_WARN("GATEWAY", "remote power-off lost bus ownership\r\n");
             return;
         }
         remote_off_command_active = 0U;
         remote_off_pending = 0U;
+        if (result == MODBUS_RESULT_OK) {
+            LOG_INFO("GATEWAY", "remote power-off command completed\r\n");
+        } else {
+            LOG_ERROR("GATEWAY", "remote power-off failed: result=%u\r\n",
+                      (unsigned int)result);
+        }
         return;
     }
 
@@ -125,6 +138,7 @@ void GatewayService_Process(void)
                                             0x0001U, 0x0001U);
     if (result == MODBUS_RESULT_PENDING) {
         remote_off_command_active = 1U;
+        LOG_INFO("GATEWAY", "remote power-off command started\r\n");
         return;
     }
     if (result == MODBUS_RESULT_BUSY) {
@@ -172,6 +186,8 @@ static uint8_t GatewayService_ExecuteWrite(uint16_t register_address,
     uint8_t result = MODBUS_RESULT_PARAM;
 
     if (GatewayService_IsRecentDuplicate(register_address, value)) {
+        LOG_DEBUG("GATEWAY", "duplicate command accepted: reg=0x%04X, value=0x%04X\r\n",
+                  (unsigned int)register_address, (unsigned int)value);
         return MODBUS_RESULT_OK;
     }
 
@@ -323,6 +339,12 @@ static uint8_t GatewayService_ExecuteWrite(uint16_t register_address,
 
     if (result == MODBUS_RESULT_OK) {
         GatewayService_RecordCompletedWrite(register_address, value);
+        LOG_INFO("GATEWAY", "command completed: reg=0x%04X, value=0x%04X\r\n",
+                 (unsigned int)register_address, (unsigned int)value);
+    } else if (result != MODBUS_RESULT_PENDING && result != MODBUS_RESULT_BUSY) {
+        LOG_ERROR("GATEWAY", "command failed: reg=0x%04X, value=0x%04X, result=%u\r\n",
+                  (unsigned int)register_address, (unsigned int)value,
+                  (unsigned int)result);
     }
     return result;
 }
@@ -337,6 +359,9 @@ static uint8_t GatewayService_Handle03(const ModbusSlaveRequest *request)
         start_register >= STATUS_REG_COUNT ||
         register_count > (uint16_t)(STATUS_REG_COUNT -
                                     start_register)) {
+        LOG_ERROR("GATEWAY", "invalid read: start_reg=%u, count=%u\r\n",
+                  (unsigned int)start_register,
+                  (unsigned int)register_count);
         return ModbusSlave_SendException(request, 0x02U) != 0U;
     }
 
@@ -409,4 +434,6 @@ void GatewayService_Init(void)
     wait_open_fly = 0U;
     takeoff_power_ready = 0U;
     ModbusSlave_RegisterHandlers(&handlers);
+    LOG_INFO("GATEWAY", "service initialized: slave=0x%02X\r\n",
+             (unsigned int)GATEWAY_SERVICE_MODBUS_ADDRESS);
 }

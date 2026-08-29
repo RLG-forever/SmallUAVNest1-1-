@@ -18,8 +18,11 @@ OBJ/
 *.bak
 JLinkLog.txt
 
-# Local editor and OS files
-.vscode/
+# Shared VS Code build tasks; keep other local editor settings ignored.
+.vscode/*
+!.vscode/tasks.json
+!.vscode/keil-build.ps1
+!.vscode/launch.json
 .idea/
 .DS_Store
 Thumbs.db

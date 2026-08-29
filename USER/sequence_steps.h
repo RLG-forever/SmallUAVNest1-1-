@@ -20,12 +20,12 @@ typedef struct {
 // 1. 电机标识（区分不同电机）
 #define MOTOR_ID_1       2       // 电机1的唯一标识
 #define MOTOR_ID_2       3       // 电机2的唯一标识
-#define MOTOR_ID_3       1       // 电机3的唯一标识
+#define MOTOR_CLAMP_ID   1       // 夹紧电机的唯一标识
 #define MOTOR_ID_4       4       // 电机4的唯一标识
 // 每个电机独立的Modbus从站地址
 #define MOTOR1_SLAVE_ADDR  0x03   // 电机1从站地址
 #define MOTOR2_SLAVE_ADDR  0x02   // 电机2从站地址
-#define MOTOR3_SLAVE_ADDR  0x01   // 电机3从站地址
+#define MOTOR_CLAMP_SLAVE_ADDR 0x01 // 夹紧电机从站地址
 #define MOTOR4_SLAVE_ADDR  0x04   // 舱门从站地址
 #define MOTOR5_SLAVE_ADDR  0x05   // 电机5从站地址
 #define MOTOR6_SLAVE_ADDR  0x06   // 电机6从站地址
@@ -49,10 +49,10 @@ typedef struct {
 #define MOTOR2_CTRL_REG1      0x00ce  // 电机2控制寄存器
 #define MOTOR2_CTRL_REG5      0x00fd  // 电机5控制寄存器（位置模式控制）
 
-//电机3
-#define MOTOR3_CTRL_REG1      0x0036  // 电机1控制寄存器地址（松开）
-#define MOTOR3_CTRL_REG2      0x0037  // 电机2控制寄存器地址（夹紧）
-#define MOTOR3_CTRL_REG3      0x0047  // 电机3控制寄存器地址（保存）
+//夹紧电机
+#define MOTOR_CLAMP_CTRL_REG1 0x0036  // 夹紧电机控制寄存器地址（松开）
+#define MOTOR_CLAMP_CTRL_REG2 0x0037  // 夹紧电机控制寄存器地址（夹紧）
+#define MOTOR_CLAMP_CTRL_REG3 0x0047  // 夹紧电机控制寄存器地址（保存）
 
 //舱门
 #define MOTOR4_CTRL_REG1       0x0046  // 电机4控制寄存器地址
@@ -123,6 +123,7 @@ typedef struct {
 //位置模式
 #define MOTOR2_POSITION_MODE_RELATIVE              0x0000        //相对模式
 #define MOTOR2_POSITION_MODE_ABSOLUTE              0x0001        //绝对模式
+
 #define MOTOR_PRESET_PULSE_01             0x3188        //电机2端低位脉冲数-315000    8778
 #define MOTOR_PRESET_PULSE_02             0xfffb        //电机2端高位脉冲数
 #define MOTOR_PRESET_PULSE_03             0xa168        //电机2端低位脉冲数369000
@@ -155,10 +156,10 @@ typedef struct {
 #define MOTOR_PRESET_PULSE_48             0xfffb        //电机2端高位脉冲数
 
 
-//电机3
-#define MOTOR3_CMD_RELEASE                 0x0001         //松开
-#define MOTOR3_CMD_CLAMP                  0x0001         //夹紧
-#define MOTOR3_CMD_SAVE_CONFIG                   0x0001         //保存配置
+//夹紧电机
+#define MOTOR_CLAMP_CMD_RELEASE            0x0001         //松开
+#define MOTOR_CLAMP_CMD_CLAMP              0x0001         //夹紧
+#define MOTOR_CLAMP_CMD_SAVE_CONFIG        0x0001         //保存配置
 
 //归中电机4~8公用寄存器地址
 #define MOTOR4_12_REG_SPEED                  0x009a         //运行速度设置

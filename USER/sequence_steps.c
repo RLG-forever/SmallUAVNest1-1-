@@ -7,15 +7,15 @@
 #include "battery_swap.h"
 #include "relay.h"
 #include "tick.h"
+#include "debug_log.h"
 
 #include <stddef.h>
-#include <stdio.h>
 
 
 uint8_t Motor1Up1(void)
 {
     MotorControlParams motors[1] = {
-        {MOTOR1_SLAVE_ADDR, MOTOR1_CTRL_REG1, MOTOR_PRESET_PULSE_02, MOTOR_PRESET_PULSE_01}
+        {MOTOR1_SLAVE_ADDR, MOTOR1_CTRL_REG1, MOTOR_PRESET_PULSE_01, MOTOR_PRESET_PULSE_02}
     };
     return MotorControl_BatchMove(motors, 1U, NULL);
 }
@@ -36,7 +36,7 @@ uint8_t Motor2Forward(void)
 
 uint8_t Motor3Clamp(void)
 {
-    return Motor_Control(MOTOR_ID_3, 2U, MOTOR3_CMD_CLAMP);
+    return Motor_Control(MOTOR_CLAMP_ID, 2U, MOTOR_CLAMP_CMD_CLAMP);
 }
 
 uint8_t Motor2Back(void)
@@ -63,7 +63,7 @@ uint8_t Motor1Down1(void)
 
 uint8_t Motor3Lossen(void)
 {
-    return Motor_Control(MOTOR_ID_3, 1U, MOTOR3_CMD_RELEASE);
+    return Motor_Control(MOTOR_CLAMP_ID, 1U, MOTOR_CLAMP_CMD_RELEASE);
 }
 
 uint8_t Motor1Up2(void)
@@ -239,7 +239,7 @@ uint8_t Battery_3(void)
 
 uint8_t Battery_4(void)
 {
-    return Motor_Control(MOTOR_ID_3, 2U, MOTOR3_CMD_CLAMP);
+    return Motor_Control(MOTOR_CLAMP_ID, 2U, MOTOR_CLAMP_CMD_CLAMP);
 }
 
 uint8_t Battery_5(void)
@@ -287,7 +287,7 @@ uint8_t Battery_9(void)
 
 uint8_t Battery_10(void)
 {
-    return Motor_Control(MOTOR_ID_3, 1U, MOTOR3_CMD_RELEASE);
+    return Motor_Control(MOTOR_CLAMP_ID, 1U, MOTOR_CLAMP_CMD_RELEASE);
 }
 
 uint8_t Battery_11(void)
@@ -453,16 +453,20 @@ uint8_t CloseDr(void)
 uint8_t CheckAndCloseDoor(void)
 {
     uint16_t uav_status = StatusRegs_Get(REG_RESERVED4);
-		printf("CheckAndCloseDoor: uav_status=%d\n", uav_status);
+    LOG_DEBUG("STEP", "door check: uav_status=%u\r\n",
+              (unsigned int)uav_status);
     if (uav_status == 3) {
-        printf("检测到无人机不在机巢（0x60=3），执行关闭舱门\n");
+        LOG_INFO("STEP", "UAV absent; closing door\r\n");
         uint8_t ret = CloseDr();
-        if (ret != 0) {
-            printf("Close door failed: %d\n", ret);
+        if (ret != MODBUS_RESULT_OK && ret != MODBUS_RESULT_PENDING &&
+            ret != MODBUS_RESULT_BUSY) {
+            LOG_ERROR("STEP", "close door failed: result=%u\r\n",
+                      (unsigned int)ret);
         }
         return ret;
     } else {
-        printf("0x60=%d，无需关闭舱门\n", uav_status);
+        LOG_DEBUG("STEP", "door close skipped: uav_status=%u\r\n",
+                  (unsigned int)uav_status);
     }
     return MODBUS_RESULT_OK;
 }
@@ -483,15 +487,14 @@ uint8_t OpenAC(void)
         uint8_t ctrl_ret3 = ModbusMaster_06_WriteSingleReg(
             MODBUS_MASTER_CLIENT_GATEWAY, AIR_CONDITIONER_SLAVE,
             AIR_POWER_CTRL_REG, AIR_POWER_ON_VALUE);
-		if(ctrl_ret3 == 0)
-    {
-        printf("空调打开指令发送成功！\r\n");
+    if (ctrl_ret3 == MODBUS_RESULT_OK) {
+        LOG_INFO("STEP", "air conditioner opened\r\n");
+    } else if (ctrl_ret3 != MODBUS_RESULT_PENDING &&
+               ctrl_ret3 != MODBUS_RESULT_BUSY) {
+        LOG_ERROR("STEP", "open air conditioner failed: result=%u\r\n",
+                  (unsigned int)ctrl_ret3);
     }
-    else
-    {
-        printf("空调打开指令发送失败，错误码：%d\r\n", ctrl_ret3);
-    }
-		return ctrl_ret3;
+    return ctrl_ret3;
 }
 
 uint8_t CloseAC(void)
@@ -500,15 +503,14 @@ uint8_t CloseAC(void)
         uint8_t ctrl_ret3 = ModbusMaster_06_WriteSingleReg(
             MODBUS_MASTER_CLIENT_GATEWAY, AIR_CONDITIONER_SLAVE,
             AIR_POWER_CTRL_REG, AIR_POWER_OFF_VALUE);
-		if(ctrl_ret3 == 0)
-    {
-        printf("空调关闭指令发送成功！\r\n");
+    if (ctrl_ret3 == MODBUS_RESULT_OK) {
+        LOG_INFO("STEP", "air conditioner closed\r\n");
+    } else if (ctrl_ret3 != MODBUS_RESULT_PENDING &&
+               ctrl_ret3 != MODBUS_RESULT_BUSY) {
+        LOG_ERROR("STEP", "close air conditioner failed: result=%u\r\n",
+                  (unsigned int)ctrl_ret3);
     }
-    else
-    {
-        printf("空调关闭指令发送失败，错误码：%d\r\n", ctrl_ret3);
-    }
-		return ctrl_ret3;
+    return ctrl_ret3;
 }
 
 /* Sequence step tables. */

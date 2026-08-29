@@ -19,7 +19,12 @@ History: V0100-0000
 /*==================================================================================
    list of header files
 ===================================================================================*/
+#define PROJECT_DEBUG 1U
+
 #include "project.h"
+#include "debug_log.h"
+
+const uint8_t g_project_debug_enabled = PROJECT_DEBUG;
 
 //static IPCGEN       ipc = IPC_DEFAULTS;
  TMRGEN       tmr = TIMR_DEFAULTS;
@@ -63,6 +68,7 @@ static void StallRecovery_Task(void)
         return;
     }
     if (recovery_step == 0U) {
+        LOG_WARN("RECOVERY", "stall detected; stopping current sequence\r\n");
         Sequence_Stop();
         recovery_step = 1U;
     }
@@ -78,10 +84,18 @@ static void StallRecovery_Task(void)
     if (result == MODBUS_RESULT_PENDING || ModbusMaster_IsBusy() || ModbusBatch_IsBusy()) {
         return;
     }
+    if (result == MODBUS_RESULT_OK) {
+        LOG_INFO("RECOVERY", "step %u completed\r\n",
+                 (unsigned int)recovery_step);
+    } else {
+        LOG_ERROR("RECOVERY", "step %u failed: result=%u\r\n",
+                  (unsigned int)recovery_step, (unsigned int)result);
+    }
     recovery_step++;
     if (recovery_step > 3U) {
         recovery_step = 0U;
         MotorMonitor_ClearStallTrigger();
+        LOG_INFO("RECOVERY", "stall recovery finished\r\n");
     }
 }
 /*==================================================================================
@@ -96,12 +110,15 @@ History: none
 		
 int main(void)
 {
+	uint8_t motor1_up_active = 1U;
+	uint8_t motor1_up_result = MODBUS_RESULT_PENDING;
+
 //	SysTickInit();
 	SystemInit();
 	Tick_Init();
 	NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);//设置系统中断优先级分组2
 //	Delayinit(168);    //初始化延时函数
-	uart4_init(9600);//串口调试信息输出printf	
+	uart4_init(115200);//串口调试信息输出printf
 	ModbusPort_InitMaster(MODBUS_PORT_DEFAULT_BAUDRATE);
 	ModbusPort_InitSlave(MODBUS_PORT_DEFAULT_BAUDRATE);
 	Relay_Init();
@@ -116,6 +133,7 @@ int main(void)
 	bsp_InitHardTimer();
 	W25QXX_Init();          // 初始化SPI Flash
 	SwapState_Init();   // 从Flash读取空仓号
+	LOG_INFO("MAIN", "initialization completed; entering main loop\r\n");
   __enable_irq();  /* 开启全局中断 */
 	delay_ms(1000);
 //	Motor_Reset(MOTOR1_SLAVE_ADDR, MOTOR1_CTRL_REG1, 8);
@@ -167,18 +185,31 @@ int main(void)
 //Battery_7();
 //OpenDr();
 
-
 //printf("\r\n============= MCU RESET DETECTED =============\r\n");
 		while(1)
 		{		
 			ModbusMaster_Process();
 			ModbusSlave_Process();
-			Sequence_Process();   	// 处理序列（一键起飞/降落完成）
-			GatewayService_Process();
-			SwapState_TrySave();   // 延迟保存（Flash 写入过程仍为同步执行）
-			StallRecovery_Task();
+			if (motor1_up_active != 0U) {
+				motor1_up_result = Motor1Up1();
+				if (motor1_up_result == MODBUS_RESULT_OK) {
+					motor1_up_active = 0U;
+					LOG_INFO("MAIN", "Motor1Up1 completed\r\n");
+				} else if (motor1_up_result != MODBUS_RESULT_PENDING &&
+						   motor1_up_result != MODBUS_RESULT_BUSY) {
+					motor1_up_active = 0U;
+					LOG_ERROR("MAIN", "Motor1Up1 failed: result=%u\r\n",
+							  (unsigned int)motor1_up_result);
+				}
+			}
+			// Sequence_Process();   	// 处理序列（一键起飞/降落完成）
+			// GatewayService_Process();
+			// SwapState_TrySave();   // 延迟保存（Flash 写入过程仍为同步执行）
+			// StallRecovery_Task();
 			/* 后台轮询优先级最低，避免抢在控制命令之前占用主站总线。 */
-			MasterPolling_Task();
+			if (motor1_up_active == 0U) {
+				MasterPolling_Task();
+			}
 		}
 }
 
