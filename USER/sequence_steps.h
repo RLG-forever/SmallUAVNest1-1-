@@ -26,7 +26,9 @@ typedef struct {
 #define MOTOR1_SLAVE_ADDR  0x03   // 电机1从站地址
 #define MOTOR2_SLAVE_ADDR  0x02   // 电机2从站地址
 #define MOTOR_CLAMP_SLAVE_ADDR 0x01 // 夹紧电机从站地址
+
 #define MOTOR4_SLAVE_ADDR  0x04   // 舱门从站地址
+
 #define MOTOR5_SLAVE_ADDR  0x05   // 电机5从站地址
 #define MOTOR6_SLAVE_ADDR  0x06   // 电机6从站地址
 #define MOTOR7_SLAVE_ADDR  0x07   // 电机7从站地址
@@ -35,6 +37,7 @@ typedef struct {
 #define MOTOR10_SLAVE_ADDR 0x0a   // 电机10从站地址
 #define MOTOR11_SLAVE_ADDR 0x0b   // 电机11从站地址
 #define MOTOR12_SLAVE_ADDR 0x0c   // 电机12从站地址
+
 #define MOTOR16_SLAVE_ADDR 0x0e   // 雨量地址
 #define MOTOR17_SLAVE_ADDR 0x0f   // 风速地址
 #define MOTOR14_SLAVE_ADDR 0x14   // 电机14从站地址(控制遥控器的舵机)

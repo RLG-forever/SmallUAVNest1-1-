@@ -202,10 +202,10 @@ int main(void)
 							  (unsigned int)motor1_up_result);
 				}
 			}
-			// Sequence_Process();   	// 处理序列（一键起飞/降落完成）
-			// GatewayService_Process();
-			// SwapState_TrySave();   // 延迟保存（Flash 写入过程仍为同步执行）
-			// StallRecovery_Task();
+			Sequence_Process();   	// 处理序列（一键起飞/降落完成）
+			GatewayService_Process();
+			SwapState_TrySave();   // 延迟保存（Flash 写入过程仍为同步执行）
+			StallRecovery_Task();
 			/* 后台轮询优先级最低，避免抢在控制命令之前占用主站总线。 */
 			if (motor1_up_active == 0U) {
 				MasterPolling_Task();

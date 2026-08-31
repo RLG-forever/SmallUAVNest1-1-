@@ -5,6 +5,9 @@
 #include "sequence_steps.h"
 #include "status_regs.h"
 
+/* 表示当前没有有效的序列步骤。 */
+#define SEQUENCE_STEP_INVALID 0xFFU
+
 
 // 序列ID
 typedef enum {
@@ -32,6 +35,14 @@ typedef enum {
     SEQ_START_INVALID_ID,      /* 序列 ID 不受支持 */
     SEQ_START_MASTER_BUSY      /* 主站事务或电机批处理仍被占用 */
 } SequenceStartResult;
+
+typedef enum {
+    SEQUENCE_RESULT_NONE = 0,
+    SEQUENCE_RESULT_SUCCESS,
+    SEQUENCE_RESULT_CANCELLED,
+    SEQUENCE_RESULT_ACTION_FAILED,
+    SEQUENCE_RESULT_RETRY_EXHAUSTED
+} SequenceResult;
 
 
 // 初始化序列模块
@@ -61,5 +72,8 @@ SequenceStartResult Sequence_StartRecovery(void);
 SeqId Sequence_GetCurrentId(void);
 uint8_t Sequence_GetCurrentStep(void);
 const uint8_t *Sequence_GetCurrentStepMotors(void);
+SequenceResult Sequence_GetLastResult(void);
+uint8_t Sequence_GetLastStep(void);
+uint16_t Sequence_GetLastError(void);
 
 #endif

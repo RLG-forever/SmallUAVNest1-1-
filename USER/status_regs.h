@@ -3,8 +3,8 @@
 
 #include <stdint.h>
 
-// 寄存器总数（0x00 ~ 0x1B 共28个）
-#define STATUS_REG_COUNT  28U
+// 寄存器总数（0x00 ~ 0x1C 共29个）
+#define STATUS_REG_COUNT  29U
 
 // 寄存器地址枚举
 typedef enum {
@@ -36,7 +36,21 @@ typedef enum {
     REG_RESERVED2,            // 备用
 		REG_RESERVED3,						// 备用
 		REG_RESERVED4,						// 备用  存储0x60的值
+    REG_COMMAND_STEP,         // 当前步骤或最后失败步骤
 } StatusRegAddr;
+
+/* 复用现有备用寄存器，保持原有寄存器地址不变。 */
+#define REG_COMMAND_STATE REG_RESERVED1
+#define REG_COMMAND_CODE  REG_RESERVED3
+
+typedef enum {
+    COMMAND_STATE_IDLE = 0U,
+    COMMAND_STATE_EXECUTING,
+    COMMAND_STATE_SUCCESS,
+    COMMAND_STATE_FAILED,
+    COMMAND_STATE_PAUSED,
+    COMMAND_STATE_CANCELLED
+} CommandState;
 
 #define STATUS_REG_NONE ((StatusRegAddr)0xFFU)
 

@@ -21,13 +21,6 @@ typedef enum {
     SEQUENCE_STATE_PAUSED
 } SequenceState;
 
-typedef enum {
-    SEQUENCE_RESULT_NONE = 0,
-    SEQUENCE_RESULT_SUCCESS,
-    SEQUENCE_RESULT_CANCELLED,
-    SEQUENCE_RESULT_ACTION_FAILED,
-    SEQUENCE_RESULT_RETRY_EXHAUSTED
-} SequenceResult;
 // 当前运行的序列
 struct {
     SeqId id;
@@ -39,6 +32,8 @@ struct {
     SequenceResult last_result;
     uint32_t delay_deadline;
     uint8_t current_step_retry_count;
+    uint8_t last_step;
+    uint16_t last_error;
 } seq_runner;
 
 static uint8_t Sequence_IsTimeReached(uint32_t now, uint32_t deadline)
@@ -52,6 +47,7 @@ static void Sequence_Finish(SequenceResult result)
              (unsigned int)seq_runner.id,
              (unsigned int)seq_runner.current_index,
              (unsigned int)result);
+    seq_runner.last_step = seq_runner.current_index;
     seq_runner.id = SEQ_ID_INVALID;
     seq_runner.steps = NULL;
     seq_runner.step_count = 0U;
@@ -125,6 +121,8 @@ void Sequence_Init(void)
     seq_runner.state = SEQUENCE_STATE_IDLE;
     seq_runner.resume_state = SEQUENCE_STATE_IDLE;
     seq_runner.last_result = SEQUENCE_RESULT_NONE;
+    seq_runner.last_step = SEQUENCE_STEP_INVALID;
+    seq_runner.last_error = 0U;
     LOG_INFO("SEQUENCE", "initialized\r\n");
 }
 
@@ -260,6 +258,8 @@ SequenceStartResult Sequence_Start(SeqId id)
     seq_runner.state = SEQUENCE_STATE_RUNNING;
     seq_runner.resume_state = SEQUENCE_STATE_IDLE;
     seq_runner.last_result = SEQUENCE_RESULT_NONE;
+    seq_runner.last_step = SEQUENCE_STEP_INVALID;
+    seq_runner.last_error = 0U;
     seq_runner.delay_deadline = 0U;
     seq_runner.current_step_retry_count = 0U;   // 重置重试计数
     LOG_INFO("SEQUENCE", "started: id=%u, bay=%u, steps=%u\r\n",
@@ -308,6 +308,7 @@ static void Sequence_ExecuteCurrentStep(void)
         }
 
         StatusRegs_Update(REG_FAULT_CODE, 0x00FFU);
+        seq_runner.last_error = 0x00FFU;
         LOG_ERROR("SEQUENCE", "step %u retry limit reached\r\n",
                   (unsigned int)seq_runner.current_index);
         Sequence_Finish(SEQUENCE_RESULT_RETRY_EXHAUSTED);
@@ -317,6 +318,7 @@ static void Sequence_ExecuteCurrentStep(void)
     LOG_ERROR("SEQUENCE", "step %u failed: result=%u\r\n",
               (unsigned int)seq_runner.current_index,
               (unsigned int)ret);
+    seq_runner.last_error = ret;
     Sequence_Finish(SEQUENCE_RESULT_ACTION_FAILED);
 }
 void Sequence_Process(void)
@@ -341,6 +343,7 @@ void Sequence_Process(void)
         return;
 
     default:
+        seq_runner.last_error = MODBUS_RESULT_PARAM;
         Sequence_Finish(SEQUENCE_RESULT_ACTION_FAILED);
         return;
     }
@@ -387,6 +390,8 @@ SequenceStartResult Sequence_StartRecovery(void)
     seq_runner.state = SEQUENCE_STATE_RUNNING;
     seq_runner.resume_state = SEQUENCE_STATE_IDLE;
     seq_runner.last_result = SEQUENCE_RESULT_NONE;
+    seq_runner.last_step = SEQUENCE_STEP_INVALID;
+    seq_runner.last_error = 0U;
     seq_runner.delay_deadline = 0U;
     seq_runner.current_step_retry_count = 0U;
     return SEQ_START_OK;
@@ -400,7 +405,7 @@ SeqId Sequence_GetCurrentId(void)
 
 uint8_t Sequence_GetCurrentStep(void)
 {
-    if (!Sequence_IsBusy()) return 0xFFU;   // 序列未运行返回0xFF
+    if (!Sequence_IsBusy()) return SEQUENCE_STEP_INVALID;
     return seq_runner.current_index;
 }
 
@@ -409,6 +414,34 @@ const uint8_t *Sequence_GetCurrentStepMotors(void)
     return SequenceSteps_GetMotorList((uint8_t)Sequence_GetCurrentId(),
                                       Sequence_GetCurrentStep());
 }
+
+/**
+ * @brief 获取最近一次动作序列的最终执行结果。
+ * @return 序列执行结果；序列正在运行或尚未执行时返回NONE。
+ */
+SequenceResult Sequence_GetLastResult(void)
+{
+    return seq_runner.last_result;
+}
+
+/**
+ * @brief 获取最近一次动作序列结束时的步骤编号。
+ * @return 最后步骤编号；尚无有效结果时返回SEQUENCE_STEP_INVALID。
+ */
+uint8_t Sequence_GetLastStep(void)
+{
+    return seq_runner.last_step;
+}
+
+/**
+ * @brief 获取最近一次动作序列的底层错误码。
+ * @return 错误码；成功、取消或尚无错误时返回0。
+ */
+uint16_t Sequence_GetLastError(void)
+{
+    return seq_runner.last_error;
+}
+
 void Sequence_Stop(void)
 {
     if (!Sequence_IsBusy()) {
