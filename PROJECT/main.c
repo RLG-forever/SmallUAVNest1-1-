@@ -78,7 +78,7 @@ static void StallRecovery_Task(void)
     } else if (recovery_step == 2U) {
         result = Battery_15();
     } else {
-        result = LeaveCenter1();
+        result = LeaveCenter();
     }
 
     if (result == MODBUS_RESULT_PENDING || ModbusMaster_IsBusy() || ModbusBatch_IsBusy()) {
