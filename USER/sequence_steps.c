@@ -548,8 +548,8 @@ const StepDef openfly_steps[] =
 			{Battery_2, 0, STATUS_REG_NONE, 0},       //4.飞机前进
             //电机2移动到位置293000
 			{Battery_28, 0, STATUS_REG_NONE, 0},      //5.电机2前进
+
             //电机2正向相对移动10000，移动到位置303000
-			//电机2移动到位置303000
 			{Battery_18, 0, STATUS_REG_NONE, 0},      //27.电机2前进
             //电机2负向相对移动10000，移动到位置293000
 			//电机2移动到位置293000
@@ -596,7 +596,6 @@ const StepDef closefly_steps[] =
             //待修改
             {Battery_6, 0, STATUS_REG_NONE, 0},       //31.飞机后退
 			//电机3回零
-            //电机回零位
             {Battery_7, 0, STATUS_REG_NONE, 0},      //32.电机1下降
 			//飞机前进
 			{Battery_21, 0, STATUS_REG_NONE, 0},     //33.飞机前进

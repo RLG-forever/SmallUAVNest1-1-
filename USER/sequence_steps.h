@@ -403,7 +403,6 @@ extern const uint8_t DOWNBATTERY_STEPS_2_COUNT;
 extern const uint8_t DOWNBATTERY_STEPS_3_COUNT;
 extern const uint8_t RECOVERY_WITH_BATTERY_COUNT;
 extern const uint8_t RECOVERY_WITHOUT_BATTERY_COUNT;
-
 const uint8_t *SequenceSteps_GetMotorList(uint8_t sequence_id,
                                           uint8_t step_index);
 
