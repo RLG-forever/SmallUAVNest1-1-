@@ -194,13 +194,20 @@ uint8_t Battery_1(void)
 //MOTOR7_SLAVE_ADDR和MOTOR8_SLAVE_ADDR移动到位置174000
 uint8_t Battery_2(void)
 {
+    int32_t positions[4];
+    uint8_t result;
     MotorControlParams motors[4] = {
         {MOTOR5_SLAVE_ADDR, MOTOR5_CTRL_REG1, MOTOR56_MOVE_POS_183000_LOW_WORD, MOTOR56_MOVE_POS_183000_HIGH_WORD},
         {MOTOR6_SLAVE_ADDR, MOTOR5_CTRL_REG1, MOTOR56_MOVE_POS_183000_LOW_WORD, MOTOR56_MOVE_POS_183000_HIGH_WORD},
         {MOTOR7_SLAVE_ADDR, MOTOR5_CTRL_REG1, MOTOR78_MOVE_POS_174000_LOW_WORD, MOTOR78_MOVE_POS_174000_HIGH_WORD},
         {MOTOR8_SLAVE_ADDR, MOTOR5_CTRL_REG1, MOTOR78_MOVE_POS_174000_LOW_WORD, MOTOR78_MOVE_POS_174000_HIGH_WORD}
     };
-    return MotorControl_BatchMove(motors, 4U, NULL);
+    result = MotorControl_BatchMoveCapture(motors, 4U, NULL, positions);
+    if (result == MODBUS_RESULT_OK &&
+        !MotorPositionStore_Save(positions[2], positions[3])) {
+        return MODBUS_RESULT_ECHO;
+    }
+    return result;
 }
 //电机2运动到315000
 uint8_t Battery_3(void)

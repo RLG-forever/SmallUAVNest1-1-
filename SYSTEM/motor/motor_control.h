@@ -10,6 +10,7 @@
  * - 其他电机：十进制 1000 为高 16 位，1001 为低 16 位。
  */
 #define MOTOR_CONTROL_ABSOLUTE_COMMAND_REG        0x00D0U
+#define MOTOR_CONTROL_RELATIVE_COMMAND_REG        0x00CEU
 #define MOTOR_CONTROL_DRIVER_POSITION_REG         0x0004U
 #define MOTOR_CONTROL_POSITION_REG                1000U
 #define MOTOR_CONTROL_POSITION_REG_COUNT          2U
@@ -31,6 +32,13 @@
 #define MOTOR_HOME_POLL_INTERVAL_MS               500U
 #define MOTOR_HOME_TIMEOUT_MS                     60000U
 
+/* 开机回零前，电机7/8的安全预移动参数。 */
+#define MOTOR_PREHOME_POSITION_LIMIT              275000L
+#define MOTOR_PREHOME_STABLE_TOLERANCE            100L
+#define MOTOR_PREHOME_STABLE_SAMPLE_COUNT         3U
+#define MOTOR_PREHOME_POLL_INTERVAL_MS            500U
+#define MOTOR_PREHOME_TIMEOUT_MS                  30000U
+
 typedef enum {
     MOTOR_HOME_STATE_IDLE = 0,
     MOTOR_HOME_STATE_SEND_COMMAND,
@@ -39,6 +47,31 @@ typedef enum {
     MOTOR_HOME_STATE_SUCCESS,
     MOTOR_HOME_STATE_FAILED
 } MotorHomeState;
+
+typedef enum {
+    MOTOR_PREHOME_STATE_IDLE = 0,
+    MOTOR_PREHOME_STATE_READ_INITIAL_MOTOR7,
+    MOTOR_PREHOME_STATE_READ_INITIAL_MOTOR8,
+    MOTOR_PREHOME_STATE_WRITE_MOTOR7,
+    MOTOR_PREHOME_STATE_WRITE_MOTOR8,
+    MOTOR_PREHOME_STATE_WAIT_POLL,
+    MOTOR_PREHOME_STATE_READ_STABLE_MOTOR7,
+    MOTOR_PREHOME_STATE_READ_STABLE_MOTOR8,
+    MOTOR_PREHOME_STATE_READY,
+    MOTOR_PREHOME_STATE_FAILED
+} MotorPreHomeState;
+
+typedef enum {
+    MOTOR_FULL_HOME_STATE_IDLE = 0,
+    MOTOR_FULL_HOME_STATE_INITIAL_HOMING,
+    MOTOR_FULL_HOME_STATE_CHECK_MOTOR2_HOME,
+    MOTOR_FULL_HOME_STATE_CHECK_MOTOR1_HOME,
+    MOTOR_FULL_HOME_STATE_PREHOME,
+    MOTOR_FULL_HOME_STATE_OTHER_HOMING,
+    MOTOR_FULL_HOME_STATE_FINAL_HOMING,
+    MOTOR_FULL_HOME_STATE_SUCCESS,
+    MOTOR_FULL_HOME_STATE_FAILED
+} MotorFullHomeState;
 
 typedef struct {
     uint8_t slave_addr;
@@ -72,6 +105,25 @@ uint8_t MotorControl_HomeGetFailedSlave(void);
 uint8_t MotorControl_HomeGetLastError(void);
 uint16_t MotorControl_HomeGetStatusWord(void);
 uint16_t MotorControl_HomeGetCompletedMask(void);
+uint8_t MotorControl_PreHomeStart(uint8_t saved_position_valid,
+                                  int32_t motor7_saved_position,
+                                  int32_t motor8_saved_position);
+void MotorControl_PreHomeProcess(void);
+uint8_t MotorControl_PreHomeIsBusy(void);
+MotorPreHomeState MotorControl_PreHomeGetState(void);
+uint8_t MotorControl_PreHomeGetCurrentSlave(void);
+uint8_t MotorControl_PreHomeGetFailedSlave(void);
+uint8_t MotorControl_PreHomeGetLastError(void);
+uint8_t MotorControl_FullHomeStart(uint8_t saved_position_valid,
+                                   int32_t motor7_saved_position,
+                                   int32_t motor8_saved_position,
+                                   uint16_t speed_command);
+void MotorControl_FullHomeProcess(void);
+uint8_t MotorControl_FullHomeIsBusy(void);
+MotorFullHomeState MotorControl_FullHomeGetState(void);
+uint8_t MotorControl_FullHomeGetCurrentSlave(void);
+uint8_t MotorControl_FullHomeGetFailedSlave(void);
+uint8_t MotorControl_FullHomeGetLastError(void);
 typedef enum {
     MOTOR_CONTROL_TARGET_LIFT_UP = 0,
     MOTOR_CONTROL_TARGET_LIFT_DOWN
@@ -85,6 +137,9 @@ uint8_t MotorControl_WriteTarget(MotorControlTarget target, uint16_t value);
  */
 uint8_t MotorControl_BatchMove(const MotorControlParams *motors, uint8_t count,
                                uint8_t *results);
+uint8_t MotorControl_BatchMoveCapture(const MotorControlParams *motors,
+                                      uint8_t count, uint8_t *results,
+                                      int32_t *positions);
 /*
  * 异步批量下发绝对位置，但不读取和校验当前位置。所有写事务收到正确应答后
  * 即返回 OK；该结果只表示命令下发成功，不表示电机已经运动到位。

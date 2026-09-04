@@ -4,6 +4,7 @@
 #include "modbus_master.h"
 #include "modbus_slave.h"
 #include "motor_control.h"
+#include "battery_swap.h"
 #include "sequence.h"
 #include "sequence_steps.h"
 #include "status_regs.h"
@@ -320,10 +321,13 @@ static void GatewayService_FinishActive(CommandState state,
 
 /* 执行单个网关寄存器命令，不负责编码从站应答。 */
 static uint8_t GatewayService_ExecuteWrite(uint16_t register_address,
-                                          uint16_t value)
+                                           uint16_t value)
 {
     GatewayCommandTarget target;
     uint8_t result = MODBUS_RESULT_PARAM;
+    uint8_t saved_position_valid;
+    int32_t saved_motor7_position = 0L;
+    int32_t saved_motor8_position = 0L;
 
     /* 回原点失败后仍允许网关重试；状态上报在锁定期间也保持可写。 */
     if (!control_enabled &&
@@ -375,7 +379,11 @@ static uint8_t GatewayService_ExecuteWrite(uint16_t register_address,
                 result = MODBUS_RESULT_PARAM;
                 break;
             }
-            result = MotorControl_HomeStart(MOTOR_HOME_SPEED_NORMAL);
+            saved_position_valid = MotorPositionStore_Get(
+                &saved_motor7_position, &saved_motor8_position);
+            result = MotorControl_FullHomeStart(
+                saved_position_valid, saved_motor7_position,
+                saved_motor8_position, MOTOR_HOME_SPEED_NORMAL);
             if (result == MODBUS_RESULT_OK) {
                 GatewayService_SetControlEnabled(0U);
             }
@@ -517,28 +525,27 @@ static void GatewayService_ProcessActiveCommand(void)
     }
 
     if (active_command.type == GATEWAY_ACTIVE_HOMING) {
-        MotorHomeState home_state = MotorControl_HomeGetState();
-
         StatusRegs_Update(REG_COMMAND_STEP,
-                          MotorControl_HomeGetCurrentSlave());
-        if (MotorControl_HomeIsBusy()) {
+                          MotorControl_FullHomeGetCurrentSlave());
+        if (MotorControl_FullHomeIsBusy()) {
             return;
         }
-        if (home_state == MOTOR_HOME_STATE_SUCCESS) {
+        if (MotorControl_FullHomeGetState() ==
+            MOTOR_FULL_HOME_STATE_SUCCESS) {
             GatewayService_SetControlEnabled(1U);
             GatewayService_FinishActive(
                 COMMAND_STATE_SUCCESS, 0U,
-                MotorControl_HomeGetCurrentSlave());
+                MotorControl_FullHomeGetCurrentSlave());
         } else {
             fault_code =
-                ((uint16_t)MotorControl_HomeGetFailedSlave() << 8) |
-                MotorControl_HomeGetLastError();
+                ((uint16_t)MotorControl_FullHomeGetFailedSlave() << 8) |
+                MotorControl_FullHomeGetLastError();
             if (fault_code == 0U) {
                 fault_code = 0x00FFU;
             }
             GatewayService_FinishActive(
                 COMMAND_STATE_FAILED, fault_code,
-                MotorControl_HomeGetFailedSlave());
+                MotorControl_FullHomeGetFailedSlave());
         }
         return;
     }
@@ -660,7 +667,7 @@ static uint8_t GatewayService_AcceptNewCommand(
         GatewayService_BeginActive(request->start_register, request->value,
                                    GATEWAY_ACTIVE_ASYNC_WRITE);
     } else if (request->start_register == GATEWAY_CMD_HOME_ALL &&
-               MotorControl_HomeIsBusy()) {
+               MotorControl_FullHomeIsBusy()) {
         GatewayService_BeginActive(request->start_register, request->value,
                                    GATEWAY_ACTIVE_HOMING);
         StatusRegs_Update(REG_COMMAND_STEP,
@@ -782,7 +789,7 @@ static uint8_t GatewayService_Handle10(const ModbusSlaveRequest *request)
     }
 
     if (register_address == GATEWAY_CMD_HOME_ALL &&
-        MotorControl_HomeIsBusy()) {
+        MotorControl_FullHomeIsBusy()) {
         GatewayService_BeginActive(register_address, value,
                                    GATEWAY_ACTIVE_HOMING);
         StatusRegs_Update(REG_COMMAND_STEP,

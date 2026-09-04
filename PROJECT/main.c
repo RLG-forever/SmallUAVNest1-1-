@@ -111,10 +111,13 @@ History: none
 int main(void)
 {
 	uint8_t normal_operations_enabled = 0U;
-	uint8_t startup_homing_pending = 0U;
+	uint8_t startup_full_homing_pending = 0U;
 	uint8_t home_start_result;
-	MotorHomeState home_state;
-	MotorHomeState last_home_state = MOTOR_HOME_STATE_IDLE;
+	uint8_t saved_position_valid;
+	int32_t saved_motor7_position = 0L;
+	int32_t saved_motor8_position = 0L;
+	MotorFullHomeState full_home_state;
+	MotorFullHomeState last_full_home_state = MOTOR_FULL_HOME_STATE_IDLE;
 
 //	SysTickInit();
 	SystemInit();
@@ -136,21 +139,26 @@ int main(void)
 	bsp_InitHardTimer();
 	W25QXX_Init();          // 初始化SPI Flash
 	SwapState_Init();   // 从Flash读取空仓号
+	MotorPositionStore_Init();
 	LOG_INFO("MAIN", "initialization completed\r\n");
   __enable_irq();  /* 开启全局中断 */
 	delay_ms(1000);
-	home_start_result = MotorControl_HomeStart(MOTOR_HOME_SPEED_NORMAL);
+	saved_position_valid = MotorPositionStore_Get(
+		&saved_motor7_position, &saved_motor8_position);
+	home_start_result = MotorControl_FullHomeStart(
+		saved_position_valid, saved_motor7_position,
+		saved_motor8_position, MOTOR_HOME_SPEED_NORMAL);
 	if (home_start_result == MODBUS_RESULT_OK) {
-		startup_homing_pending = 1U;
+		startup_full_homing_pending = 1U;
 		StatusRegs_Update(REG_COMMAND_CODE,
 						  GATEWAY_SERVICE_HOME_COMMAND_REG);
 		StatusRegs_Update(REG_COMMAND_STATE, COMMAND_STATE_EXECUTING);
 		StatusRegs_Update(REG_COMMAND_STEP,
-						  MotorControl_HomeGetCurrentSlave());
+						  MotorControl_FullHomeGetCurrentSlave());
 	} else {
 		StatusRegs_Update(REG_COMMAND_STATE, COMMAND_STATE_FAILED);
 		StatusRegs_Update(REG_FAULT_CODE, home_start_result);
-		LOG_ERROR("MAIN", "failed to start startup homing: result=%u\r\n",
+		LOG_ERROR("MAIN", "failed to start initial homing: result=%u\r\n",
 				  (unsigned int)home_start_result);
 	}
 //	Motor_Reset(MOTOR1_SLAVE_ADDR, MOTOR1_CTRL_REG1, 8);
@@ -163,47 +171,54 @@ int main(void)
 		{		
 			ModbusMaster_Process();
 			ModbusSlave_Process();
-			MotorControl_HomeProcess();
-			home_state = MotorControl_HomeGetState();
+			MotorControl_FullHomeProcess();
+			full_home_state = MotorControl_FullHomeGetState();
+			if (startup_full_homing_pending &&
+				MotorControl_FullHomeIsBusy()) {
+				StatusRegs_Update(
+					REG_COMMAND_STEP,
+					MotorControl_FullHomeGetCurrentSlave());
+			}
 
-			if (home_state != last_home_state) {
-				if (MotorControl_HomeIsBusy()) {
+			if (full_home_state != last_full_home_state) {
+				if (MotorControl_FullHomeIsBusy()) {
 					normal_operations_enabled = 0U;
 					GatewayService_SetControlEnabled(0U);
-				} else if (home_state == MOTOR_HOME_STATE_SUCCESS) {
+				} else if (full_home_state == MOTOR_FULL_HOME_STATE_SUCCESS) {
 					normal_operations_enabled = 1U;
 					GatewayService_SetControlEnabled(1U);
-					if (startup_homing_pending) {
-						startup_homing_pending = 0U;
+					if (startup_full_homing_pending) {
+						startup_full_homing_pending = 0U;
 						StatusRegs_Update(REG_COMMAND_STATE,
 										  COMMAND_STATE_SUCCESS);
-						StatusRegs_Update(REG_COMMAND_STEP,
-										  MotorControl_HomeGetCurrentSlave());
+						StatusRegs_Update(
+							REG_COMMAND_STEP,
+							MotorControl_FullHomeGetCurrentSlave());
 						StatusRegs_Update(REG_FAULT_CODE, 0U);
 					}
 					LOG_INFO("MAIN",
-							 "all motors homed; normal operations enabled\r\n");
-				} else if (home_state == MOTOR_HOME_STATE_FAILED) {
+							 "full homing completed; normal operations enabled\r\n");
+				} else if (full_home_state == MOTOR_FULL_HOME_STATE_FAILED) {
 					uint16_t fault_code =
-						((uint16_t)MotorControl_HomeGetFailedSlave() << 8) |
-						MotorControl_HomeGetLastError();
+						((uint16_t)MotorControl_FullHomeGetFailedSlave() << 8) |
+						MotorControl_FullHomeGetLastError();
 
 					normal_operations_enabled = 0U;
 					GatewayService_SetControlEnabled(0U);
-					if (startup_homing_pending) {
-						startup_homing_pending = 0U;
+					if (startup_full_homing_pending) {
+						startup_full_homing_pending = 0U;
 						StatusRegs_Update(REG_COMMAND_STATE,
 										  COMMAND_STATE_FAILED);
 						StatusRegs_Update(REG_COMMAND_STEP,
-										  MotorControl_HomeGetFailedSlave());
+										  MotorControl_FullHomeGetFailedSlave());
 						StatusRegs_Update(REG_FAULT_CODE, fault_code);
 					}
 					LOG_ERROR("MAIN",
-							  "homing failed; operations locked: slave=0x%02X, result=%u\r\n",
-							  (unsigned int)MotorControl_HomeGetFailedSlave(),
-							  (unsigned int)MotorControl_HomeGetLastError());
+							  "full homing failed; operations locked: slave=0x%02X, result=%u\r\n",
+							  (unsigned int)MotorControl_FullHomeGetFailedSlave(),
+							  (unsigned int)MotorControl_FullHomeGetLastError());
 				}
-				last_home_state = home_state;
+				last_full_home_state = full_home_state;
 			}
 
 			GatewayService_Process();
