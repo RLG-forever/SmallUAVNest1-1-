@@ -110,8 +110,11 @@ History: none
 		
 int main(void)
 {
-	uint8_t motor1_up_active = 1U;
-	uint8_t motor1_up_result = MODBUS_RESULT_PENDING;
+	uint8_t normal_operations_enabled = 0U;
+	uint8_t startup_homing_pending = 0U;
+	uint8_t home_start_result;
+	MotorHomeState home_state;
+	MotorHomeState last_home_state = MOTOR_HOME_STATE_IDLE;
 
 //	SysTickInit();
 	SystemInit();
@@ -133,81 +136,82 @@ int main(void)
 	bsp_InitHardTimer();
 	W25QXX_Init();          // 初始化SPI Flash
 	SwapState_Init();   // 从Flash读取空仓号
-	LOG_INFO("MAIN", "initialization completed; entering main loop\r\n");
+	LOG_INFO("MAIN", "initialization completed\r\n");
   __enable_irq();  /* 开启全局中断 */
 	delay_ms(1000);
+	home_start_result = MotorControl_HomeStart(MOTOR_HOME_SPEED_NORMAL);
+	if (home_start_result == MODBUS_RESULT_OK) {
+		startup_homing_pending = 1U;
+		StatusRegs_Update(REG_COMMAND_CODE,
+						  GATEWAY_SERVICE_HOME_COMMAND_REG);
+		StatusRegs_Update(REG_COMMAND_STATE, COMMAND_STATE_EXECUTING);
+		StatusRegs_Update(REG_COMMAND_STEP,
+						  MotorControl_HomeGetCurrentSlave());
+	} else {
+		StatusRegs_Update(REG_COMMAND_STATE, COMMAND_STATE_FAILED);
+		StatusRegs_Update(REG_FAULT_CODE, home_start_result);
+		LOG_ERROR("MAIN", "failed to start startup homing: result=%u\r\n",
+				  (unsigned int)home_start_result);
+	}
 //	Motor_Reset(MOTOR1_SLAVE_ADDR, MOTOR1_CTRL_REG1, 8);
 	// 复位前确保主站状态空闲
 	
-	//GPIO_SetBits(LED_PORT, LED1);
-	
-//		while(W25QXX_ReadID()!=W25Q128)								//检测不到W25Q128
-//	{
-//		printf("W25Q128 Check Failed!");
-//		delay_ms(500);
-//		//LCD_ShowString(30,150,200,16,16,"Please Check!      ");
-//		///delay_ms(500);
-//		//LED0=!LED0;		//DS0闪烁
-//	}
-//	printf("W25Q128 Check OK");
-	
-//	W25QXX_Write(&a,0,1);
-//	delay_ms(500);
-//	
-//	
-//	W25QXX_Read(&b,0,1);	
-//	delay_ms(500);
-//	
-//	printf("读取电机电流失败，错误码%d\n", b);
-//	a=9;
-//		W25QXX_Write(&a,0,1);
-//	delay_ms(500);
-//	
-//	
-//	W25QXX_Read(&b,0,1);	
-//	delay_ms(500);
-	
 
-//	LeaveCenter();
-// LeaveCenter2();
-//Battery_2();
-//Battery_6();
-//Center_1();
-//Center_2();
-//Battery_21();
-//Battery_4();
-//Battery_10();
-//OpenAC();
-//CloseAC();
-//Battery_21();
-//FlyOpen();
-//Battery_5();
-//Battery_7();
-//OpenDr();
 
 //printf("\r\n============= MCU RESET DETECTED =============\r\n");
 		while(1)
 		{		
 			ModbusMaster_Process();
 			ModbusSlave_Process();
-			if (motor1_up_active != 0U) {
-				motor1_up_result = Motor1Up1();
-				if (motor1_up_result == MODBUS_RESULT_OK) {
-					motor1_up_active = 0U;
-					LOG_INFO("MAIN", "Motor1Up1 completed\r\n");
-				} else if (motor1_up_result != MODBUS_RESULT_PENDING &&
-						   motor1_up_result != MODBUS_RESULT_BUSY) {
-					motor1_up_active = 0U;
-					LOG_ERROR("MAIN", "Motor1Up1 failed: result=%u\r\n",
-							  (unsigned int)motor1_up_result);
+			MotorControl_HomeProcess();
+			home_state = MotorControl_HomeGetState();
+
+			if (home_state != last_home_state) {
+				if (MotorControl_HomeIsBusy()) {
+					normal_operations_enabled = 0U;
+					GatewayService_SetControlEnabled(0U);
+				} else if (home_state == MOTOR_HOME_STATE_SUCCESS) {
+					normal_operations_enabled = 1U;
+					GatewayService_SetControlEnabled(1U);
+					if (startup_homing_pending) {
+						startup_homing_pending = 0U;
+						StatusRegs_Update(REG_COMMAND_STATE,
+										  COMMAND_STATE_SUCCESS);
+						StatusRegs_Update(REG_COMMAND_STEP,
+										  MotorControl_HomeGetCurrentSlave());
+						StatusRegs_Update(REG_FAULT_CODE, 0U);
+					}
+					LOG_INFO("MAIN",
+							 "all motors homed; normal operations enabled\r\n");
+				} else if (home_state == MOTOR_HOME_STATE_FAILED) {
+					uint16_t fault_code =
+						((uint16_t)MotorControl_HomeGetFailedSlave() << 8) |
+						MotorControl_HomeGetLastError();
+
+					normal_operations_enabled = 0U;
+					GatewayService_SetControlEnabled(0U);
+					if (startup_homing_pending) {
+						startup_homing_pending = 0U;
+						StatusRegs_Update(REG_COMMAND_STATE,
+										  COMMAND_STATE_FAILED);
+						StatusRegs_Update(REG_COMMAND_STEP,
+										  MotorControl_HomeGetFailedSlave());
+						StatusRegs_Update(REG_FAULT_CODE, fault_code);
+					}
+					LOG_ERROR("MAIN",
+							  "homing failed; operations locked: slave=0x%02X, result=%u\r\n",
+							  (unsigned int)MotorControl_HomeGetFailedSlave(),
+							  (unsigned int)MotorControl_HomeGetLastError());
 				}
+				last_home_state = home_state;
 			}
-			Sequence_Process();   	// 处理序列（一键起飞/降落完成）
+
 			GatewayService_Process();
-			SwapState_TrySave();   // 延迟保存（Flash 写入过程仍为同步执行）
-			StallRecovery_Task();
-			/* 后台轮询优先级最低，避免抢在控制命令之前占用主站总线。 */
-			if (motor1_up_active == 0U) {
+			if (normal_operations_enabled) {
+				Sequence_Process();   	// 处理序列（一键起飞/降落完成）
+				SwapState_TrySave();   // 延迟保存（Flash 写入过程仍为同步执行）
+				StallRecovery_Task();
+				/* 后台轮询优先级最低，避免抢在控制命令之前占用主站总线。 */
 				MasterPolling_Task();
 			}
 		}

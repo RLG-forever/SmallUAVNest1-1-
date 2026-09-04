@@ -46,10 +46,11 @@ typedef struct {
 // ======================== 步进电机控制寄存器映射 ========================
 // 06/10功能码 - 写寄存器（控制指令）16进制
 //电机1
-#define MOTOR1_CTRL_REG1      0x00ce  // 电机1控制寄存器
+#define MOTOR1_CTRL_REG1      0x00d0  // 电机1绝对位置控制寄存器（D0低字，D1高字）
 
 //电机2
-#define MOTOR2_CTRL_REG1      0x00ce  // 电机2控制寄存器
+#define MOTOR2_CTRL_REG1      0x00d0  // 电机2绝对位置控制寄存器（D0低字，D1高字）
+#define MOTOR_MOVE_RELATIVE_POS_REG      0x00ce  // 电机2绝对位置控制寄存器（D0低字，D1高字）
 #define MOTOR2_CTRL_REG5      0x00fd  // 电机5控制寄存器（位置模式控制）
 
 //夹紧电机
@@ -64,7 +65,7 @@ typedef struct {
 #define MOTOR4_CMD_STOP                  0x0005  // 停止
 
 //电机5-12
-#define MOTOR5_CTRL_REG1      0x00ce  // 电机5-12控制寄存器地址（行程设置）
+#define MOTOR5_CTRL_REG1      0x00d0  // 电机5-12绝对位置控制寄存器（D0低字，D1高字）
 
 //空调
 
@@ -87,24 +88,44 @@ typedef struct {
 //电机1
 // 位置控制模式
 // 位置控制模式
-#define MOTOR_PRESET_PULSE_07            0xF6F0        //行程低位，远离电机-332000  ef20
-#define MOTOR_PRESET_PULSE_08            0xfffa        //行程高位
+#define MOTOR1_MOVE_POS_315000_LOW_WORD  0xCE78  //远离电机，正脉冲315000低位
+#define MOTOR1_MOVE_POS_315000_HIGH_WORD 0x0004  //远离电机，正脉冲315000高位
+#define MOTOR1_MOVE_POS_9000_LOW_WORD    0x2328  //远离电机，正脉冲9000低位
+#define MOTOR1_MOVE_POS_9000_HIGH_WORD   0x0000  //远离电机，正脉冲9000高位
+#define MOTOR1_MOVE_POS_330000_LOW_WORD  0x0910  //远离电机，正脉冲330000低位
+#define MOTOR1_MOVE_POS_330000_HIGH_WORD 0x0005  //远离电机，正脉冲330000高位
+#define MOTOR1_MOVE_POS_136000_LOW_WORD  0x1340  //远离电机，正脉冲136000低位
+#define MOTOR1_MOVE_POS_136000_HIGH_WORD 0x0002  //远离电机，正脉冲136000高位
+#define MOTOR1_MOVE_POS_2000_LOW_WORD    0x07D0  //远离电机，正脉冲2000低位
+#define MOTOR1_MOVE_POS_2000_HIGH_WORD   0x0000  //远离电机，正脉冲2000高位
+#define MOTOR1_MOVE_POS_69000_LOW_WORD   0x0D88  //远离电机，正脉冲69000低位
+#define MOTOR1_MOVE_POS_69000_HIGH_WORD  0x0001  //远离电机，正脉冲69000高位
+#define MOTOR1_MOVE_POS_329000_LOW_WORD  0x0528  //远离电机，正脉冲329000低位
+#define MOTOR1_MOVE_POS_329000_HIGH_WORD 0x0005  //远离电机，正脉冲329000高位
+#define MOTOR1_MOVE_POS_293000_LOW_WORD  0x7888  //远离电机，正脉冲293000低位
+#define MOTOR1_MOVE_POS_293000_HIGH_WORD 0x0004  //远离电机，正脉冲293000高位
+
+#define MOTOR_PRESET_PULSE_07            MOTOR1_MOVE_POS_330000_LOW_WORD  //兼容原宏名
+#define MOTOR_PRESET_PULSE_08            MOTOR1_MOVE_POS_330000_HIGH_WORD //兼容原宏名
 #define MOTOR_PRESET_PULSE_09            0x10e0        //程低位，靠近电机332000
-#define MOTOR_PRESET_PULSE_10           0x0006        //行程高位   5
-#define MOTOR_PRESET_PULSE_11           0xecc0        //程低位，远离电机-136000
-#define MOTOR_PRESET_PULSE_12           0xfffd        //行程高位
+#define MOTOR_PRESET_PULSE_10           0x0005        //行程高位   5
+#define MOTOR_PRESET_PULSE_11           MOTOR1_MOVE_POS_136000_LOW_WORD  //兼容原宏名
+#define MOTOR_PRESET_PULSE_12           MOTOR1_MOVE_POS_136000_HIGH_WORD //兼容原宏名
+
 #define MOTOR_PRESET_PULSE_13           0x1340        //程低位，靠近电机136000
 #define MOTOR_PRESET_PULSE_14           0x0002        //行程高位
-#define MOTOR_PRESET_PULSE_15           0xf830        //程低位，远离电机-2000
-#define MOTOR_PRESET_PULSE_16           0xffff        //行程高位
+
+
+#define MOTOR_PRESET_PULSE_15           MOTOR1_MOVE_POS_2000_LOW_WORD  //兼容原宏名
+#define MOTOR_PRESET_PULSE_16           MOTOR1_MOVE_POS_2000_HIGH_WORD //兼容原宏名
 #define MOTOR_PRESET_PULSE_17           0x07d0        //程低位，靠近电机2000
 #define MOTOR_PRESET_PULSE_18           0x0000        //行程高位
-#define MOTOR_PRESET_PULSE_35           0xf278        //程低位，远离电机-69000
-#define MOTOR_PRESET_PULSE_36           0xfffe        //行程高位
+#define MOTOR_PRESET_PULSE_35           MOTOR1_MOVE_POS_69000_LOW_WORD  //兼容原宏名
+#define MOTOR_PRESET_PULSE_36           MOTOR1_MOVE_POS_69000_HIGH_WORD //兼容原宏名
 #define MOTOR_PRESET_PULSE_37           0x0d88        //程低位，靠近电机69000
 #define MOTOR_PRESET_PULSE_38           0x0001        //行程高位
-#define MOTOR_PRESET_PULSE_43             0xFAD8        //电机2端低位脉冲数-329000
-#define MOTOR_PRESET_PULSE_44             0xfffa        //电机2端高位脉冲数
+#define MOTOR_PRESET_PULSE_43           MOTOR1_MOVE_POS_329000_LOW_WORD  //兼容原宏名
+#define MOTOR_PRESET_PULSE_44           MOTOR1_MOVE_POS_329000_HIGH_WORD //兼容原宏名
 
 
 
@@ -127,36 +148,73 @@ typedef struct {
 #define MOTOR2_POSITION_MODE_RELATIVE              0x0000        //相对模式
 #define MOTOR2_POSITION_MODE_ABSOLUTE              0x0001        //绝对模式
 
-#define MOTOR_PRESET_PULSE_01             0x3188        //电机2端低位脉冲数-315000    8778
-#define MOTOR_PRESET_PULSE_02             0xfffb        //电机2端高位脉冲数
+#define MOTOR2_MOVE_POS_315000_LOW_WORD  0xCE78  //远离电机，正脉冲315000低位
+#define MOTOR2_MOVE_POS_315000_HIGH_WORD 0x0004  //远离电机，正脉冲315000高位
+#define MOTOR2_MOVE_POS_9000_LOW_WORD    0x2328  //远离电机，正脉冲9000低位
+#define MOTOR2_MOVE_POS_9000_HIGH_WORD   0x0000  //远离电机，正脉冲9000高位
+#define MOTOR2_MOVE_POS_136000_LOW_WORD  0x1340  //远离电机，正脉冲136000低位
+#define MOTOR2_MOVE_POS_136000_HIGH_WORD 0x0002  //远离电机，正脉冲136000高位
+#define MOTOR2_MOVE_POS_24000_LOW_WORD   0x5DC0  //远离电机，正脉冲24000低位
+#define MOTOR2_MOVE_POS_24000_HIGH_WORD  0x0000  //远离电机，正脉冲24000高位
+#define MOTOR2_MOVE_POS_314000_LOW_WORD  0xCA90  //电机2目标位置314000低位
+#define MOTOR2_MOVE_POS_314000_HIGH_WORD 0x0004  //电机2目标位置314000高位
+#define MOTOR2_MOVE_POS_361000_LOW_WORD  0x8228  //远离电机，正脉冲361000低位
+#define MOTOR2_MOVE_POS_361000_HIGH_WORD 0x0005  //远离电机，正脉冲361000高位
+#define MOTOR2_MOVE_POS_370000_LOW_WORD  0xA550  //电机2目标位置370000低位
+#define MOTOR2_MOVE_POS_370000_HIGH_WORD 0x0005  //电机2目标位置370000高位
+#define MOTOR2_MOVE_POS_299000_LOW_WORD  0x8FF8  //电机2目标位置299000低位
+#define MOTOR2_MOVE_POS_299000_HIGH_WORD 0x0004  //电机2目标位置299000高位
+
+#define MOTOR2_MOVE_POS_10000_LOW_WORD   0x2710  //远离电机，正脉冲10000低位
+#define MOTOR2_MOVE_POS_10000_HIGH_WORD  0x0000  //远离电机，正脉冲10000高位
+
+#define OPEN_UAV_BATTERY_POS_LOW_WORD    0x9F98  //无人机电池打开位置303000低位
+#define OPEN_UAV_BATTERY_POS_HIGH_WORD   0x0004  //无人机电池打开位置303000高位
+
+#define NEAR_UAV_BATTERY_POS_LOW_WORD    0x7888  //无人机电池靠近位置293000低位
+#define NEAR_UAV_BATTERY_POS_HIGH_WORD   0x0004  //无人机电池靠近位置293000高位
+
+#define MOTOR_HOME_POSITION_LOW_WORD     0x0000  //原点位置0低位
+#define MOTOR_HOME_POSITION_HIGH_WORD    0x0000  //原点位置0高位
+
+#define MOTOR2_MOVE_POS_290000_LOW_WORD  0x6CD0  //远离电机，正脉冲290000低位
+#define MOTOR2_MOVE_POS_290000_HIGH_WORD 0x0004  //远离电机，正脉冲290000高位
+#define MOTOR2_MOVE_POS_293000_LOW_WORD  0x7888  //远离电机，正脉冲293000低位
+#define MOTOR2_MOVE_POS_293000_HIGH_WORD 0x0004  //远离电机，正脉冲293000高位
+
+#define MOTOR_PRESET_PULSE_01             MOTOR2_MOVE_POS_315000_LOW_WORD  //兼容原宏名
+#define MOTOR_PRESET_PULSE_02             MOTOR2_MOVE_POS_315000_HIGH_WORD //兼容原宏名
 #define MOTOR_PRESET_PULSE_03             0xa168        //电机2端低位脉冲数369000
-#define MOTOR_PRESET_PULSE_04             0x0006        //电机2端高位脉冲数	  5
-#define MOTOR_PRESET_PULSE_05             0xDCD8       //电机2端低位脉冲数-9000     eb89
-#define MOTOR_PRESET_PULSE_06             0xffff        //电机2端高位脉冲数
-#define MOTOR_PRESET_PULSE_19             0x7888        //电机2端低位脉冲数293000
-#define MOTOR_PRESET_PULSE_20             0x0005        //电机2端高位脉冲数   5
-#define MOTOR_PRESET_PULSE_21             0xA240        //电机2端低位脉冲数-15000    c568
-#define MOTOR_PRESET_PULSE_22             0xffff        //电机2端高位脉冲数
+#define MOTOR_PRESET_PULSE_04             0x0005        //电机2端高位脉冲数	  5
+#define MOTOR_PRESET_PULSE_05             MOTOR2_MOVE_POS_9000_LOW_WORD  //兼容原宏名
+#define MOTOR_PRESET_PULSE_06             MOTOR2_MOVE_POS_9000_HIGH_WORD //兼容原宏名
+#define MOTOR_PRESET_PULSE_19             0x7888        //电机2目标位置358536低位
+#define MOTOR_PRESET_PULSE_20             0x0005        //电机2目标位置358536高位
+#define MOTOR_PRESET_PULSE_21             MOTOR2_MOVE_POS_24000_LOW_WORD  //兼容原宏名
+#define MOTOR_PRESET_PULSE_22             MOTOR2_MOVE_POS_24000_HIGH_WORD //兼容原宏名
 #define MOTOR_PRESET_PULSE_23             0x3a98        //电机2端低位脉冲数15000
 #define MOTOR_PRESET_PULSE_24             0x0000        //电机2端高位脉冲数
 #define MOTOR_PRESET_PULSE_25             0xb320        //电机2端低位脉冲数308000
-#define MOTOR_PRESET_PULSE_26             0x0005        //电机2端高位脉冲数   4
-#define MOTOR_PRESET_PULSE_27             0x7DD8        //电机2端低位脉冲数-363000   7608
-#define MOTOR_PRESET_PULSE_28             0xfffa        //电机2端高位脉冲数
+#define MOTOR_PRESET_PULSE_26             0x0004        //电机2端高位脉冲数   4
+#define MOTOR_PRESET_PULSE_27             MOTOR2_MOVE_POS_361000_LOW_WORD  //兼容原宏名
+#define MOTOR_PRESET_PULSE_28             MOTOR2_MOVE_POS_361000_HIGH_WORD //兼容原宏名
 #define MOTOR_PRESET_PULSE_29             0x89f8        //电机2端低位脉冲数363000
-#define MOTOR_PRESET_PULSE_30             0x0006        //电机2端高位脉冲数   5
-#define MOTOR_PRESET_PULSE_31             0xd8f0        //电机2端低位脉冲数-10000
-#define MOTOR_PRESET_PULSE_32             0xffff        //电机2端高位脉冲数
-#define MOTOR_PRESET_PULSE_33             0x2710        //电机2端低位脉冲数10000
-#define MOTOR_PRESET_PULSE_34             0x0000        //电机2端高位脉冲数
+#define MOTOR_PRESET_PULSE_30             0x0005        //电机2端高位脉冲数   5
+
+#define MOTOR_PRESET_PULSE_31             MOTOR2_MOVE_POS_10000_LOW_WORD  //兼容原宏名
+#define MOTOR_PRESET_PULSE_32             MOTOR2_MOVE_POS_10000_HIGH_WORD //兼容原宏名
+
+#define MOTOR_PRESET_PULSE_33             0xD8F0        //电机2端低位脉冲数10000
+#define MOTOR_PRESET_PULSE_34             0xFFFF        //电机2端高位脉冲数
+
 #define MOTOR_PRESET_PULSE_39             0xd260        //电机2端低位脉冲数316000
-#define MOTOR_PRESET_PULSE_40             0x0005        //电机2端高位脉冲数   4
-#define MOTOR_PRESET_PULSE_41             0x9330        //电机2端低位脉冲数-290000
-#define MOTOR_PRESET_PULSE_42             0xfffb        //电机2端高位脉冲数
-#define MOTOR_PRESET_PULSE_45             0x8778        //电机2端低位脉冲数-295000  7FA8
-#define MOTOR_PRESET_PULSE_46             0xfffb        //电机2端高位脉冲数
-#define MOTOR_PRESET_PULSE_47             0x8778        //电机2端低位脉冲数-290000
-#define MOTOR_PRESET_PULSE_48             0xfffb        //电机2端高位脉冲数
+#define MOTOR_PRESET_PULSE_40             0x0004        //电机2端高位脉冲数   4
+#define MOTOR_PRESET_PULSE_41             MOTOR2_MOVE_POS_290000_LOW_WORD  //兼容原宏名
+#define MOTOR_PRESET_PULSE_42             MOTOR2_MOVE_POS_290000_HIGH_WORD //兼容原宏名
+#define MOTOR_PRESET_PULSE_45             MOTOR2_MOVE_POS_293000_LOW_WORD  //兼容原宏名
+#define MOTOR_PRESET_PULSE_46             MOTOR2_MOVE_POS_293000_HIGH_WORD //兼容原宏名
+#define MOTOR_PRESET_PULSE_47             MOTOR1_MOVE_POS_293000_LOW_WORD  //兼容原宏名
+#define MOTOR_PRESET_PULSE_48             MOTOR1_MOVE_POS_293000_HIGH_WORD //兼容原宏名
 
 
 //夹紧电机
@@ -177,30 +235,49 @@ typedef struct {
 #define MOTOR5_TRAVEL_HIGH_WORD        0x0002         //行程高位，靠近电机
 //#define MOTOR6_TRAVEL_LOW_WORD        0x40e0         //行程低位，远离电机-180000
 //#define MOTOR6_TRAVEL_HIGH_WORD        0xfffd         //行程高位，远离电机
-#define MOTOR6_TRAVEL_LOW_WORD        0x4F00         //行程低位，远离电机-176000
-#define MOTOR6_TRAVEL_HIGH_WORD        0xfffd         //行程高位，远离电机
+#define MOTOR6_MOVE_POS_LOW_WORD   0xB100         //远离电机，正脉冲176384低位
+#define MOTOR6_MOVE_POS_HIGH_WORD  0x0002         //远离电机，正脉冲176384高位
+#define MOTOR6_TRAVEL_LOW_WORD          MOTOR6_MOVE_POS_LOW_WORD  //兼容原宏名
+#define MOTOR6_TRAVEL_HIGH_WORD         MOTOR6_MOVE_POS_HIGH_WORD //兼容原宏名
 #define MOTOR7_TRAVEL_LOW_WORD        0x5d78         //行程低位，靠近电机155000
 #define MOTOR7_TRAVEL_HIGH_WORD        0x0002         //行程高位，靠近电机
-#define MOTOR8_TRAVEL_LOW_WORD        0xa8d0        //行程低位，远离电机-350000
-#define MOTOR8_TRAVEL_HIGH_WORD        0xfffa         //行程高位，远离电机
+#define MOTOR8_MOVE_POS_LOW_WORD   0x5730         //远离电机，正脉冲350000低位
+#define MOTOR8_MOVE_POS_HIGH_WORD  0x0005         //远离电机，正脉冲350000高位
+#define MOTOR8_TRAVEL_LOW_WORD          MOTOR8_MOVE_POS_LOW_WORD  //兼容原宏名
+#define MOTOR8_TRAVEL_HIGH_WORD         MOTOR8_MOVE_POS_HIGH_WORD //兼容原宏名
 #define MOTOR9_TRAVEL_LOW_WORD        0x5f90         //行程低位，靠近电机90000
 #define MOTOR9_TRAVEL_HIGH_WORD        0x0001         //行程高位，靠近电机
-#define MOTOR10_TRAVEL_LOW_WORD        0xa070        //行程低位，远离电机-90000
-#define MOTOR10_TRAVEL_HIGH_WORD        0xfffe         //行程高位，远离电机
+#define MOTOR10_MOVE_POS_LOW_WORD  0x5F90         //远离电机，正脉冲90000低位
+#define MOTOR10_MOVE_POS_HIGH_WORD 0x0001         //远离电机，正脉冲90000高位
+#define MOTOR10_TRAVEL_LOW_WORD         MOTOR10_MOVE_POS_LOW_WORD  //兼容原宏名
+#define MOTOR10_TRAVEL_HIGH_WORD        MOTOR10_MOVE_POS_HIGH_WORD //兼容原宏名
 #define MOTOR11_TRAVEL_LOW_WORD        0x82b8         //行程低位，靠近电机99000
 #define MOTOR11_TRAVEL_HIGH_WORD        0x0001         //行程高位，靠近电机
-#define MOTOR12_TRAVEL_LOW_WORD        0x7d48        //行程低位，远离电机-99000
-#define MOTOR12_TRAVEL_HIGH_WORD        0xfffe         //行程高位，远离电机
+#define MOTOR12_MOVE_POS_LOW_WORD  0x82B8         //远离电机，正脉冲99000低位
+#define MOTOR12_MOVE_POS_HIGH_WORD 0x0001         //远离电机，正脉冲99000高位
+#define MOTOR12_TRAVEL_LOW_WORD         MOTOR12_MOVE_POS_LOW_WORD  //兼容原宏名
+#define MOTOR12_TRAVEL_HIGH_WORD        MOTOR12_MOVE_POS_HIGH_WORD //兼容原宏名
 #define MOTOR13_TRAVEL_LOW_WORD        0x3450         //行程低位，靠近电机210000
 #define MOTOR13_TRAVEL_HIGH_WORD        0x0003         //行程高位，靠近电机
-#define MOTOR14_TRAVEL_LOW_WORD        0xe4a8        //行程低位，远离电机-7000
-#define MOTOR14_TRAVEL_HIGH_WORD        0xffff         //行程高位，远离电机
+#define MOTOR14_MOVE_POS_LOW_WORD  0x1B58         //远离电机，正脉冲7000低位
+#define MOTOR14_MOVE_POS_HIGH_WORD 0x0000         //远离电机，正脉冲7000高位
+#define MOTOR14_TRAVEL_LOW_WORD         MOTOR14_MOVE_POS_LOW_WORD  //兼容原宏名
+#define MOTOR14_TRAVEL_HIGH_WORD        MOTOR14_MOVE_POS_HIGH_WORD //兼容原宏名
 #define MOTOR15_TRAVEL_LOW_WORD        0x0d40         //行程低位，靠近电机200000
 #define MOTOR15_TRAVEL_HIGH_WORD        0x0003         //行程高位，靠近电机
-#define MOTOR16_TRAVEL_LOW_WORD        0xf2c0        //行程低位，远离电机-200000
-#define MOTOR16_TRAVEL_HIGH_WORD        0xfffc         //行程高位，远离电机
+#define MOTOR16_MOVE_POS_LOW_WORD  0x0D40         //远离电机，正脉冲200000低位
+#define MOTOR16_MOVE_POS_HIGH_WORD 0x0003         //远离电机，正脉冲200000高位
+#define MOTOR16_TRAVEL_LOW_WORD         MOTOR16_MOVE_POS_LOW_WORD  //兼容原宏名
+#define MOTOR16_TRAVEL_HIGH_WORD        MOTOR16_MOVE_POS_HIGH_WORD //兼容原宏名
 #define MOTOR17_TRAVEL_LOW_WORD        0x5f00         //行程低位，靠近电机352000
 #define MOTOR17_TRAVEL_HIGH_WORD        0x0005         //行程高位，靠近电机
+
+#define MOTOR9_LEAVE_CENTER_POS_HIGH_WORD       0x0000         //行程高位，靠近电机
+#define MOTOR9_LEAVE_CENTER_POS_LOW_WORD        0x2710         //行程高位，靠近电机
+
+#define MOTOR12_LEAVE_CENTER_POS_HIGH_WORD       0x0000         //行程高位，靠近电机
+#define MOTOR12_LEAVE_CENTER_POS_LOW_WORD        0x2710         //行程高位，靠近电机
+
 
 //电机12
 #define MOTOR12_UP        0x0033  // 上升
@@ -235,8 +312,6 @@ uint8_t Motor1Down1(void);
 uint8_t Motor3Lossen(void);
 uint8_t Motor1Up2(void);
 uint8_t Motor1Up3(void);
-uint8_t CloseCenter1(void);
-uint8_t CloseCenter2(void);
 uint8_t FlyForward(void);
 uint8_t FlyBack(void);
 uint8_t RelayCtrl(void);
@@ -247,35 +322,35 @@ uint8_t LeaveCenter(void);
 uint8_t LeaveCenter1(void);
 uint8_t LeaveCenter2(void);
 
-uint8_t Battery_1(void);
-uint8_t Battery_2(void);
-uint8_t Battery_3(void);
-uint8_t Battery_4(void);
-uint8_t Battery_5(void);
-uint8_t Battery_6(void);
-uint8_t Battery_7(void);
-uint8_t Battery_8(void);
-uint8_t Battery_9(void);
-uint8_t Battery_10(void);
-uint8_t Battery_11(void);
-uint8_t Battery_12(void);
-uint8_t Battery_13(void);
-uint8_t Battery_14(void);
-uint8_t Battery_15(void);
-uint8_t Battery_16(void);
-uint8_t Battery_17(void);
-uint8_t Battery_18(void);
-uint8_t Battery_19(void);
-uint8_t Battery_20(void);
-uint8_t Battery_21(void);
-uint8_t Battery_22(void);
-uint8_t Battery_23(void);
-uint8_t Battery_24(void);
-uint8_t Battery_25(void);
-uint8_t Battery_26(void);
-uint8_t Battery_27(void);
-uint8_t Battery_28(void);
-uint8_t Battery_29(void);
+uint8_t Battery_1(void);   // 电机1：移动到绝对位置330000
+uint8_t Battery_2(void);   // 电机5、6、7、8：批量移动
+uint8_t Battery_3(void);   // 电机2：移动到绝对位置315000
+uint8_t Battery_4(void);   // 夹紧电机：夹紧
+uint8_t Battery_5(void);   // 电机2：移动到原点位置0
+uint8_t Battery_6(void);   // 电机5、6、7、8：批量移动
+uint8_t Battery_7(void);   // 电机1：移动到原点位置0
+uint8_t Battery_8(void);   // 电机1：移动到绝对位置136000
+uint8_t Battery_9(void);   // 电机2：移动到绝对位置361000
+uint8_t Battery_10(void);  // 夹紧电机：松开
+uint8_t Battery_11(void);  // 电机2：移动到绝对位置370000
+uint8_t Battery_12(void);  // 电机2：移动到原点位置0
+uint8_t Battery_13(void);  // 电机1：移动到原点位置0
+uint8_t Battery_14(void);  // 电机1：移动到绝对位置2000
+uint8_t Battery_15(void);  // 电机1：移动到绝对位置2000
+uint8_t Battery_16(void);  // 电机2：移动到绝对位置314000
+uint8_t Battery_17(void);  // 电机2：移动到绝对位置299000
+uint8_t Battery_18(void);  // 电机2：移动到绝对位置303000
+uint8_t Battery_19(void);  // 电机2：移动到绝对位置293000
+uint8_t Battery_20(void);  // 电机2：移动到绝对位置308000
+uint8_t Battery_21(void);  // 电机5、6、7、8：批量移动
+uint8_t Battery_22(void);  // 电机2：移动到原点位置0
+uint8_t Battery_23(void);  // 电机1：移动到绝对位置69000
+uint8_t Battery_24(void);  // 电机1：移动到原点位置0
+uint8_t Battery_25(void);  // 电机2：移动到原点位置0
+uint8_t Battery_26(void);  // 电机2：移动到绝对位置290000
+uint8_t Battery_27(void);  // 电机1：移动到绝对位置329000
+uint8_t Battery_28(void);  // 电机2：移动到绝对位置293000
+uint8_t Battery_29(void);  // 电机1：移动到绝对位置293000
 
 uint8_t OpenDr(void);
 uint8_t CloseDr(void);

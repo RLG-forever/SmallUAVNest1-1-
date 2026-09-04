@@ -33,6 +33,7 @@ typedef enum {
     GATEWAY_CMD_CANCEL = 0x0043U,
     GATEWAY_CMD_OPEN_UP = 0x0044U, //与GATEWAY_CMD_OPEN_DOOR业务逻辑重复
     GATEWAY_CMD_CLOSE_DOWN = 0x0045U,
+    GATEWAY_CMD_HOME_ALL = GATEWAY_SERVICE_HOME_COMMAND_REG,
     GATEWAY_CMD_CHARGER_ON = 0x0048U,
     GATEWAY_CMD_CHARGER_OFF = 0x0049U,
     GATEWAY_CMD_OPEN_FLY = 0x0050U,
@@ -57,7 +58,8 @@ typedef struct {
 typedef enum {
     GATEWAY_ACTIVE_NONE = 0U,       // 当前没有需要后台推进的活动命令
     GATEWAY_ACTIVE_ASYNC_WRITE,     // 下游Modbus写操作未完成，需要重复调用直至得到最终结果
-    GATEWAY_ACTIVE_SEQUENCE         // 动作序列已经启动，需要等待整个序列执行结束
+    GATEWAY_ACTIVE_SEQUENCE,        // 动作序列已经启动，需要等待整个序列执行结束
+    GATEWAY_ACTIVE_HOMING
 } GatewayActiveType;
 
 typedef struct {
@@ -81,6 +83,7 @@ static uint32_t last_write_time;
 static uint32_t remote_off_deadline;
 static uint8_t remote_off_pending;
 static uint8_t remote_off_command_active;
+static uint8_t control_enabled;
 
 static uint8_t GatewayService_ExecuteWrite(uint16_t register_address,
                                            uint16_t value);
@@ -121,11 +124,27 @@ void GatewayService_CancelRemotePowerOff(void)
     remote_off_pending = 0U;
 }
 
+void GatewayService_SetControlEnabled(uint8_t enabled)
+{
+    uint8_t new_state = enabled ? 1U : 0U;
+
+    if (control_enabled == new_state) {
+        return;
+    }
+    control_enabled = new_state;
+    LOG_INFO("GATEWAY", "action commands %s\r\n",
+             control_enabled ? "enabled" : "disabled");
+}
+
 void GatewayService_Process(void)
 {
     uint8_t result;
 
     GatewayService_ProcessActiveCommand();
+
+    if (!control_enabled) {
+        return;
+    }
 
     /* 已接收的下游写命令在完成前持续占用主站事务。 */
     if (active_command.active &&
@@ -306,6 +325,13 @@ static uint8_t GatewayService_ExecuteWrite(uint16_t register_address,
     GatewayCommandTarget target;
     uint8_t result = MODBUS_RESULT_PARAM;
 
+    /* 回原点失败后仍允许网关重试；状态上报在锁定期间也保持可写。 */
+    if (!control_enabled &&
+        register_address != GATEWAY_CMD_HOME_ALL &&
+        register_address != GATEWAY_CMD_UAV_STATUS) {
+        return MODBUS_RESULT_BUSY;
+    }
+
     switch (register_address) {
         case GATEWAY_CMD_OPEN_DOOR:
             result = GatewayService_StartSequence(SEQ_ID_OPENDR);
@@ -343,6 +369,16 @@ static uint8_t GatewayService_ExecuteWrite(uint16_t register_address,
             break;
         case GATEWAY_CMD_CLOSE_DOWN:
             result = GatewayService_StartSequence(SEQ_ID_CLOSEDOWN);
+            break;
+        case GATEWAY_CMD_HOME_ALL:
+            if (value != GATEWAY_SERVICE_HOME_ALL_VALUE) {
+                result = MODBUS_RESULT_PARAM;
+                break;
+            }
+            result = MotorControl_HomeStart(MOTOR_HOME_SPEED_NORMAL);
+            if (result == MODBUS_RESULT_OK) {
+                GatewayService_SetControlEnabled(0U);
+            }
             break;
         case GATEWAY_CMD_OPEN_FLY:
             result = GatewayService_StartSequence(SEQ_ID_OPENFLY);
@@ -432,6 +468,10 @@ static uint8_t GatewayService_ExecuteWrite(uint16_t register_address,
 
         case GATEWAY_CMD_UAV_STATUS:
             StatusRegs_Update(REG_RESERVED4, value);
+            if (!control_enabled) {
+                result = MODBUS_RESULT_OK;
+                break;
+            }
             if (value == 2U) {
                 wait_open_fly = 0U;
                 result = MODBUS_RESULT_OK;
@@ -473,6 +513,33 @@ static void GatewayService_ProcessActiveCommand(void)
     uint8_t step;
 
     if (!active_command.active) {
+        return;
+    }
+
+    if (active_command.type == GATEWAY_ACTIVE_HOMING) {
+        MotorHomeState home_state = MotorControl_HomeGetState();
+
+        StatusRegs_Update(REG_COMMAND_STEP,
+                          MotorControl_HomeGetCurrentSlave());
+        if (MotorControl_HomeIsBusy()) {
+            return;
+        }
+        if (home_state == MOTOR_HOME_STATE_SUCCESS) {
+            GatewayService_SetControlEnabled(1U);
+            GatewayService_FinishActive(
+                COMMAND_STATE_SUCCESS, 0U,
+                MotorControl_HomeGetCurrentSlave());
+        } else {
+            fault_code =
+                ((uint16_t)MotorControl_HomeGetFailedSlave() << 8) |
+                MotorControl_HomeGetLastError();
+            if (fault_code == 0U) {
+                fault_code = 0x00FFU;
+            }
+            GatewayService_FinishActive(
+                COMMAND_STATE_FAILED, fault_code,
+                MotorControl_HomeGetFailedSlave());
+        }
         return;
     }
 
@@ -529,6 +596,11 @@ static uint8_t GatewayService_HandleControlCommand(
     const ModbusSlaveRequest *request)
 {
     uint8_t step = 0U;
+
+    /* 未配置可靠的回原点停止命令，运行期间不接受暂停或取消。 */
+    if (!control_enabled || MotorControl_HomeIsBusy()) {
+        return ModbusSlave_SendException(request, 0x06U) != 0U;
+    }
 
     if (request->start_register == GATEWAY_CMD_PAUSE) {
         Sequence_Pause();
@@ -587,6 +659,12 @@ static uint8_t GatewayService_AcceptNewCommand(
     if (result == MODBUS_RESULT_PENDING) {
         GatewayService_BeginActive(request->start_register, request->value,
                                    GATEWAY_ACTIVE_ASYNC_WRITE);
+    } else if (request->start_register == GATEWAY_CMD_HOME_ALL &&
+               MotorControl_HomeIsBusy()) {
+        GatewayService_BeginActive(request->start_register, request->value,
+                                   GATEWAY_ACTIVE_HOMING);
+        StatusRegs_Update(REG_COMMAND_STEP,
+                          MotorControl_HomeGetCurrentSlave());
     } else if (Sequence_IsBusy()) {
         GatewayService_BeginActive(request->start_register, request->value,
                                    GATEWAY_ACTIVE_SEQUENCE);
@@ -671,6 +749,13 @@ static uint8_t GatewayService_Handle10(const ModbusSlaveRequest *request)
     register_address = (uint16_t)(request->start_register + index);
     value = Modbus_GetU16BE(&request->write_data[index * 2U]);
 
+    if (register_address == GATEWAY_CMD_HOME_ALL &&
+        request->register_count != 1U) {
+        active = 0U;
+        index = 0U;
+        return ModbusSlave_SendException(request, 0x03U) != 0U;
+    }
+
     if (active_command.active) {
         active = 0U;
         index = 0U;
@@ -696,6 +781,17 @@ static uint8_t GatewayService_Handle10(const ModbusSlaveRequest *request)
         return ModbusSlave_SendException(request, 0x02U) != 0U;
     }
 
+    if (register_address == GATEWAY_CMD_HOME_ALL &&
+        MotorControl_HomeIsBusy()) {
+        GatewayService_BeginActive(register_address, value,
+                                   GATEWAY_ACTIVE_HOMING);
+        StatusRegs_Update(REG_COMMAND_STEP,
+                          MotorControl_HomeGetCurrentSlave());
+        active = 0U;
+        index = 0U;
+        return ModbusSlave_SendWriteAck(request) != 0U;
+    }
+
     GatewayService_RecordCompletedWrite(register_address, value);
 
     index++;
@@ -718,6 +814,7 @@ void GatewayService_Init(void)
 
     wait_open_fly = 0U;
     takeoff_power_ready = 0U;
+    control_enabled = 0U;
     memset(&active_command, 0, sizeof(active_command));
     last_write_register = 0xFFFFU;
     last_write_value = 0xFFFFU;
