@@ -233,7 +233,7 @@ uint8_t Battery_6(void)
         {MOTOR8_SLAVE_ADDR, MOTOR5_CTRL_REG1, MOTOR6_MOVE_POS_LOW_WORD, MOTOR6_MOVE_POS_HIGH_WORD}
     };    
     return MotorControl_BatchMove(motors, 4U, NULL);*/
-    return Center_2()；
+    return Center_2();
 }
 //电机回零位
 uint8_t Battery_7(void)
