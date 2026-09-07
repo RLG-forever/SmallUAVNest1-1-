@@ -23,6 +23,7 @@ History: V0100-0000
 
 #include "project.h"
 #include "debug_log.h"
+#include "exec_steps.h"
 
 const uint8_t g_project_debug_enabled = PROJECT_DEBUG;
 
@@ -56,7 +57,7 @@ u8 b =0;
 /**
  * @brief 堵转后的非阻塞恢复短任务。
  *
- * 首次触发时停止当前序列，随后依次推进 Battery_22、Battery_15 和
+ * 首次触发时停止当前序列，随后依次推进电机2回零、电机1回零和
  * LeaveCenter1；每个动作返回 PENDING 时立即让出主循环。
  */
 static void StallRecovery_Task(void)
@@ -74,9 +75,9 @@ static void StallRecovery_Task(void)
     }
 
     if (recovery_step == 1U) {
-        result = Battery_22();
+        result = ExecSteps_MoveToAbsPos(&EXEC_MOTOR2_HOME);
     } else if (recovery_step == 2U) {
-        result = Battery_15();
+        result = ExecSteps_MoveToAbsPos(&EXEC_MOTOR1_HOME);
     } else {
         result = LeaveCenter();
     }

@@ -49,6 +49,13 @@ typedef struct {
     uint16_t position_register_address;
 } MotorControlParams;
 
+typedef struct {
+    uint8_t slave_addr;
+    uint16_t register_address;
+    int32_t absolute_pos;
+    uint16_t position_register_address;
+} MotorMoveAbsPosParams;
+
 uint8_t Motor_Single_Control(uint8_t slave_addr, uint8_t motor_num, uint16_t motor_cmd);
 uint8_t Motor_Control(uint8_t motor_id, uint8_t reg_num, uint16_t motor_cmd);
 uint8_t Motor_Batch_Control(uint8_t slave_addr, uint16_t start_reg,
@@ -85,6 +92,9 @@ uint8_t MotorControl_WriteTarget(MotorControlTarget target, uint16_t value);
  */
 uint8_t MotorControl_BatchMove(const MotorControlParams *motors, uint8_t count,
                                uint8_t *results);
+/* 使用有符号绝对位置；调用方式、到位检测和返回值与 BatchMove 相同。 */
+uint8_t MotorControl_MoveToAbsPos(const MotorMoveAbsPosParams *motors,
+                                 uint8_t count, uint8_t *results);
 /*
  * 异步批量下发绝对位置，但不读取和校验当前位置。所有写事务收到正确应答后
  * 即返回 OK；该结果只表示命令下发成功，不表示电机已经运动到位。

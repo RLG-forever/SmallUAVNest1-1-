@@ -5,6 +5,7 @@
 #include "status_regs.h"
 
 typedef uint8_t (*StepFunc)(void);
+typedef uint8_t (*StepContextFunc)(const void *context);
 
 #define STEP_RESULT_RETRY 0x80U
 
@@ -13,6 +14,8 @@ typedef struct {
     uint32_t post_delay_ms;
     StatusRegAddr completion_reg;
     uint16_t completion_value;
+    StepContextFunc run_with_context;
+    const void *context;
 } StepDef;
 
 
@@ -42,6 +45,41 @@ typedef struct {
 #define MOTOR17_SLAVE_ADDR 0x0f   // 风速地址
 #define MOTOR14_SLAVE_ADDR 0x14   // 电机14从站地址(控制遥控器的舵机)
 #define MOTOR15_SLAVE_ADDR 0x13   // 电机15从站地址(电池充电空开)
+
+/* 上机调试标定参数：宏名描述机械用途，数值仅在此处修改。 */
+#define MOTOR_HOME_POS                           0L
+#define CALIB_MOTOR1_RECOVERY_POS                315000L
+#define CALIB_MOTOR1_AUX_POS                     9000L
+#define CALIB_MOTOR1_FLY_LIFT_POS                329000L
+#define CALIB_MOTOR1_TRANSFER_LIFT_POS           330000L
+
+#define CALIB_MOTOR2_RECOVERY_FORWARD_POS        136000L
+#define CALIB_MOTOR2_FLY_NEAR_POS                293000L
+#define CALIB_MOTOR2_FLY_FAR_POS                 303000L
+#define CALIB_MOTOR2_AIRCRAFT_WORK_POS           315000L
+#define CALIB_MOTOR2_BAY_WORK_POS                361000L
+#define CALIB_MOTOR2_BAY_RELEASE_POS             370000L
+#define CALIB_MOTOR2_AIRCRAFT_RELEASE_POS        290000L
+#define CALIB_MOTOR2_AIRCRAFT_CLEAR_POS          314000L
+#define CALIB_MOTOR2_LOAD_RETRACT_POS            299000L
+
+#define CALIB_BATTERY_BAY1_POS                   136000L
+#define CALIB_BATTERY_BAY2_POS                   69000L
+#define CALIB_BATTERY_BAY3_POS                   2000L
+
+#define CALIB_PLANE_TRANSFER_IN_MOTOR56_POS      183000L
+#define CALIB_PLANE_TRANSFER_IN_MOTOR78_POS      174000L
+#define CALIB_PLANE_TRANSFER_OUT_MOTOR56_POS     207000L
+#define CALIB_PLANE_TRANSFER_OUT_MOTOR78_POS     150000L
+#define CALIB_PLANE_BASE_POS                     176000L
+#define CALIB_PLANE_OFFSET_POS                   176384L
+
+#define CALIB_CENTER_FRONT_POS                   7000L
+#define CALIB_CENTER_REAR_POS                    350000L
+#define CALIB_CENTER_SIDE_A_POS                  90000L
+#define CALIB_CENTER_SIDE_B_POS                  99000L
+#define CALIB_CENTER_RELEASE_POS                 10000L
+
 // 06功能码帧长度（固定8字节）
 // ======================== 步进电机控制寄存器映射 ========================
 // 06/10功能码 - 写寄存器（控制指令）16进制
@@ -327,38 +365,6 @@ uint8_t RelayCtrl(void);
 uint8_t Center_1(void);
 uint8_t Center_2(void);
 uint8_t LeaveCenter(void);
-uint8_t LeaveCenter1(void);
-uint8_t LeaveCenter2(void);
-
-uint8_t Battery_1(void);   // 电机1：移动到绝对位置330000
-uint8_t Battery_2(void);   // 电机5、6、7、8：批量移动
-uint8_t Battery_3(void);   // 电机2：移动到绝对位置315000
-uint8_t Battery_4(void);   // 夹紧电机：夹紧
-uint8_t Battery_5(void);   // 电机2：移动到原点位置0
-uint8_t Battery_6(void);   // 电机5、6、7、8：批量移动
-uint8_t Battery_7(void);   // 电机1：移动到原点位置0
-uint8_t Battery_8(void);   // 电机1：移动到绝对位置136000
-uint8_t Battery_9(void);   // 电机2：移动到绝对位置361000
-uint8_t Battery_10(void);  // 夹紧电机：松开
-uint8_t Battery_11(void);  // 电机2：移动到绝对位置370000
-uint8_t Battery_12(void);  // 电机2：移动到原点位置0
-uint8_t Battery_13(void);  // 电机1：移动到原点位置0
-uint8_t Battery_14(void);  // 电机1：移动到绝对位置2000
-uint8_t Battery_15(void);  // 电机1：移动到绝对位置2000
-uint8_t Battery_16(void);  // 电机2：移动到绝对位置314000
-uint8_t Battery_17(void);  // 电机2：移动到绝对位置299000
-uint8_t Battery_18(void);  // 电机2：移动到绝对位置303000
-uint8_t Battery_19(void);  // 电机2：移动到绝对位置293000
-uint8_t Battery_20(void);  // 电机2：移动到绝对位置308000
-uint8_t Battery_21(void);  // 电机5、6、7、8：批量移动
-uint8_t Battery_22(void);  // 电机2：移动到原点位置0
-uint8_t Battery_23(void);  // 电机1：移动到绝对位置69000
-uint8_t Battery_24(void);  // 电机1：移动到原点位置0
-uint8_t Battery_25(void);  // 电机2：移动到原点位置0
-uint8_t Battery_26(void);  // 电机2：移动到绝对位置290000
-uint8_t Battery_27(void);  // 电机1：移动到绝对位置329000
-uint8_t Battery_28(void);  // 电机2：移动到绝对位置293000
-uint8_t Battery_29(void);  // 电机1：移动到绝对位置293000
 
 uint8_t OpenDr(void);
 uint8_t CloseDr(void);
@@ -371,44 +377,26 @@ uint8_t CloseAC(void);
 extern const StepDef opendr1_steps[];
 extern const StepDef opendr_steps[];
 extern const StepDef closedr_steps[];
-extern const StepDef openfly_steps[];
-extern const StepDef closefly_steps[];
-extern const StepDef takeoff_steps_1[];
-extern const StepDef takeoff_steps_2[];
-extern const StepDef takeoff_steps_3[];
-extern const StepDef landing_steps_1[];
-extern const StepDef landing_steps_2[];
-extern const StepDef landing_steps_3[];
+extern const StepDef takeoff_steps[];
+extern const StepDef landing_steps[];
 extern const StepDef closecenter_steps[];
 extern const StepDef leavecenter_steps[];
-extern const StepDef loadbattery_steps_1[];
-extern const StepDef loadbattery_steps_2[];
-extern const StepDef loadbattery_steps_3[];
-extern const StepDef downbattery_steps_1[];
-extern const StepDef downbattery_steps_2[];
-extern const StepDef downbattery_steps_3[];
+extern const StepDef loadbattery_steps[];
+extern const StepDef downbattery_steps[];
 extern const StepDef recovery_with_battery_steps[];
 extern const StepDef recovery_without_battery_steps[];
 
 extern const uint8_t OPENDR1_STEP_COUNT;
 extern const uint8_t OPENDR_STEP_COUNT;
 extern const uint8_t CLOSEDR_STEP_COUNT;
-extern const uint8_t OPENFLY_STEP_COUNT;
-extern const uint8_t CLOSEFLY_STEP_COUNT;
-extern const uint8_t TAKEOFF_STEPS_1_COUNT;
-extern const uint8_t TAKEOFF_STEPS_2_COUNT;
-extern const uint8_t TAKEOFF_STEPS_3_COUNT;
-extern const uint8_t LANDING_STEPS_1_COUNT;
-extern const uint8_t LANDING_STEPS_2_COUNT;
-extern const uint8_t LANDING_STEPS_3_COUNT;
+#define OPENFLY_STEP_OFFSET  2U
+#define OPENFLY_STEP_COUNT   13U
+extern const uint8_t TAKEOFF_STEP_COUNT;
+extern const uint8_t LANDING_STEP_COUNT;
 extern const uint8_t CLOSECENTER_STEP_COUNT;
 extern const uint8_t LEAVECENTER_STEP_COUNT;
-extern const uint8_t LOADBATTERY_STEPS_1_COUNT;
-extern const uint8_t LOADBATTERY_STEPS_2_COUNT;
-extern const uint8_t LOADBATTERY_STEPS_3_COUNT;
-extern const uint8_t DOWNBATTERY_STEPS_1_COUNT;
-extern const uint8_t DOWNBATTERY_STEPS_2_COUNT;
-extern const uint8_t DOWNBATTERY_STEPS_3_COUNT;
+extern const uint8_t LOADBATTERY_STEP_COUNT;
+extern const uint8_t DOWNBATTERY_STEP_COUNT;
 extern const uint8_t RECOVERY_WITH_BATTERY_COUNT;
 extern const uint8_t RECOVERY_WITHOUT_BATTERY_COUNT;
 const uint8_t *SequenceSteps_GetMotorList(uint8_t sequence_id,

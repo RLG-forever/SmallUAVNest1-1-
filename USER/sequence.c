@@ -27,6 +27,7 @@ struct {
     const StepDef *steps;
     uint8_t step_count;
     uint8_t current_index;
+    uint8_t selected_bay;
     SequenceState state;
     SequenceState resume_state;
     SequenceResult last_result;
@@ -52,6 +53,7 @@ static void Sequence_Finish(SequenceResult result)
     seq_runner.steps = NULL;
     seq_runner.step_count = 0U;
     seq_runner.current_index = 0U;
+    seq_runner.selected_bay = 0U;
     seq_runner.state = SEQUENCE_STATE_IDLE;
     seq_runner.resume_state = SEQUENCE_STATE_IDLE;
     seq_runner.last_result = result;
@@ -151,8 +153,6 @@ SequenceStartResult Sequence_Start(SeqId id)
                  (unsigned int)empty_bay);
         empty_bay = 1;
     }
-    uint8_t index = empty_bay - 1; // 数组索引
-
     switch (id) {
 				case SEQ_ID_OPENDR1:
 						seq_runner.steps = opendr1_steps;
@@ -180,53 +180,37 @@ SequenceStartResult Sequence_Start(SeqId id)
 						LOG_INFO("SEQUENCE", "release-center sequence selected\r\n");
 				break;
 				case SEQ_ID_LOADBATTERY:
-				{
-						const StepDef *array[] = {loadbattery_steps_1, loadbattery_steps_2, loadbattery_steps_3};
-                        const uint8_t counts[] = {LOADBATTERY_STEPS_1_COUNT, LOADBATTERY_STEPS_2_COUNT, LOADBATTERY_STEPS_3_COUNT};
-                        seq_runner.steps = array[index];
-                        seq_runner.step_count = counts[index];
+                        seq_runner.steps = loadbattery_steps;
+                        seq_runner.step_count = LOADBATTERY_STEP_COUNT;
                         LOG_INFO("SEQUENCE", "load-battery sequence selected: bay=%u\r\n",
                                  (unsigned int)empty_bay);
-                        break;
-				}
+                break;
 				case SEQ_ID_DOWNBATTERY:
-				{
-					  const StepDef *array[] = {downbattery_steps_1, downbattery_steps_2, downbattery_steps_3};
-                    const uint8_t counts[] = {DOWNBATTERY_STEPS_1_COUNT, DOWNBATTERY_STEPS_2_COUNT, DOWNBATTERY_STEPS_3_COUNT};
-                    seq_runner.steps = array[index];
-                    seq_runner.step_count = counts[index];
+                    seq_runner.steps = downbattery_steps;
+                    seq_runner.step_count = DOWNBATTERY_STEP_COUNT;
                     LOG_INFO("SEQUENCE", "unload-battery sequence selected: bay=%u\r\n",
                              (unsigned int)empty_bay);
                 break;
-				}
                 case SEQ_ID_TAKEOFF:
-				{
-						const StepDef *array[] = {takeoff_steps_1, takeoff_steps_2, takeoff_steps_3};
-                        const uint8_t counts[] = {TAKEOFF_STEPS_1_COUNT, TAKEOFF_STEPS_2_COUNT, TAKEOFF_STEPS_3_COUNT};
-                        seq_runner.steps = array[index];
-                        seq_runner.step_count = counts[index];
+                        seq_runner.steps = takeoff_steps;
+                        seq_runner.step_count = TAKEOFF_STEP_COUNT;
                         LOG_INFO("SEQUENCE", "takeoff sequence selected: bay=%u\r\n",
                                  (unsigned int)empty_bay);
                 break;
-				}
                 case SEQ_ID_LANDING:
-				{
-                    const StepDef *array[] = {landing_steps_1, landing_steps_2, landing_steps_3};
-                    const uint8_t counts[] = {LANDING_STEPS_1_COUNT, LANDING_STEPS_2_COUNT, LANDING_STEPS_3_COUNT};
-                    seq_runner.steps = array[index];
-                    seq_runner.step_count = counts[index];
+                    seq_runner.steps = landing_steps;
+                    seq_runner.step_count = LANDING_STEP_COUNT;
                     LOG_INFO("SEQUENCE", "landing sequence selected: bay=%u\r\n",
                              (unsigned int)empty_bay);
                 break;
-				}
 				case SEQ_ID_OPENFLY:
-                    seq_runner.steps = openfly_steps;
+                    seq_runner.steps = &takeoff_steps[OPENFLY_STEP_OFFSET];
                     seq_runner.step_count = OPENFLY_STEP_COUNT;
                     LOG_INFO("SEQUENCE", "open-fly sequence selected\r\n");
                 break;
 				case SEQ_ID_CLOSEFLY:
-                    seq_runner.steps = closefly_steps;
-                    seq_runner.step_count = CLOSEFLY_STEP_COUNT;
+                    seq_runner.steps = &takeoff_steps[OPENFLY_STEP_OFFSET];
+                    seq_runner.step_count = OPENFLY_STEP_COUNT;
                     LOG_INFO("SEQUENCE", "close-fly sequence selected\r\n");
                 break;
 
@@ -254,6 +238,7 @@ SequenceStartResult Sequence_Start(SeqId id)
     StatusRegs_TakeSnapshot();
 
     seq_runner.id = id;
+    seq_runner.selected_bay = empty_bay;
     seq_runner.current_index = 0U;
     seq_runner.state = SEQUENCE_STATE_RUNNING;
     seq_runner.resume_state = SEQUENCE_STATE_IDLE;
@@ -278,7 +263,15 @@ SequenceStartResult Sequence_Start(SeqId id)
 static void Sequence_ExecuteCurrentStep(void)
 {
     const StepDef *step = &seq_runner.steps[seq_runner.current_index];
-    uint8_t ret = step->run();
+    uint8_t ret;
+
+    if (step->run_with_context != NULL) {
+        ret = step->run_with_context(step->context);
+    } else if (step->run != NULL) {
+        ret = step->run();
+    } else {
+        ret = MODBUS_RESULT_PARAM;
+    }
 
     if (ret == MODBUS_RESULT_PENDING || MotorControl_IsBusy()) {
         return;
@@ -407,6 +400,11 @@ uint8_t Sequence_GetCurrentStep(void)
 {
     if (!Sequence_IsBusy()) return SEQUENCE_STEP_INVALID;
     return seq_runner.current_index;
+}
+
+uint8_t Sequence_GetSelectedBay(void)
+{
+    return seq_runner.selected_bay;
 }
 
 const uint8_t *Sequence_GetCurrentStepMotors(void)

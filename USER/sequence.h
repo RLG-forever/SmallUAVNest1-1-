@@ -71,6 +71,7 @@ SequenceStartResult Sequence_StartRecovery(void);
 
 SeqId Sequence_GetCurrentId(void);
 uint8_t Sequence_GetCurrentStep(void);
+uint8_t Sequence_GetSelectedBay(void);
 const uint8_t *Sequence_GetCurrentStepMotors(void);
 SequenceResult Sequence_GetLastResult(void);
 uint8_t Sequence_GetLastStep(void);

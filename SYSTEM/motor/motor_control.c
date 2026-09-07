@@ -822,6 +822,31 @@ uint8_t MotorControl_BatchMove(const MotorControlParams *motors, uint8_t count,
     return MotorControl_BatchMoveInternal(motors, count, results, 1U);
 }
 
+uint8_t MotorControl_MoveToAbsPos(const MotorMoveAbsPosParams *motors,
+                                 uint8_t count, uint8_t *results)
+{
+    MotorControlParams converted[MODBUS_BATCH_MAX_MOTORS];
+    uint32_t raw_position;
+    uint8_t index;
+
+    if (motors == NULL || count == 0U || count > MODBUS_BATCH_MAX_MOTORS) {
+        return MotorControl_BatchMove(NULL, count, results);
+    }
+
+    for (index = 0U; index < count; index++) {
+        /* 先转为无符号数，保留负位置的补码并使用逻辑右移拆分高低字。 */
+        raw_position = (uint32_t)motors[index].absolute_pos;
+        converted[index].slave_addr = motors[index].slave_addr;
+        converted[index].register_address = motors[index].register_address;
+        converted[index].value_low_word = (uint16_t)(raw_position & 0xFFFFU);
+        converted[index].value_high_word = (uint16_t)(raw_position >> 16);
+        converted[index].position_register_address =
+            motors[index].position_register_address;
+    }
+
+    return MotorControl_BatchMove(converted, count, results);
+}
+
 uint8_t MotorControl_BatchMoveNoPositionCheck(
     const MotorControlParams *motors, uint8_t count, uint8_t *results)
 {

@@ -600,6 +600,16 @@
               <FilePath>.\sequence_steps.c</FilePath>
             </File>
             <File>
+              <FileName>exec_steps.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\exec_steps.h</FilePath>
+            </File>
+            <File>
+              <FileName>exec_steps.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\exec_steps.c</FilePath>
+            </File>
+            <File>
               <FileName>bsp_timer.h</FileName>
               <FileType>5</FileType>
               <FilePath>.\bsp_timer.h</FilePath>
