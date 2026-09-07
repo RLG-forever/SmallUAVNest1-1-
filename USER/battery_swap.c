@@ -14,16 +14,29 @@ static uint8_t need_save = 0;   // 保存标志
 static MotorPositionState g_motor_position_state;
 static uint8_t motor_position_state_valid;
 
+typedef struct {
+    uint32_t magic;
+    uint16_t version;
+    uint16_t reserved;
+    int32_t motor7_position;
+    int32_t motor8_position;
+    uint32_t checksum;
+} MotorPositionStateV1;
+
 static uint32_t MotorPositionStore_Checksum(
     const MotorPositionState *state)
 {
-    uint32_t version_word;
+    uint32_t checksum;
+    uint8_t index;
 
-    version_word = ((uint32_t)state->version << 16) |
-                   (uint32_t)state->reserved;
-    return state->magic ^ version_word ^
-           (uint32_t)state->motor7_position ^
-           (uint32_t)state->motor8_position ^ 0xA55A5AA5UL;
+    checksum = state->magic ^
+               (((uint32_t)state->version << 16) |
+                (uint32_t)state->valid_mask) ^
+               0xA55A5AA5UL;
+    for (index = 0U; index < MOTOR_POSITION_STORE_COUNT; index++) {
+        checksum ^= (uint32_t)state->motor_positions[index];
+    }
+    return checksum;
 }
 
 static uint8_t MotorPositionStore_IsValid(
@@ -31,47 +44,35 @@ static uint8_t MotorPositionStore_IsValid(
 {
     if (state->magic != MOTOR_POSITION_STATE_MAGIC ||
         state->version != MOTOR_POSITION_STATE_VERSION ||
+        (state->valid_mask &
+         (uint16_t)(~MOTOR_POSITION_STORE_VALID_MASK)) != 0U ||
         state->checksum != MotorPositionStore_Checksum(state)) {
-        return 0U;
-    }
-    if (state->motor7_position < 0L ||
-        state->motor7_position > 1000000L ||
-        state->motor8_position < 0L ||
-        state->motor8_position > 1000000L) {
         return 0U;
     }
     return 1U;
 }
 
-void MotorPositionStore_Init(void)
+static uint8_t MotorPositionStore_IsLegacyValid(
+    const MotorPositionStateV1 *state)
 {
-    W25QXX_Read((u8 *)&g_motor_position_state,
-                MOTOR_POSITION_STATE_ADDR,
-                sizeof(g_motor_position_state));
-    motor_position_state_valid =
-        MotorPositionStore_IsValid(&g_motor_position_state);
-    if (motor_position_state_valid) {
-        LOG_INFO("MOTOR_POS",
-                 "loaded: motor7=%ld, motor8=%ld\r\n",
-                 (long)g_motor_position_state.motor7_position,
-                 (long)g_motor_position_state.motor8_position);
-    } else {
-        memset(&g_motor_position_state, 0,
-               sizeof(g_motor_position_state));
-        LOG_WARN("MOTOR_POS", "no valid saved position\r\n");
-    }
+    uint32_t version_word;
+    uint32_t checksum;
+
+    version_word = ((uint32_t)state->version << 16) |
+                   (uint32_t)state->reserved;
+    checksum = state->magic ^ version_word ^
+               (uint32_t)state->motor7_position ^
+               (uint32_t)state->motor8_position ^ 0xA55A5AA5UL;
+    return (state->magic == MOTOR_POSITION_STATE_MAGIC &&
+            state->version == 1U && state->checksum == checksum) ? 1U : 0U;
 }
 
-uint8_t MotorPositionStore_Save(int32_t motor7_position,
-                                int32_t motor8_position)
+static uint8_t MotorPositionStore_Write(void)
 {
     MotorPositionState verify_state;
 
-    memset(&g_motor_position_state, 0, sizeof(g_motor_position_state));
     g_motor_position_state.magic = MOTOR_POSITION_STATE_MAGIC;
     g_motor_position_state.version = MOTOR_POSITION_STATE_VERSION;
-    g_motor_position_state.motor7_position = motor7_position;
-    g_motor_position_state.motor8_position = motor8_position;
     g_motor_position_state.checksum =
         MotorPositionStore_Checksum(&g_motor_position_state);
 
@@ -82,27 +83,156 @@ uint8_t MotorPositionStore_Save(int32_t motor7_position,
                 MOTOR_POSITION_STATE_ADDR,
                 sizeof(verify_state));
     if (memcmp(&verify_state, &g_motor_position_state,
-               sizeof(verify_state)) != 0) {
+               sizeof(verify_state)) != 0 ||
+        !MotorPositionStore_IsValid(&verify_state)) {
         motor_position_state_valid = 0U;
         LOG_ERROR("MOTOR_POS", "save verification failed\r\n");
         return 0U;
     }
 
     motor_position_state_valid = 1U;
-    LOG_INFO("MOTOR_POS", "saved: motor7=%ld, motor8=%ld\r\n",
-             (long)motor7_position, (long)motor8_position);
     return 1U;
+}
+
+void MotorPositionStore_Init(void)
+{
+    MotorPositionStateV1 legacy_state;
+
+    W25QXX_Read((u8 *)&g_motor_position_state,
+                MOTOR_POSITION_STATE_ADDR,
+                sizeof(g_motor_position_state));
+    motor_position_state_valid =
+        MotorPositionStore_IsValid(&g_motor_position_state);
+    if (motor_position_state_valid) {
+        LOG_INFO("MOTOR_POS",
+                 "loaded motor positions: valid_mask=0x%02X\r\n",
+                 (unsigned int)g_motor_position_state.valid_mask);
+        return;
+    }
+
+    W25QXX_Read((u8 *)&legacy_state, MOTOR_POSITION_STATE_ADDR,
+                sizeof(legacy_state));
+    if (MotorPositionStore_IsLegacyValid(&legacy_state)) {
+        memset(&g_motor_position_state, 0,
+               sizeof(g_motor_position_state));
+        g_motor_position_state.valid_mask =
+            (uint16_t)((1U << (7U -
+                              MOTOR_POSITION_STORE_FIRST_SLAVE)) |
+                       (1U << (8U -
+                              MOTOR_POSITION_STORE_FIRST_SLAVE)));
+        g_motor_position_state.motor_positions[
+            7U - MOTOR_POSITION_STORE_FIRST_SLAVE] =
+            legacy_state.motor7_position;
+        g_motor_position_state.motor_positions[
+            8U - MOTOR_POSITION_STORE_FIRST_SLAVE] =
+            legacy_state.motor8_position;
+        if (MotorPositionStore_Write()) {
+            LOG_INFO("MOTOR_POS",
+                     "legacy motor7/8 positions migrated to version %u\r\n",
+                     (unsigned int)MOTOR_POSITION_STATE_VERSION);
+        }
+        return;
+    }
+
+    memset(&g_motor_position_state, 0,
+           sizeof(g_motor_position_state));
+    LOG_WARN("MOTOR_POS", "no valid saved position\r\n");
+}
+
+uint8_t MotorPositionStore_Save(int32_t motor7_position,
+                                int32_t motor8_position)
+{
+    const uint8_t slave_addrs[2] = {
+        7U, 8U
+    };
+    const int32_t positions[2] = {
+        motor7_position, motor8_position
+    };
+
+    return MotorPositionStore_UpdateBatch(slave_addrs, positions, 2U);
 }
 
 uint8_t MotorPositionStore_Get(int32_t *motor7_position,
                                int32_t *motor8_position)
 {
+    uint16_t required_mask;
+
+    required_mask =
+        (uint16_t)((1U << (7U -
+                          MOTOR_POSITION_STORE_FIRST_SLAVE)) |
+                   (1U << (8U -
+                          MOTOR_POSITION_STORE_FIRST_SLAVE)));
     if (!motor_position_state_valid || motor7_position == NULL ||
-        motor8_position == NULL) {
+        motor8_position == NULL ||
+        (g_motor_position_state.valid_mask & required_mask) !=
+            required_mask) {
         return 0U;
     }
-    *motor7_position = g_motor_position_state.motor7_position;
-    *motor8_position = g_motor_position_state.motor8_position;
+    *motor7_position = g_motor_position_state.motor_positions[
+        7U - MOTOR_POSITION_STORE_FIRST_SLAVE];
+    *motor8_position = g_motor_position_state.motor_positions[
+        8U - MOTOR_POSITION_STORE_FIRST_SLAVE];
+    return 1U;
+}
+
+uint8_t MotorPositionStore_GetAll(
+    int32_t positions[MOTOR_POSITION_STORE_COUNT], uint16_t *valid_mask)
+{
+    if (!motor_position_state_valid || positions == NULL ||
+        valid_mask == NULL) {
+        return 0U;
+    }
+    memcpy(positions, g_motor_position_state.motor_positions,
+           sizeof(g_motor_position_state.motor_positions));
+    *valid_mask = g_motor_position_state.valid_mask;
+    return 1U;
+}
+
+uint8_t MotorPositionStore_UpdateBatch(const uint8_t *slave_addrs,
+                                       const int32_t *positions,
+                                       uint8_t count)
+{
+    uint8_t index;
+    uint8_t position_index;
+    uint8_t changed = 0U;
+
+    if (slave_addrs == NULL || positions == NULL || count == 0U) {
+        return 0U;
+    }
+    if (!motor_position_state_valid) {
+        memset(&g_motor_position_state, 0,
+               sizeof(g_motor_position_state));
+    }
+
+    for (index = 0U; index < count; index++) {
+        if (slave_addrs[index] < MOTOR_POSITION_STORE_FIRST_SLAVE ||
+            slave_addrs[index] >=
+                MOTOR_POSITION_STORE_FIRST_SLAVE +
+                MOTOR_POSITION_STORE_COUNT) {
+            continue;
+        }
+        position_index = (uint8_t)(
+            slave_addrs[index] - MOTOR_POSITION_STORE_FIRST_SLAVE);
+        if ((g_motor_position_state.valid_mask &
+             (uint16_t)(1U << position_index)) == 0U ||
+            g_motor_position_state.motor_positions[position_index] !=
+                positions[index]) {
+            g_motor_position_state.motor_positions[position_index] =
+                positions[index];
+            g_motor_position_state.valid_mask |=
+                (uint16_t)(1U << position_index);
+            changed = 1U;
+        }
+    }
+
+    if (!changed) {
+        return 1U;
+    }
+    if (!MotorPositionStore_Write()) {
+        return 0U;
+    }
+    LOG_INFO("MOTOR_POS", "positions updated: valid_mask=0x%02X\r\n",
+             (unsigned int)g_motor_position_state.valid_mask);
     return 1U;
 }
 

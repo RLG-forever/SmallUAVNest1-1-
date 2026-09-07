@@ -11,10 +11,13 @@
 /* 存储地址直接使用宏计算 */
 #define SWAP_STATE_ADDR (FLASH_SIZE - 512)
 
-/* 电机7/8位置记录独占倒数第二个4KB扇区，避免与空仓状态互相影响。 */
+/* 电机5~12位置记录独占倒数第二个4KB扇区，避免与空仓状态互相影响。 */
 #define MOTOR_POSITION_STATE_ADDR (FLASH_SIZE - 8192UL)
 #define MOTOR_POSITION_STATE_MAGIC 0x4D503738UL
-#define MOTOR_POSITION_STATE_VERSION 1U
+#define MOTOR_POSITION_STATE_VERSION 2U
+#define MOTOR_POSITION_STORE_FIRST_SLAVE 5U
+#define MOTOR_POSITION_STORE_COUNT 8U
+#define MOTOR_POSITION_STORE_VALID_MASK 0x00FFU
 
 /* 状态结构体 */
 typedef struct {
@@ -25,9 +28,8 @@ typedef struct {
 typedef struct {
     uint32_t magic;
     uint16_t version;
-    uint16_t reserved;
-    int32_t motor7_position;
-    int32_t motor8_position;
+    uint16_t valid_mask;
+    int32_t motor_positions[MOTOR_POSITION_STORE_COUNT];
     uint32_t checksum;
 } MotorPositionState;
 
@@ -44,5 +46,10 @@ uint8_t MotorPositionStore_Save(int32_t motor7_position,
                                 int32_t motor8_position);
 uint8_t MotorPositionStore_Get(int32_t *motor7_position,
                                int32_t *motor8_position);
+uint8_t MotorPositionStore_GetAll(
+    int32_t positions[MOTOR_POSITION_STORE_COUNT], uint16_t *valid_mask);
+uint8_t MotorPositionStore_UpdateBatch(const uint8_t *slave_addrs,
+                                       const int32_t *positions,
+                                       uint8_t count);
 
 #endif

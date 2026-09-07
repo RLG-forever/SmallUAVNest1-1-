@@ -4,6 +4,7 @@
 #include "modbus_master.h"
 #include "tick.h"
 #include "debug_log.h"
+#include "battery_swap.h"
 
 #include <stddef.h>
 #include <string.h>
@@ -15,7 +16,8 @@ typedef enum {
     MOTOR_BATCH_PHASE_IDLE = 0,
     MOTOR_BATCH_PHASE_WRITE,
     MOTOR_BATCH_PHASE_WAIT_POLL,
-    MOTOR_BATCH_PHASE_VERIFY
+    MOTOR_BATCH_PHASE_VERIFY_POSITION,
+    MOTOR_BATCH_PHASE_VERIFY_ALARM
 } MotorBatchPhase;
 
 /* 物理总线为串行总线，因此多电机命令按事务依次执行。 */
@@ -27,9 +29,12 @@ typedef struct {
     uint8_t index;
     uint8_t failures;
     uint8_t first_failure;
+    uint8_t reached_mask;
     uint16_t position_words[MOTOR_CONTROL_POSITION_REG_COUNT];
+    uint16_t alarm_status_word;
     uint32_t next_poll_tick;
     uint32_t verify_deadline;
+    int32_t current_position;
     int32_t target_positions[MODBUS_BATCH_MAX_MOTORS];
     int32_t reached_positions[MODBUS_BATCH_MAX_MOTORS];
     uint8_t results[MODBUS_BATCH_MAX_MOTORS];
@@ -40,16 +45,33 @@ typedef struct {
     MotorHomeState state;
     uint8_t motor_count;
     uint8_t addresses[MOTOR_HOME_MAX_MOTORS];
+    uint8_t precheck_count;
+    uint8_t precheck_addresses[MOTOR_HOME_MAX_MOTORS];
+    uint8_t precheck_index;
+    uint8_t pair_index;
     uint8_t command_index;
     uint8_t status_index;
     uint8_t current_slave;
     uint8_t failed_slave;
     uint8_t last_error;
     uint8_t motor2_gate_active;
+    uint8_t level_in_progress;
+    uint8_t level_stable_count;
+    uint16_t saved_position_valid_mask;
+    uint16_t driver_baseline_mask;
     uint16_t speed_command;
+    uint16_t alarm_status_word;
+    uint16_t position_words[MOTOR_CONTROL_POSITION_REG_COUNT];
+    uint16_t relative_position_words[2];
     uint16_t status_words[MOTOR_HOME_STATUS_REG_COUNT];
     uint16_t last_status_word;
     uint16_t completed_mask;
+    int32_t pair_first_position;
+    int32_t pair_second_position;
+    int32_t relative_adjustment;
+    int32_t level_target;
+    int32_t saved_positions[MOTOR_POSITION_STORE_COUNT];
+    int32_t driver_baselines[MOTOR_POSITION_STORE_COUNT];
     uint32_t next_poll_tick;
     uint32_t timeout_deadline;
 } MotorHomeContext;
@@ -59,9 +81,11 @@ typedef struct {
     uint8_t saved_position_valid;
     uint8_t move_mask;
     uint8_t stable_sample_count;
+    uint8_t alarm_index;
     uint8_t current_slave;
     uint8_t failed_slave;
     uint8_t last_error;
+    uint16_t alarm_status_word;
     int32_t saved_positions[2];
     int32_t initial_positions[2];
     int32_t last_positions[2];
@@ -129,6 +153,13 @@ static const uint8_t motor_home_motor78_addresses[] = {
     MOTOR8_SLAVE_ADDR
 };
 
+static const uint8_t motor_home_level_pairs[MOTOR_HOME_LEVEL_PAIR_COUNT][2] = {
+    {MOTOR5_SLAVE_ADDR, MOTOR6_SLAVE_ADDR},
+    {MOTOR7_SLAVE_ADDR, MOTOR8_SLAVE_ADDR},
+    {MOTOR9_SLAVE_ADDR, MOTOR10_SLAVE_ADDR},
+    {MOTOR11_SLAVE_ADDR, MOTOR12_SLAVE_ADDR}
+};
+
 static uint16_t MotorControl_GetPositionRegister(
     const MotorControlParams *motor)
 {
@@ -170,6 +201,80 @@ static uint8_t MotorControl_PositionReached(int32_t current,
         difference = -difference;
     }
     return (uint8_t)(difference <= MOTOR_CONTROL_POSITION_TOLERANCE);
+}
+
+static int64_t MotorControl_AbsI64(int64_t value)
+{
+    return value < 0 ? -value : value;
+}
+
+static uint8_t MotorControl_HomePrecheckContains(uint8_t slave_addr)
+{
+    uint8_t index;
+
+    for (index = 0U; index < motor_home.precheck_count; index++) {
+        if (motor_home.precheck_addresses[index] == slave_addr) {
+            return 1U;
+        }
+    }
+    return 0U;
+}
+
+static uint8_t MotorControl_HomeReadPosition(uint8_t slave_addr,
+                                             int32_t *position)
+{
+    uint8_t result;
+    uint8_t saved_index;
+    uint16_t baseline_bit;
+    uint16_t saved_pair_mask;
+    int32_t driver_position;
+    int64_t restored_position;
+
+    result = ModbusMaster_03_ReadHoldReg(
+        MODBUS_MASTER_CLIENT_MOTOR_CONTROL,
+        slave_addr,
+        MOTOR_CONTROL_DRIVER_POSITION_REG,
+        MOTOR_CONTROL_POSITION_REG_COUNT,
+        motor_home.position_words);
+    if (result == MODBUS_RESULT_OK) {
+        /* 驱动器返回低字在前、高字在后。 */
+        driver_position = MotorControl_CombinePosition(
+            motor_home.position_words[1], motor_home.position_words[0]);
+        if (slave_addr >= MOTOR_POSITION_STORE_FIRST_SLAVE &&
+            slave_addr < MOTOR_POSITION_STORE_FIRST_SLAVE +
+                         MOTOR_POSITION_STORE_COUNT) {
+            saved_index = (uint8_t)(
+                slave_addr - MOTOR_POSITION_STORE_FIRST_SLAVE);
+            baseline_bit = (uint16_t)(1U << saved_index);
+        } else {
+            saved_index = 0U;
+            baseline_bit = 0U;
+        }
+        saved_pair_mask = baseline_bit == 0U
+                          ? 0U
+                          : (uint16_t)(3U << (saved_index & 0xFEU));
+        if (baseline_bit != 0U &&
+            (motor_home.saved_position_valid_mask & saved_pair_mask) ==
+                saved_pair_mask) {
+            if ((motor_home.driver_baseline_mask & baseline_bit) == 0U) {
+                motor_home.driver_baselines[saved_index] =
+                    driver_position;
+                motor_home.driver_baseline_mask |= baseline_bit;
+            }
+            restored_position =
+                (int64_t)motor_home.saved_positions[saved_index] +
+                ((int64_t)driver_position -
+                 (int64_t)motor_home.driver_baselines[saved_index]);
+            if (restored_position > (int64_t)INT32_MAX ||
+                restored_position < (int64_t)INT32_MIN) {
+                return MODBUS_RESULT_PARAM;
+            }
+            *position = (int32_t)restored_position;
+        } else {
+            *position = driver_position;
+        }
+    }
+    return result;
 }
 
 static uint8_t MotorControl_PreHomePositionStable(int32_t current,
@@ -233,6 +338,35 @@ static void MotorControl_PreHomeFail(uint8_t slave_addr, uint8_t error)
 
 static void MotorControl_PreHomeSetReady(void)
 {
+    const uint8_t slave_addrs[2] = {
+        MOTOR7_SLAVE_ADDR, MOTOR8_SLAVE_ADDR
+    };
+    int32_t positions[2];
+    int64_t restored_position;
+    uint8_t index;
+
+    for (index = 0U; index < 2U; index++) {
+        if (motor_prehome.saved_position_valid) {
+            restored_position =
+                (int64_t)motor_prehome.saved_positions[index] +
+                (int64_t)motor_prehome.relative_distances[index];
+            if (restored_position > (int64_t)INT32_MAX ||
+                restored_position < (int64_t)INT32_MIN) {
+                MotorControl_PreHomeFail(slave_addrs[index],
+                                         MODBUS_RESULT_PARAM);
+                return;
+            }
+            positions[index] = (int32_t)restored_position;
+        } else {
+            positions[index] = motor_prehome.initial_positions[index];
+        }
+    }
+    if (!MotorPositionStore_UpdateBatch(slave_addrs, positions, 2U)) {
+        MotorControl_PreHomeFail(motor_prehome.current_slave,
+                                 MODBUS_RESULT_ECHO);
+        return;
+    }
+
     motor_prehome.state = MOTOR_PREHOME_STATE_READY;
     motor_prehome.current_slave = 0U;
     LOG_INFO("PREHOME", "ready for normal homing\r\n");
@@ -248,6 +382,18 @@ static void MotorControl_PreHomeBeginStableCheck(void)
     motor_prehome.next_poll_tick = now + MOTOR_PREHOME_POLL_INTERVAL_MS;
     motor_prehome.timeout_deadline = now + MOTOR_PREHOME_TIMEOUT_MS;
     motor_prehome.state = MOTOR_PREHOME_STATE_WAIT_POLL;
+}
+
+static void MotorControl_PreHomeAdvanceAlarmCheck(void)
+{
+    if (motor_prehome.alarm_index == 0U) {
+        motor_prehome.alarm_index = 1U;
+        motor_prehome.current_slave = MOTOR8_SLAVE_ADDR;
+        motor_prehome.state = MOTOR_PREHOME_STATE_CHECK_ALARM;
+    } else {
+        motor_prehome.current_slave = MOTOR7_SLAVE_ADDR;
+        motor_prehome.state = MOTOR_PREHOME_STATE_READ_INITIAL_MOTOR7;
+    }
 }
 
 uint8_t MotorControl_PreHomeIsBusy(void)
@@ -292,7 +438,7 @@ uint8_t MotorControl_PreHomeStart(uint8_t saved_position_valid,
     motor_prehome.saved_positions[0] = motor7_saved_position;
     motor_prehome.saved_positions[1] = motor8_saved_position;
     motor_prehome.current_slave = MOTOR7_SLAVE_ADDR;
-    motor_prehome.state = MOTOR_PREHOME_STATE_READ_INITIAL_MOTOR7;
+    motor_prehome.state = MOTOR_PREHOME_STATE_CHECK_ALARM;
     LOG_INFO("PREHOME", "started: saved_valid=%u, motor7=%ld, motor8=%ld\r\n",
              (unsigned int)motor_prehome.saved_position_valid,
              (long)motor7_saved_position, (long)motor8_saved_position);
@@ -304,9 +450,90 @@ void MotorControl_PreHomeProcess(void)
     uint8_t result;
     uint8_t index;
     uint8_t stable;
+    uint8_t alarm_status;
+    uint8_t slave_addr;
     uint32_t now;
 
     if (!MotorControl_PreHomeIsBusy()) {
+        return;
+    }
+
+    if (motor_prehome.state == MOTOR_PREHOME_STATE_CHECK_ALARM) {
+        slave_addr = motor_prehome.alarm_index == 0U
+                     ? MOTOR7_SLAVE_ADDR : MOTOR8_SLAVE_ADDR;
+        motor_prehome.current_slave = slave_addr;
+        result = ModbusMaster_03_ReadHoldReg(
+            MODBUS_MASTER_CLIENT_MOTOR_CONTROL,
+            slave_addr,
+            MOTOR_CONTROL_ALARM_STATUS_REG,
+            1U,
+            &motor_prehome.alarm_status_word);
+        if (result == MODBUS_RESULT_PENDING || result == MODBUS_RESULT_BUSY) {
+            return;
+        }
+        if (result != MODBUS_RESULT_OK) {
+            MotorControl_PreHomeFail(slave_addr, result);
+            return;
+        }
+        alarm_status = (uint8_t)(motor_prehome.alarm_status_word &
+                                 MOTOR_CONTROL_ALARM_STATUS_MASK);
+        if (alarm_status == 0U) {
+            MotorControl_PreHomeAdvanceAlarmCheck();
+        } else {
+            LOG_WARN("PREHOME",
+                     "alarm found before pre-move: slave=0x%02X, alarm=%u\r\n",
+                     (unsigned int)slave_addr,
+                     (unsigned int)alarm_status);
+            motor_prehome.state = MOTOR_PREHOME_STATE_CLEAR_ALARM;
+        }
+        return;
+    }
+
+    if (motor_prehome.state == MOTOR_PREHOME_STATE_CLEAR_ALARM) {
+        slave_addr = motor_prehome.alarm_index == 0U
+                     ? MOTOR7_SLAVE_ADDR : MOTOR8_SLAVE_ADDR;
+        result = ModbusMaster_06_WriteSingleReg(
+            MODBUS_MASTER_CLIENT_MOTOR_CONTROL,
+            slave_addr,
+            MOTOR_CONTROL_ALARM_CLEAR_REG,
+            0U);
+        if (result == MODBUS_RESULT_PENDING || result == MODBUS_RESULT_BUSY) {
+            return;
+        }
+        if (result != MODBUS_RESULT_OK) {
+            MotorControl_PreHomeFail(slave_addr, result);
+            return;
+        }
+        motor_prehome.state = MOTOR_PREHOME_STATE_VERIFY_CLEAR;
+        return;
+    }
+
+    if (motor_prehome.state == MOTOR_PREHOME_STATE_VERIFY_CLEAR) {
+        slave_addr = motor_prehome.alarm_index == 0U
+                     ? MOTOR7_SLAVE_ADDR : MOTOR8_SLAVE_ADDR;
+        result = ModbusMaster_03_ReadHoldReg(
+            MODBUS_MASTER_CLIENT_MOTOR_CONTROL,
+            slave_addr,
+            MOTOR_CONTROL_ALARM_STATUS_REG,
+            1U,
+            &motor_prehome.alarm_status_word);
+        if (result == MODBUS_RESULT_PENDING || result == MODBUS_RESULT_BUSY) {
+            return;
+        }
+        if (result != MODBUS_RESULT_OK) {
+            MotorControl_PreHomeFail(slave_addr, result);
+            return;
+        }
+        alarm_status = (uint8_t)(motor_prehome.alarm_status_word &
+                                 MOTOR_CONTROL_ALARM_STATUS_MASK);
+        if (alarm_status != 0U) {
+            MotorControl_PreHomeFail(
+                slave_addr, MOTOR_CONTROL_RESULT_ALARM(alarm_status));
+            return;
+        }
+        LOG_INFO("PREHOME", "alarm cleared: slave=0x%02X\r\n",
+                 (unsigned int)slave_addr);
+        MotorControl_PreHomeAdvanceAlarmCheck();
         return;
     }
 
@@ -341,15 +568,14 @@ void MotorControl_PreHomeProcess(void)
         LOG_INFO("PREHOME", "current: motor7=%ld, motor8=%ld\r\n",
                  (long)motor_prehome.initial_positions[0],
                  (long)motor_prehome.initial_positions[1]);
-        if (MotorControl_PositionReached(
-                motor_prehome.initial_positions[0], 0L) &&
-            MotorControl_PositionReached(
-                motor_prehome.initial_positions[1], 0L)) {
-            MotorControl_PreHomeSetReady();
-            return;
-        }
-
         if (!motor_prehome.saved_position_valid) {
+            if (MotorControl_PositionReached(
+                    motor_prehome.initial_positions[0], 0L) &&
+                MotorControl_PositionReached(
+                    motor_prehome.initial_positions[1], 0L)) {
+                MotorControl_PreHomeSetReady();
+                return;
+            }
             LOG_WARN("PREHOME",
                      "positions are not zero but no saved position is available\r\n");
             MotorControl_PreHomeSetReady();
@@ -527,6 +753,31 @@ static uint8_t MotorControl_RequestMatches(const MotorControlParams *motors,
 static uint8_t MotorControl_FinishBatch(uint8_t result, uint8_t *results,
                                         int32_t *positions)
 {
+    uint8_t index;
+    uint8_t saved_count = 0U;
+    uint8_t saved_addresses[MODBUS_BATCH_MAX_MOTORS];
+    int32_t saved_positions[MODBUS_BATCH_MAX_MOTORS];
+
+    if (motor_batch.check_position) {
+        for (index = 0U; index < motor_batch.count; index++) {
+            if ((motor_batch.reached_mask &
+                 (uint8_t)(1U << index)) != 0U) {
+                saved_addresses[saved_count] =
+                    motor_batch.motors[index].slave_addr;
+                saved_positions[saved_count] =
+                    motor_batch.reached_positions[index];
+                saved_count++;
+            }
+        }
+        if (saved_count > 0U &&
+            !MotorPositionStore_UpdateBatch(saved_addresses,
+                                            saved_positions,
+                                            saved_count) &&
+            result == MODBUS_RESULT_OK) {
+            result = MODBUS_RESULT_ECHO;
+        }
+    }
+
     LOG_INFO("MOTOR", "batch finished: count=%u, result=%u\r\n",
                       (unsigned int)motor_batch.count,
                       (unsigned int)result);
@@ -573,9 +824,9 @@ static uint8_t MotorControl_ReadCurrentPosition(int32_t *position)
 /* 堵转状态由电机服务模块统一持有，避免头文件静态变量产生多个副本。 */
 uint8_t MotorControl_HomeIsBusy(void)
 {
-    return (motor_home.state == MOTOR_HOME_STATE_SEND_COMMAND ||
-            motor_home.state == MOTOR_HOME_STATE_WAIT_POLL ||
-            motor_home.state == MOTOR_HOME_STATE_READ_STATUS) ? 1U : 0U;
+    return (motor_home.state != MOTOR_HOME_STATE_IDLE &&
+            motor_home.state != MOTOR_HOME_STATE_SUCCESS &&
+            motor_home.state != MOTOR_HOME_STATE_FAILED) ? 1U : 0U;
 }
 
 static void MotorControl_HomeFail(uint8_t slave_addr, uint8_t error)
@@ -591,6 +842,62 @@ static void MotorControl_HomeFail(uint8_t slave_addr, uint8_t error)
               "homing failed: slave=0x%02X, result=%u, status=0x%04X\r\n",
               (unsigned int)slave_addr, (unsigned int)error,
               (unsigned int)motor_home.last_status_word);
+}
+
+static void MotorControl_HomeBeginCommandPhase(void)
+{
+    motor_home.command_index = 0U;
+    motor_home.current_slave = motor_home.addresses[0];
+    motor_home.state = MOTOR_HOME_STATE_SEND_COMMAND;
+    LOG_INFO("MOTOR", "homing precheck completed\r\n");
+}
+
+static void MotorControl_HomeSelectNextPair(void)
+{
+    while (motor_home.pair_index < MOTOR_HOME_LEVEL_PAIR_COUNT &&
+           (!MotorControl_HomePrecheckContains(
+                motor_home_level_pairs[motor_home.pair_index][0]) ||
+            !MotorControl_HomePrecheckContains(
+                motor_home_level_pairs[motor_home.pair_index][1]))) {
+        motor_home.pair_index++;
+    }
+
+    if (motor_home.pair_index >= MOTOR_HOME_LEVEL_PAIR_COUNT) {
+        MotorControl_HomeBeginCommandPhase();
+        return;
+    }
+
+    motor_home.level_in_progress = 0U;
+    motor_home.level_stable_count = 0U;
+    motor_home.current_slave =
+        motor_home_level_pairs[motor_home.pair_index][0];
+    motor_home.state = MOTOR_HOME_STATE_READ_PAIR_FIRST;
+}
+
+static uint8_t MotorControl_HomeSaveCurrentPair(void)
+{
+    uint8_t slave_addrs[2];
+    int32_t positions[2];
+
+    slave_addrs[0] = motor_home_level_pairs[motor_home.pair_index][0];
+    slave_addrs[1] = motor_home_level_pairs[motor_home.pair_index][1];
+    positions[0] = motor_home.pair_first_position;
+    positions[1] = motor_home.pair_second_position;
+    return MotorPositionStore_UpdateBatch(slave_addrs, positions, 2U);
+}
+
+static void MotorControl_HomeAdvancePrecheck(void)
+{
+    motor_home.precheck_index++;
+    if (motor_home.precheck_index < motor_home.precheck_count) {
+        motor_home.current_slave =
+            motor_home.precheck_addresses[motor_home.precheck_index];
+        motor_home.state = MOTOR_HOME_STATE_CHECK_ALARM;
+        return;
+    }
+
+    motor_home.pair_index = 0U;
+    MotorControl_HomeSelectNextPair();
 }
 
 static uint16_t MotorControl_HomeAllMask(void)
@@ -610,7 +917,9 @@ static void MotorControl_HomeSelectFirstIncomplete(void)
 
 static uint8_t MotorControl_HomeStartInternal(const uint8_t *addresses,
                                               uint8_t count,
-                                              uint16_t speed_command)
+                                              uint16_t speed_command,
+                                              const uint8_t *precheck_addresses,
+                                              uint8_t precheck_count)
 {
     uint8_t index;
     uint8_t includes_motor1 = 0U;
@@ -628,6 +937,10 @@ static uint8_t MotorControl_HomeStartInternal(const uint8_t *addresses,
         return MODBUS_RESULT_PARAM;
     }
     if (addresses == NULL || count == 0U || count > MOTOR_HOME_MAX_MOTORS) {
+        return MODBUS_RESULT_PARAM;
+    }
+    if (precheck_count > MOTOR_HOME_MAX_MOTORS ||
+        (precheck_count > 0U && precheck_addresses == NULL)) {
         return MODBUS_RESULT_PARAM;
     }
 
@@ -648,11 +961,27 @@ static uint8_t MotorControl_HomeStartInternal(const uint8_t *addresses,
     }
 
     memset(&motor_home, 0, sizeof(motor_home));
-    motor_home.state = MOTOR_HOME_STATE_SEND_COMMAND;
     motor_home.motor_count = count;
     memcpy(motor_home.addresses, addresses, count);
+    motor_home.precheck_count = precheck_count;
+    if (precheck_count > 0U) {
+        memcpy(motor_home.precheck_addresses, precheck_addresses,
+               precheck_count);
+    }
+    if (MotorPositionStore_GetAll(
+            motor_home.saved_positions,
+            &motor_home.saved_position_valid_mask)) {
+        LOG_INFO("MOTOR",
+                 "homing loaded Flash positions: valid_mask=0x%02X\r\n",
+                 (unsigned int)motor_home.saved_position_valid_mask);
+    }
     motor_home.speed_command = speed_command;
-    motor_home.current_slave = motor_home.addresses[0];
+    if (precheck_count > 0U) {
+        motor_home.current_slave = motor_home.precheck_addresses[0];
+        motor_home.state = MOTOR_HOME_STATE_CHECK_ALARM;
+    } else {
+        MotorControl_HomeBeginCommandPhase();
+    }
     LOG_INFO("MOTOR", "homing started: count=%u, speed_cmd=0x%04X\r\n",
              (unsigned int)motor_home.motor_count,
              (unsigned int)speed_command);
@@ -665,7 +994,10 @@ uint8_t MotorControl_HomeStart(uint16_t speed_command)
         motor_home_addresses,
         (uint8_t)(sizeof(motor_home_addresses) /
                   sizeof(motor_home_addresses[0])),
-        speed_command);
+        speed_command,
+        motor_home_addresses,
+        (uint8_t)(sizeof(motor_home_addresses) /
+                  sizeof(motor_home_addresses[0])));
 }
 
 static uint8_t MotorControl_HomeStartBeforePreHome(uint16_t speed_command)
@@ -674,7 +1006,10 @@ static uint8_t MotorControl_HomeStartBeforePreHome(uint16_t speed_command)
         motor_home_before_prehome_addresses,
         (uint8_t)(sizeof(motor_home_before_prehome_addresses) /
                   sizeof(motor_home_before_prehome_addresses[0])),
-        speed_command);
+        speed_command,
+        motor_home_before_prehome_addresses,
+        (uint8_t)(sizeof(motor_home_before_prehome_addresses) /
+                  sizeof(motor_home_before_prehome_addresses[0])));
 }
 
 static uint8_t MotorControl_HomeStartAfterPreHome(uint16_t speed_command)
@@ -683,7 +1018,10 @@ static uint8_t MotorControl_HomeStartAfterPreHome(uint16_t speed_command)
         motor_home_after_prehome_addresses,
         (uint8_t)(sizeof(motor_home_after_prehome_addresses) /
                   sizeof(motor_home_after_prehome_addresses[0])),
-        speed_command);
+        speed_command,
+        motor_home_after_prehome_addresses,
+        (uint8_t)(sizeof(motor_home_after_prehome_addresses) /
+                  sizeof(motor_home_after_prehome_addresses[0])));
 }
 
 static uint8_t MotorControl_HomeStartMotor78(uint16_t speed_command)
@@ -692,7 +1030,10 @@ static uint8_t MotorControl_HomeStartMotor78(uint16_t speed_command)
         motor_home_motor78_addresses,
         (uint8_t)(sizeof(motor_home_motor78_addresses) /
                   sizeof(motor_home_motor78_addresses[0])),
-        speed_command);
+        speed_command,
+        motor_home_motor78_addresses,
+        (uint8_t)(sizeof(motor_home_motor78_addresses) /
+                  sizeof(motor_home_motor78_addresses[0])));
 }
 
 uint8_t MotorControl_HomeStartSingle(uint8_t slave_addr,
@@ -706,7 +1047,8 @@ uint8_t MotorControl_HomeStartSingle(uint8_t slave_addr,
          index++) {
         if (motor_home_addresses[index] == slave_addr) {
             return MotorControl_HomeStartInternal(&slave_addr, 1U,
-                                                  speed_command);
+                                                  speed_command,
+                                                  &slave_addr, 1U);
         }
     }
     return MODBUS_RESULT_PARAM;
@@ -716,9 +1058,294 @@ void MotorControl_HomeProcess(void)
 {
     uint8_t result;
     uint8_t slave_addr;
+    uint8_t alarm_status;
+    uint8_t pair_first_slave;
+    uint8_t pair_second_slave;
     uint32_t now;
+    uint32_t raw_adjustment;
+    int32_t zero_position = 0L;
+    int64_t position_difference;
 
     if (!MotorControl_HomeIsBusy()) {
+        return;
+    }
+
+    if (motor_home.state == MOTOR_HOME_STATE_CHECK_ALARM) {
+        slave_addr = motor_home.precheck_addresses[
+            motor_home.precheck_index];
+        motor_home.current_slave = slave_addr;
+        result = ModbusMaster_03_ReadHoldReg(
+            MODBUS_MASTER_CLIENT_MOTOR_CONTROL,
+            slave_addr,
+            MOTOR_CONTROL_ALARM_STATUS_REG,
+            1U,
+            &motor_home.alarm_status_word);
+        if (result == MODBUS_RESULT_PENDING || result == MODBUS_RESULT_BUSY) {
+            return;
+        }
+        if (result != MODBUS_RESULT_OK) {
+            MotorControl_HomeFail(slave_addr, result);
+            return;
+        }
+
+        alarm_status = (uint8_t)(motor_home.alarm_status_word &
+                                 MOTOR_CONTROL_ALARM_STATUS_MASK);
+        if (alarm_status == 0U) {
+            MotorControl_HomeAdvancePrecheck();
+        } else {
+            LOG_WARN("MOTOR",
+                     "alarm found before homing: slave=0x%02X, alarm=%u\r\n",
+                     (unsigned int)slave_addr,
+                     (unsigned int)alarm_status);
+            motor_home.state = MOTOR_HOME_STATE_CLEAR_ALARM;
+        }
+        return;
+    }
+
+    if (motor_home.state == MOTOR_HOME_STATE_CLEAR_ALARM) {
+        slave_addr = motor_home.precheck_addresses[
+            motor_home.precheck_index];
+        result = ModbusMaster_06_WriteSingleReg(
+            MODBUS_MASTER_CLIENT_MOTOR_CONTROL,
+            slave_addr,
+            MOTOR_CONTROL_ALARM_CLEAR_REG,
+            0U);
+        if (result == MODBUS_RESULT_PENDING || result == MODBUS_RESULT_BUSY) {
+            return;
+        }
+        if (result != MODBUS_RESULT_OK) {
+            MotorControl_HomeFail(slave_addr, result);
+            return;
+        }
+        motor_home.state = MOTOR_HOME_STATE_VERIFY_CLEAR;
+        return;
+    }
+
+    if (motor_home.state == MOTOR_HOME_STATE_VERIFY_CLEAR) {
+        slave_addr = motor_home.precheck_addresses[
+            motor_home.precheck_index];
+        result = ModbusMaster_03_ReadHoldReg(
+            MODBUS_MASTER_CLIENT_MOTOR_CONTROL,
+            slave_addr,
+            MOTOR_CONTROL_ALARM_STATUS_REG,
+            1U,
+            &motor_home.alarm_status_word);
+        if (result == MODBUS_RESULT_PENDING || result == MODBUS_RESULT_BUSY) {
+            return;
+        }
+        if (result != MODBUS_RESULT_OK) {
+            MotorControl_HomeFail(slave_addr, result);
+            return;
+        }
+
+        alarm_status = (uint8_t)(motor_home.alarm_status_word &
+                                 MOTOR_CONTROL_ALARM_STATUS_MASK);
+        if (alarm_status != 0U) {
+            MotorControl_HomeFail(
+                slave_addr, MOTOR_CONTROL_RESULT_ALARM(alarm_status));
+            return;
+        }
+        LOG_INFO("MOTOR", "alarm cleared: slave=0x%02X\r\n",
+                 (unsigned int)slave_addr);
+        MotorControl_HomeAdvancePrecheck();
+        return;
+    }
+
+    if (motor_home.state == MOTOR_HOME_STATE_READ_PAIR_FIRST) {
+        pair_first_slave =
+            motor_home_level_pairs[motor_home.pair_index][0];
+        motor_home.current_slave = pair_first_slave;
+        result = MotorControl_HomeReadPosition(
+            pair_first_slave, &motor_home.pair_first_position);
+        if (result == MODBUS_RESULT_PENDING || result == MODBUS_RESULT_BUSY) {
+            return;
+        }
+        if (result != MODBUS_RESULT_OK) {
+            MotorControl_HomeFail(pair_first_slave, result);
+            return;
+        }
+        motor_home.current_slave =
+            motor_home_level_pairs[motor_home.pair_index][1];
+        motor_home.state = MOTOR_HOME_STATE_READ_PAIR_SECOND;
+        return;
+    }
+
+    if (motor_home.state == MOTOR_HOME_STATE_READ_PAIR_SECOND) {
+        pair_first_slave =
+            motor_home_level_pairs[motor_home.pair_index][0];
+        pair_second_slave =
+            motor_home_level_pairs[motor_home.pair_index][1];
+        motor_home.current_slave = pair_second_slave;
+        result = MotorControl_HomeReadPosition(
+            pair_second_slave, &motor_home.pair_second_position);
+        if (result == MODBUS_RESULT_PENDING || result == MODBUS_RESULT_BUSY) {
+            return;
+        }
+        if (result != MODBUS_RESULT_OK) {
+            MotorControl_HomeFail(pair_second_slave, result);
+            return;
+        }
+
+        position_difference = (int64_t)motor_home.pair_first_position -
+                              (int64_t)motor_home.pair_second_position;
+        LOG_INFO("MOTOR",
+                 "home level check: pair=0x%02X/0x%02X, first=%ld, second=%ld, diff=%ld\r\n",
+                 (unsigned int)pair_first_slave,
+                 (unsigned int)pair_second_slave,
+                 (long)motor_home.pair_first_position,
+                 (long)motor_home.pair_second_position,
+                 (long)position_difference);
+
+        if (motor_home.level_in_progress) {
+            if (MotorControl_AbsI64(position_difference) <=
+                    MOTOR_HOME_LEVEL_COMPLETE_TOLERANCE &&
+                MotorControl_AbsI64(
+                    (int64_t)motor_home.pair_second_position -
+                    (int64_t)motor_home.level_target) <=
+                    MOTOR_HOME_LEVEL_COMPLETE_TOLERANCE) {
+                motor_home.level_stable_count++;
+            } else {
+                motor_home.level_stable_count = 0U;
+            }
+
+            if (motor_home.level_stable_count >=
+                MOTOR_HOME_LEVEL_STABLE_SAMPLE_COUNT) {
+                if (!MotorControl_HomeSaveCurrentPair()) {
+                    MotorControl_HomeFail(pair_second_slave,
+                                          MODBUS_RESULT_ECHO);
+                    return;
+                }
+                LOG_INFO("MOTOR",
+                         "home leveling completed: pair=0x%02X/0x%02X, diff=%ld\r\n",
+                         (unsigned int)pair_first_slave,
+                         (unsigned int)pair_second_slave,
+                         (long)position_difference);
+                motor_home.level_in_progress = 0U;
+                motor_home.pair_index++;
+                MotorControl_HomeSelectNextPair();
+                return;
+            }
+
+            now = GetTick();
+            if (MotorControl_IsTimeReached(now,
+                                           motor_home.timeout_deadline)) {
+                MotorControl_HomeFail(pair_second_slave,
+                                      MODBUS_RESULT_TIMEOUT);
+            } else {
+                motor_home.next_poll_tick =
+                    now + MOTOR_HOME_LEVEL_POLL_INTERVAL_MS;
+                motor_home.state = MOTOR_HOME_STATE_WAIT_LEVEL;
+            }
+            return;
+        }
+
+        if (MotorControl_AbsI64(position_difference) <=
+            MOTOR_HOME_LEVEL_ERROR_THRESHOLD) {
+            if (!MotorControl_HomeSaveCurrentPair()) {
+                MotorControl_HomeFail(pair_second_slave,
+                                      MODBUS_RESULT_ECHO);
+                return;
+            }
+            motor_home.pair_index++;
+            MotorControl_HomeSelectNextPair();
+            return;
+        }
+
+        if (position_difference > (int64_t)INT32_MAX ||
+            position_difference < (int64_t)INT32_MIN) {
+            MotorControl_HomeFail(pair_second_slave, MODBUS_RESULT_PARAM);
+            return;
+        }
+
+        /* 以每组第一台电机为基准，让第二台相对移动 first-second 个脉冲。 */
+        motor_home.relative_adjustment = (int32_t)position_difference;
+        motor_home.level_target = motor_home.pair_first_position;
+        raw_adjustment = (uint32_t)motor_home.relative_adjustment;
+        motor_home.relative_position_words[0] =
+            (uint16_t)(raw_adjustment & 0xFFFFUL);
+        motor_home.relative_position_words[1] =
+            (uint16_t)(raw_adjustment >> 16);
+        motor_home.state = MOTOR_HOME_STATE_LEVEL_PAIR;
+        return;
+    }
+
+    if (motor_home.state == MOTOR_HOME_STATE_LEVEL_PAIR) {
+        pair_first_slave =
+            motor_home_level_pairs[motor_home.pair_index][0];
+        pair_second_slave =
+            motor_home_level_pairs[motor_home.pair_index][1];
+        motor_home.current_slave = pair_second_slave;
+        result = ModbusMaster_10_WriteMultiReg(
+            MODBUS_MASTER_CLIENT_MOTOR_CONTROL,
+            pair_second_slave,
+            MOTOR_CONTROL_RELATIVE_COMMAND_REG,
+            2U,
+            motor_home.relative_position_words);
+        if (result == MODBUS_RESULT_PENDING || result == MODBUS_RESULT_BUSY) {
+            return;
+        }
+        if (result != MODBUS_RESULT_OK) {
+            MotorControl_HomeFail(pair_second_slave, result);
+            return;
+        }
+
+        now = GetTick();
+        motor_home.level_in_progress = 1U;
+        motor_home.level_stable_count = 0U;
+        motor_home.next_poll_tick = now + MOTOR_HOME_LEVEL_POLL_INTERVAL_MS;
+        motor_home.timeout_deadline = now + MOTOR_HOME_LEVEL_TIMEOUT_MS;
+        motor_home.state = MOTOR_HOME_STATE_WAIT_LEVEL;
+        LOG_WARN("MOTOR",
+                 "home leveling started: reference=0x%02X, adjusted=0x%02X, relative=%ld\r\n",
+                 (unsigned int)pair_first_slave,
+                 (unsigned int)pair_second_slave,
+                 (long)motor_home.relative_adjustment);
+        return;
+    }
+
+    if (motor_home.state == MOTOR_HOME_STATE_WAIT_LEVEL) {
+        pair_second_slave =
+            motor_home_level_pairs[motor_home.pair_index][1];
+        now = GetTick();
+        if (MotorControl_IsTimeReached(now, motor_home.timeout_deadline)) {
+            ModbusMaster_Cancel();
+            MotorControl_HomeFail(pair_second_slave,
+                                  MODBUS_RESULT_TIMEOUT);
+            return;
+        }
+        if (!MotorControl_IsTimeReached(now, motor_home.next_poll_tick)) {
+            return;
+        }
+        motor_home.current_slave = pair_second_slave;
+        motor_home.state = MOTOR_HOME_STATE_CHECK_LEVEL_ALARM;
+        return;
+    }
+
+    if (motor_home.state == MOTOR_HOME_STATE_CHECK_LEVEL_ALARM) {
+        pair_second_slave =
+            motor_home_level_pairs[motor_home.pair_index][1];
+        result = ModbusMaster_03_ReadHoldReg(
+            MODBUS_MASTER_CLIENT_MOTOR_CONTROL,
+            pair_second_slave,
+            MOTOR_CONTROL_ALARM_STATUS_REG,
+            1U,
+            &motor_home.alarm_status_word);
+        if (result == MODBUS_RESULT_PENDING || result == MODBUS_RESULT_BUSY) {
+            return;
+        }
+        if (result != MODBUS_RESULT_OK) {
+            MotorControl_HomeFail(pair_second_slave, result);
+            return;
+        }
+        alarm_status = (uint8_t)(motor_home.alarm_status_word &
+                                 MOTOR_CONTROL_ALARM_STATUS_MASK);
+        if (alarm_status != 0U) {
+            MotorControl_HomeFail(
+                pair_second_slave,
+                MOTOR_CONTROL_RESULT_ALARM(alarm_status));
+            return;
+        }
+        motor_home.state = MOTOR_HOME_STATE_READ_PAIR_FIRST;
         return;
     }
 
@@ -806,6 +1433,11 @@ void MotorControl_HomeProcess(void)
         /* 文档约定只判断状态低字的 bit15，其他位不参与完成判定。 */
         motor_home.last_status_word = motor_home.status_words[0];
         if ((motor_home.last_status_word & MOTOR_HOME_COMPLETE_MASK) != 0U) {
+            if (!MotorPositionStore_UpdateBatch(&slave_addr,
+                                                &zero_position, 1U)) {
+                MotorControl_HomeFail(slave_addr, MODBUS_RESULT_ECHO);
+                return;
+            }
             motor_home.completed_mask |=
                 (uint16_t)(1UL << motor_home.status_index);
             if (slave_addr == MOTOR2_SLAVE_ADDR) {
@@ -1353,8 +1985,8 @@ static uint8_t MotorControl_BatchMoveInternal(
 {
     uint16_t commands[2];
     uint8_t result;
+    uint8_t alarm_status;
     uint8_t index;
-    int32_t current_position;
     uint32_t now;
 
     if (MotorControl_HomeIsBusy() || MotorControl_PreHomeIsBusy()) {
@@ -1467,11 +2099,12 @@ static uint8_t MotorControl_BatchMoveInternal(
             if (!MotorControl_IsTimeReached(now, motor_batch.next_poll_tick)) {
                 return MODBUS_RESULT_PENDING;
             }
-            motor_batch.phase = MOTOR_BATCH_PHASE_VERIFY;
+            motor_batch.phase = MOTOR_BATCH_PHASE_VERIFY_POSITION;
             return MODBUS_RESULT_PENDING;
 
-        case MOTOR_BATCH_PHASE_VERIFY:
-            result = MotorControl_ReadCurrentPosition(&current_position);
+        case MOTOR_BATCH_PHASE_VERIFY_POSITION:
+            result = MotorControl_ReadCurrentPosition(
+                &motor_batch.current_position);
             if (result == MODBUS_RESULT_PENDING || result == MODBUS_RESULT_BUSY) {
                 return result;
             }
@@ -1486,16 +2119,54 @@ static uint8_t MotorControl_BatchMoveInternal(
                 return MotorControl_FinishBatch(result, results, positions);
             }
 
+            /* 每次读取位置后都必须检查当前告警，再判断本次移动是否完成。 */
+            motor_batch.phase = MOTOR_BATCH_PHASE_VERIFY_ALARM;
+            return MODBUS_RESULT_PENDING;
+
+        case MOTOR_BATCH_PHASE_VERIFY_ALARM:
+            result = ModbusMaster_03_ReadHoldReg(
+                MODBUS_MASTER_CLIENT_MOTOR_CONTROL,
+                motor_batch.motors[motor_batch.index].slave_addr,
+                MOTOR_CONTROL_ALARM_STATUS_REG,
+                1U,
+                &motor_batch.alarm_status_word);
+            if (result == MODBUS_RESULT_PENDING || result == MODBUS_RESULT_BUSY) {
+                return result;
+            }
+            if (result != MODBUS_RESULT_OK) {
+                motor_batch.results[motor_batch.index] = result;
+                LOG_ERROR("MOTOR",
+                    "alarm status read failed: slave=0x%02X, result=%u\r\n",
+                    (unsigned int)motor_batch.motors[motor_batch.index].slave_addr,
+                    (unsigned int)result);
+                return MotorControl_FinishBatch(result, results, positions);
+            }
+
+            alarm_status = (uint8_t)(motor_batch.alarm_status_word &
+                                     MOTOR_CONTROL_ALARM_STATUS_MASK);
+            if (alarm_status != 0U) {
+                result = MOTOR_CONTROL_RESULT_ALARM(alarm_status);
+                motor_batch.results[motor_batch.index] = result;
+                LOG_ERROR("MOTOR",
+                    "move aborted by alarm: slave=0x%02X, alarm=%u, raw=0x%04X\r\n",
+                    (unsigned int)motor_batch.motors[motor_batch.index].slave_addr,
+                    (unsigned int)alarm_status,
+                    (unsigned int)motor_batch.alarm_status_word);
+                return MotorControl_FinishBatch(result, results, positions);
+            }
+
             if (MotorControl_PositionReached(
-                    current_position,
+                    motor_batch.current_position,
                     motor_batch.target_positions[motor_batch.index])) {
                 motor_batch.results[motor_batch.index] = MODBUS_RESULT_OK;
                 motor_batch.reached_positions[motor_batch.index] =
-                    current_position;
+                    motor_batch.current_position;
+                motor_batch.reached_mask |=
+                    (uint8_t)(1U << motor_batch.index);
                 LOG_INFO("MOTOR",
                     "position reached: slave=0x%02X, current=%ld, target=%ld\r\n",
                     (unsigned int)motor_batch.motors[motor_batch.index].slave_addr,
-                    (long)current_position,
+                    (long)motor_batch.current_position,
                     (long)motor_batch.target_positions[motor_batch.index]);
                 motor_batch.index++;
                 if (motor_batch.index >= motor_batch.count) {
@@ -1503,13 +2174,14 @@ static uint8_t MotorControl_BatchMoveInternal(
                                                     positions);
                 }
                 /* 其他电机同时运动，直接检查批次中的下一台。 */
+                motor_batch.phase = MOTOR_BATCH_PHASE_VERIFY_POSITION;
                 return MODBUS_RESULT_PENDING;
             }
 
             LOG_DEBUG("MOTOR",
                 "position pending: slave=0x%02X, current=%ld, target=%ld\r\n",
                 (unsigned int)motor_batch.motors[motor_batch.index].slave_addr,
-                (long)current_position,
+                (long)motor_batch.current_position,
                 (long)motor_batch.target_positions[motor_batch.index]);
 
             now = GetTick();
@@ -1518,7 +2190,7 @@ static uint8_t MotorControl_BatchMoveInternal(
                 LOG_ERROR("MOTOR",
                     "position timeout: slave=0x%02X, current=%ld, target=%ld\r\n",
                     (unsigned int)motor_batch.motors[motor_batch.index].slave_addr,
-                    (long)current_position,
+                    (long)motor_batch.current_position,
                     (long)motor_batch.target_positions[motor_batch.index]);
                 return MotorControl_FinishBatch(MODBUS_RESULT_TIMEOUT, results,
                                                 positions);
