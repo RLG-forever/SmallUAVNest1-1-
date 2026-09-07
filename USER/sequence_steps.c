@@ -1,4 +1,6 @@
 #include "sequence_steps.h"
+#include "exec_steps.h"
+#include "sequence.h"
 
 #include "motor_control.h"
 #include "modbus_common.h"
@@ -11,23 +13,128 @@
 
 #include <stddef.h>
 
-//MOTOR1_SLAVE_ADDR运动到位置315000
+/* 需要同步运动的电机组；单电机步骤直接在 EXEC_MOVE_ABS_STEP 中写参数。 */
+static const MotorMoveAbsPosParams plane_transfer_in_motors[] = {
+    EXEC_ABS_POS(MOTOR5_SLAVE_ADDR, CALIB_PLANE_TRANSFER_IN_MOTOR56_POS),
+    EXEC_ABS_POS(MOTOR6_SLAVE_ADDR, CALIB_PLANE_TRANSFER_IN_MOTOR56_POS),
+    EXEC_ABS_POS(MOTOR7_SLAVE_ADDR, CALIB_PLANE_TRANSFER_IN_MOTOR78_POS),
+    EXEC_ABS_POS(MOTOR8_SLAVE_ADDR, CALIB_PLANE_TRANSFER_IN_MOTOR78_POS)
+};
+
+static const MotorMoveAbsPosParams plane_transfer_out_motors[] = {
+    EXEC_ABS_POS(MOTOR5_SLAVE_ADDR, CALIB_PLANE_TRANSFER_OUT_MOTOR56_POS),
+    EXEC_ABS_POS(MOTOR6_SLAVE_ADDR, CALIB_PLANE_TRANSFER_OUT_MOTOR56_POS),
+    EXEC_ABS_POS(MOTOR7_SLAVE_ADDR, CALIB_PLANE_TRANSFER_OUT_MOTOR78_POS),
+    EXEC_ABS_POS(MOTOR8_SLAVE_ADDR, CALIB_PLANE_TRANSFER_OUT_MOTOR78_POS)
+};
+
+static const MotorMoveAbsPosParams fly_forward_motors[] = {
+    EXEC_ABS_POS(MOTOR5_SLAVE_ADDR, CALIB_PLANE_OFFSET_POS),
+    EXEC_ABS_POS(MOTOR6_SLAVE_ADDR, CALIB_PLANE_OFFSET_POS),
+    EXEC_ABS_POS(MOTOR7_SLAVE_ADDR, CALIB_PLANE_BASE_POS),
+    EXEC_ABS_POS(MOTOR8_SLAVE_ADDR, CALIB_PLANE_BASE_POS)
+};
+
+static const MotorMoveAbsPosParams fly_back_motors[] = {
+    EXEC_ABS_POS(MOTOR5_SLAVE_ADDR, CALIB_PLANE_BASE_POS),
+    EXEC_ABS_POS(MOTOR6_SLAVE_ADDR, CALIB_PLANE_BASE_POS),
+    EXEC_ABS_POS(MOTOR7_SLAVE_ADDR, CALIB_PLANE_OFFSET_POS),
+    EXEC_ABS_POS(MOTOR8_SLAVE_ADDR, CALIB_PLANE_OFFSET_POS)
+};
+
+static const MotorMoveAbsPosParams center_1_motors[] = {
+    EXEC_ABS_POS(MOTOR10_SLAVE_ADDR, CALIB_CENTER_SIDE_A_POS),
+    EXEC_ABS_POS(MOTOR9_SLAVE_ADDR, CALIB_CENTER_SIDE_A_POS),
+    EXEC_ABS_POS(MOTOR11_SLAVE_ADDR, CALIB_CENTER_SIDE_B_POS),
+    EXEC_ABS_POS(MOTOR12_SLAVE_ADDR, CALIB_CENTER_SIDE_B_POS)
+};
+
+static const MotorMoveAbsPosParams center_2_motors[] = {
+    EXEC_ABS_POS(MOTOR5_SLAVE_ADDR, CALIB_CENTER_FRONT_POS),
+    EXEC_ABS_POS(MOTOR6_SLAVE_ADDR, CALIB_CENTER_FRONT_POS),
+    EXEC_ABS_POS(MOTOR7_SLAVE_ADDR, CALIB_CENTER_REAR_POS),
+    EXEC_ABS_POS(MOTOR8_SLAVE_ADDR, CALIB_CENTER_REAR_POS)
+};
+
+static const MotorMoveAbsPosParams leave_center_motors[] = {
+    EXEC_ABS_POS(MOTOR5_SLAVE_ADDR, MOTOR_HOME_POS),
+    EXEC_ABS_POS(MOTOR6_SLAVE_ADDR, MOTOR_HOME_POS),
+    EXEC_ABS_POS(MOTOR7_SLAVE_ADDR, MOTOR_HOME_POS),
+    EXEC_ABS_POS(MOTOR8_SLAVE_ADDR, MOTOR_HOME_POS),
+    EXEC_ABS_POS(MOTOR10_SLAVE_ADDR, MOTOR_HOME_POS),
+    EXEC_ABS_POS(MOTOR12_SLAVE_ADDR, MOTOR_HOME_POS),
+    EXEC_ABS_POS(MOTOR9_SLAVE_ADDR, CALIB_CENTER_RELEASE_POS),
+    EXEC_ABS_POS(MOTOR11_SLAVE_ADDR, CALIB_CENTER_RELEASE_POS)
+};
+
+static uint8_t MoveOneToAbsPos(uint8_t slave_addr, int32_t position)
+{
+    const MotorMoveAbsPosParams motor =
+        EXEC_ABS_POS(slave_addr, position);
+
+    return MotorControl_MoveToAbsPos(&motor, 1U, NULL);
+}
+
+static uint8_t MoveArrayToAbsPos(const MotorMoveAbsPosParams *motors,
+                                 uint8_t count)
+{
+    return MotorControl_MoveToAbsPos(motors, count, NULL);
+}
+
+static uint8_t MovePlaneTransferIn(void)
+{
+    int32_t positions[EXEC_ARRAY_COUNT(plane_transfer_in_motors)];
+    uint8_t result = MotorControl_MoveToAbsPosCapture(
+        plane_transfer_in_motors,
+        EXEC_ARRAY_COUNT(plane_transfer_in_motors), NULL, positions);
+
+    if (result == MODBUS_RESULT_OK &&
+        !MotorPositionStore_Save(positions[2], positions[3])) {
+        return MODBUS_RESULT_ECHO;
+    }
+    return result;
+}
+
+enum {
+    BATTERY_BAY_CURRENT = 0U,
+    BATTERY_BAY_NEXT,
+    BATTERY_BAY_OFFSET_COUNT
+};
+
+static const int32_t battery_bay_positions[3] = {
+    CALIB_BATTERY_BAY1_POS,
+    CALIB_BATTERY_BAY2_POS,
+    CALIB_BATTERY_BAY3_POS
+};
+
+static const uint8_t battery_bay_current = BATTERY_BAY_CURRENT;
+static const uint8_t battery_bay_next = BATTERY_BAY_NEXT;
+
+static uint8_t MoveMotor1ToSelectedBay(const void *context)
+{
+    const uint8_t *bay_offset = (const uint8_t *)context;
+    uint8_t bay = Sequence_GetSelectedBay();
+    uint8_t position_index;
+
+    if (bay_offset == NULL || *bay_offset >= BATTERY_BAY_OFFSET_COUNT ||
+        bay < 1U || bay > 3U) {
+        return MODBUS_RESULT_PARAM;
+    }
+
+    position_index = (uint8_t)(((bay - 1U) + *bay_offset) % 3U);
+    return MoveOneToAbsPos(MOTOR1_SLAVE_ADDR,
+                           battery_bay_positions[position_index]);
+}
+
+// 电机1移动到回收流程标定位置
 uint8_t Motor1Up1(void)
 {
-    MotorControlParams motors[1] = {
-        {MOTOR1_SLAVE_ADDR, MOTOR1_CTRL_REG1, MOTOR1_MOVE_POS_315000_LOW_WORD, MOTOR1_MOVE_POS_315000_HIGH_WORD}
-    };
-    return MotorControl_BatchMove(motors, 1U, NULL);
+    return MoveOneToAbsPos(MOTOR1_SLAVE_ADDR, CALIB_MOTOR1_RECOVERY_POS);
 }
-//电机2移动到136000位置
+// 电机2移动到回收流程前进标定位置
 uint8_t Motor2Forward(void)
 {
-    MotorControlParams motors[1] = {
-        {MOTOR2_SLAVE_ADDR, MOTOR2_CTRL_REG1,
-         MOTOR2_MOVE_POS_136000_LOW_WORD,
-         MOTOR2_MOVE_POS_136000_HIGH_WORD}
-    };
-    return MotorControl_BatchMove(motors, 1U, NULL);
+    return MoveOneToAbsPos(MOTOR2_SLAVE_ADDR, CALIB_MOTOR2_RECOVERY_FORWARD_POS);
 }
 
 uint8_t Motor3Clamp(void)
@@ -38,23 +145,13 @@ uint8_t Motor3Clamp(void)
 //电机2回零
 uint8_t Motor2Back(void)
 {
-    MotorControlParams motors[1] = {
-        {MOTOR2_SLAVE_ADDR, MOTOR2_CTRL_REG1,
-         MOTOR_HOME_POSITION_LOW_WORD,
-         MOTOR_HOME_POSITION_HIGH_WORD}
-    };
-    return MotorControl_BatchMove(motors, 1U, NULL);
+    return MoveOneToAbsPos(MOTOR2_SLAVE_ADDR, MOTOR_HOME_POS);
 }
 
 //电机1回到原点位置0
 uint8_t Motor1Down1(void)
 {
-    MotorControlParams motors[1] = {
-        {MOTOR1_SLAVE_ADDR, MOTOR1_CTRL_REG1,
-         MOTOR_HOME_POSITION_LOW_WORD,
-         MOTOR_HOME_POSITION_HIGH_WORD}
-    };
-    return MotorControl_BatchMove(motors, 1U, NULL);
+    return MoveOneToAbsPos(MOTOR1_SLAVE_ADDR, MOTOR_HOME_POS);
 }
 
 uint8_t Motor3Lossen(void)
@@ -64,41 +161,25 @@ uint8_t Motor3Lossen(void)
 
 uint8_t Motor1Up2(void)
 {
-    MotorControlParams motors[1] = {
-        {MOTOR1_SLAVE_ADDR, MOTOR1_CTRL_REG1, MOTOR1_MOVE_POS_9000_LOW_WORD, MOTOR1_MOVE_POS_9000_HIGH_WORD}
-    };
-    return MotorControl_BatchMove(motors, 1U, NULL);
+    return MoveOneToAbsPos(MOTOR1_SLAVE_ADDR, CALIB_MOTOR1_AUX_POS);
 }
 
 uint8_t Motor1Up3(void)
 {
-    MotorControlParams motors[1] = {
-        {MOTOR1_SLAVE_ADDR, MOTOR1_CTRL_REG1, MOTOR1_MOVE_POS_330000_LOW_WORD, MOTOR1_MOVE_POS_330000_HIGH_WORD}
-    };
-    return MotorControl_BatchMove(motors, 1U, NULL);
+    return MoveOneToAbsPos(MOTOR1_SLAVE_ADDR, CALIB_MOTOR1_TRANSFER_LIFT_POS);
 }
 
 
 uint8_t FlyForward(void)
 {
-    MotorControlParams motors[4] = {
-        {MOTOR5_SLAVE_ADDR, MOTOR5_CTRL_REG1, MOTOR6_MOVE_POS_LOW_WORD, MOTOR6_MOVE_POS_HIGH_WORD},
-        {MOTOR6_SLAVE_ADDR, MOTOR5_CTRL_REG1, MOTOR6_MOVE_POS_LOW_WORD, MOTOR6_MOVE_POS_HIGH_WORD},
-        {MOTOR7_SLAVE_ADDR, MOTOR5_CTRL_REG1, MOTOR5_TRAVEL_LOW_WORD, MOTOR5_TRAVEL_HIGH_WORD},
-        {MOTOR8_SLAVE_ADDR, MOTOR5_CTRL_REG1, MOTOR5_TRAVEL_LOW_WORD, MOTOR5_TRAVEL_HIGH_WORD}
-    };
-    return MotorControl_BatchMove(motors, 4U, NULL);
+    return MoveArrayToAbsPos(fly_forward_motors,
+                             EXEC_ARRAY_COUNT(fly_forward_motors));
 }
 
 uint8_t FlyBack(void)
 {
-    MotorControlParams motors[4] = {
-        {MOTOR5_SLAVE_ADDR, MOTOR5_CTRL_REG1, MOTOR5_TRAVEL_LOW_WORD, MOTOR5_TRAVEL_HIGH_WORD},
-        {MOTOR6_SLAVE_ADDR, MOTOR5_CTRL_REG1, MOTOR5_TRAVEL_LOW_WORD, MOTOR5_TRAVEL_HIGH_WORD},
-        {MOTOR7_SLAVE_ADDR, MOTOR5_CTRL_REG1, MOTOR6_MOVE_POS_LOW_WORD, MOTOR6_MOVE_POS_HIGH_WORD},
-        {MOTOR8_SLAVE_ADDR, MOTOR5_CTRL_REG1, MOTOR6_MOVE_POS_LOW_WORD, MOTOR6_MOVE_POS_HIGH_WORD}
-    };
-    return MotorControl_BatchMove(motors, 4U, NULL);
+    return MoveArrayToAbsPos(fly_back_motors,
+                             EXEC_ARRAY_COUNT(fly_back_motors));
 }
 
 uint8_t RelayCtrl(void)
@@ -122,316 +203,20 @@ uint8_t RelayCtrl(void)
 
 uint8_t Center_1(void)
 {
-    MotorControlParams motors[4] = {
-        {MOTOR10_SLAVE_ADDR, MOTOR5_CTRL_REG1, MOTOR10_MOVE_POS_LOW_WORD, MOTOR10_MOVE_POS_HIGH_WORD},        
-        {MOTOR9_SLAVE_ADDR, MOTOR5_CTRL_REG1, MOTOR9_TRAVEL_LOW_WORD, MOTOR9_TRAVEL_HIGH_WORD},
-
-        {MOTOR11_SLAVE_ADDR, MOTOR5_CTRL_REG1, MOTOR11_TRAVEL_LOW_WORD, MOTOR11_TRAVEL_HIGH_WORD},
-        {MOTOR12_SLAVE_ADDR, MOTOR5_CTRL_REG1, MOTOR12_MOVE_POS_LOW_WORD, MOTOR12_MOVE_POS_HIGH_WORD}
-    };
-    return MotorControl_BatchMove(motors, 4U, NULL);
+    return MoveArrayToAbsPos(center_1_motors,
+                             EXEC_ARRAY_COUNT(center_1_motors));
 }
 
 uint8_t Center_2(void)
 {
-    MotorControlParams motors[4] = {
-        {MOTOR5_SLAVE_ADDR, MOTOR5_CTRL_REG1, MOTOR14_MOVE_POS_LOW_WORD, MOTOR14_MOVE_POS_HIGH_WORD},
-        {MOTOR6_SLAVE_ADDR, MOTOR5_CTRL_REG1, MOTOR14_MOVE_POS_LOW_WORD, MOTOR14_MOVE_POS_HIGH_WORD},
-        {MOTOR7_SLAVE_ADDR, MOTOR5_CTRL_REG1, MOTOR8_MOVE_POS_LOW_WORD, MOTOR8_MOVE_POS_HIGH_WORD},
-        {MOTOR8_SLAVE_ADDR, MOTOR5_CTRL_REG1, MOTOR8_MOVE_POS_LOW_WORD, MOTOR8_MOVE_POS_HIGH_WORD}
-    };
-    return MotorControl_BatchMove(motors, 4U, NULL);
+    return MoveArrayToAbsPos(center_2_motors,
+                             EXEC_ARRAY_COUNT(center_2_motors));
 }
 
 uint8_t LeaveCenter(void)
 {
-    MotorControlParams motors[8] = {
-        {MOTOR5_SLAVE_ADDR, MOTOR5_CTRL_REG1, MOTOR_HOME_POSITION_LOW_WORD, MOTOR_HOME_POSITION_HIGH_WORD},
-        {MOTOR6_SLAVE_ADDR, MOTOR5_CTRL_REG1, MOTOR_HOME_POSITION_LOW_WORD, MOTOR_HOME_POSITION_HIGH_WORD},
-        
-        {MOTOR7_SLAVE_ADDR, MOTOR5_CTRL_REG1, MOTOR_HOME_POSITION_LOW_WORD, MOTOR_HOME_POSITION_HIGH_WORD},
-        {MOTOR8_SLAVE_ADDR, MOTOR5_CTRL_REG1, MOTOR_HOME_POSITION_LOW_WORD, MOTOR_HOME_POSITION_HIGH_WORD},
-        
-        {MOTOR10_SLAVE_ADDR, MOTOR5_CTRL_REG1, MOTOR_HOME_POSITION_LOW_WORD, MOTOR_HOME_POSITION_HIGH_WORD},        
-        {MOTOR12_SLAVE_ADDR, MOTOR5_CTRL_REG1, MOTOR_HOME_POSITION_LOW_WORD, MOTOR_HOME_POSITION_HIGH_WORD},
-        
-        {MOTOR9_SLAVE_ADDR, MOTOR5_CTRL_REG1, MOTOR9_LEAVE_CENTER_POS_LOW_WORD, MOTOR9_LEAVE_CENTER_POS_HIGH_WORD},
-        {MOTOR11_SLAVE_ADDR, MOTOR5_CTRL_REG1, MOTOR12_LEAVE_CENTER_POS_LOW_WORD, MOTOR12_LEAVE_CENTER_POS_HIGH_WORD}
-    };
-    return MotorControl_BatchMove(motors, 8U, NULL);
-}
-
-//调试用
-uint8_t LeaveCenter1(void)
-{
-    MotorControlParams motors[8] = {
-        {MOTOR5_SLAVE_ADDR, MOTOR5_CTRL_REG1, MOTOR13_TRAVEL_LOW_WORD, MOTOR13_TRAVEL_HIGH_WORD},
-        {MOTOR6_SLAVE_ADDR, MOTOR5_CTRL_REG1, MOTOR13_TRAVEL_LOW_WORD, MOTOR13_TRAVEL_HIGH_WORD},
-        
-        {MOTOR7_SLAVE_ADDR, MOTOR5_CTRL_REG1, MOTOR7_TRAVEL_LOW_WORD, MOTOR17_TRAVEL_HIGH_WORD},
-        {MOTOR8_SLAVE_ADDR, MOTOR5_CTRL_REG1, MOTOR7_TRAVEL_LOW_WORD, MOTOR17_TRAVEL_HIGH_WORD},
-
-        {MOTOR10_SLAVE_ADDR, MOTOR5_CTRL_REG1, MOTOR9_TRAVEL_LOW_WORD, MOTOR9_TRAVEL_HIGH_WORD},
-        {MOTOR12_SLAVE_ADDR, MOTOR5_CTRL_REG1, MOTOR11_TRAVEL_LOW_WORD, MOTOR11_TRAVEL_HIGH_WORD},
-        
-        {MOTOR9_SLAVE_ADDR, MOTOR5_CTRL_REG1, MOTOR10_MOVE_POS_LOW_WORD, MOTOR10_MOVE_POS_HIGH_WORD},
-        {MOTOR11_SLAVE_ADDR, MOTOR5_CTRL_REG1, MOTOR12_MOVE_POS_LOW_WORD, MOTOR12_MOVE_POS_HIGH_WORD}
-    };
-    return MotorControl_BatchMove(motors, 8U, NULL);
-}
-
-//电机3运动到330000
-uint8_t Battery_1(void)
-{
-    MotorControlParams motors[1] = {
-        {MOTOR1_SLAVE_ADDR, MOTOR1_CTRL_REG1, MOTOR1_MOVE_POS_330000_LOW_WORD, MOTOR1_MOVE_POS_330000_HIGH_WORD}
-    };
-    return MotorControl_BatchMove(motors, 1U, NULL);
-}
-
-//飞机前进
-//MOTOR5_SLAVE_ADDR和MOTOR6_SLAVE_ADDR移动到位置183000
-//MOTOR7_SLAVE_ADDR和MOTOR8_SLAVE_ADDR移动到位置174000
-uint8_t Battery_2(void)
-{
-    int32_t positions[4];
-    uint8_t result;
-    MotorControlParams motors[4] = {
-        {MOTOR5_SLAVE_ADDR, MOTOR5_CTRL_REG1, MOTOR56_MOVE_POS_183000_LOW_WORD, MOTOR56_MOVE_POS_183000_HIGH_WORD},
-        {MOTOR6_SLAVE_ADDR, MOTOR5_CTRL_REG1, MOTOR56_MOVE_POS_183000_LOW_WORD, MOTOR56_MOVE_POS_183000_HIGH_WORD},
-        {MOTOR7_SLAVE_ADDR, MOTOR5_CTRL_REG1, MOTOR78_MOVE_POS_174000_LOW_WORD, MOTOR78_MOVE_POS_174000_HIGH_WORD},
-        {MOTOR8_SLAVE_ADDR, MOTOR5_CTRL_REG1, MOTOR78_MOVE_POS_174000_LOW_WORD, MOTOR78_MOVE_POS_174000_HIGH_WORD}
-    };
-    result = MotorControl_BatchMoveCapture(motors, 4U, NULL, positions);
-    if (result == MODBUS_RESULT_OK &&
-        !MotorPositionStore_Save(positions[2], positions[3])) {
-        return MODBUS_RESULT_ECHO;
-    }
-    return result;
-}
-//电机2运动到315000
-uint8_t Battery_3(void)
-{
-    MotorControlParams motors[1] = {
-        {MOTOR2_SLAVE_ADDR, MOTOR2_CTRL_REG1, MOTOR2_MOVE_POS_315000_LOW_WORD, MOTOR2_MOVE_POS_315000_HIGH_WORD}
-    };
-    return MotorControl_BatchMove(motors, 1U, NULL);
-}
-//电机夹紧
-uint8_t Battery_4(void)
-{
-    return Motor_Control(MOTOR_CLAMP_ID, 2U, MOTOR_CLAMP_CMD_CLAMP);
-}
-//回到零位
-uint8_t Battery_5(void)
-{
-    MotorControlParams motors[1] = {
-        {MOTOR2_SLAVE_ADDR, MOTOR2_CTRL_REG1, MOTOR_HOME_POSITION_LOW_WORD, MOTOR_HOME_POSITION_HIGH_WORD}
-    };
-    return MotorControl_BatchMove(motors, 1U, NULL);
-}
-//再次回到夹紧位置
-uint8_t Battery_6(void)
-{
-    /*MotorControlParams motors[4] = {
-        {MOTOR5_SLAVE_ADDR, MOTOR5_CTRL_REG1, MOTOR5_TRAVEL_LOW_WORD, MOTOR5_TRAVEL_HIGH_WORD},
-        {MOTOR6_SLAVE_ADDR, MOTOR5_CTRL_REG1, MOTOR5_TRAVEL_LOW_WORD, MOTOR5_TRAVEL_HIGH_WORD},
-        {MOTOR7_SLAVE_ADDR, MOTOR5_CTRL_REG1, MOTOR6_MOVE_POS_LOW_WORD, MOTOR6_MOVE_POS_HIGH_WORD},
-        {MOTOR8_SLAVE_ADDR, MOTOR5_CTRL_REG1, MOTOR6_MOVE_POS_LOW_WORD, MOTOR6_MOVE_POS_HIGH_WORD}
-    };    
-    return MotorControl_BatchMove(motors, 4U, NULL);*/
-    return Center_2();
-}
-//电机回零位
-uint8_t Battery_7(void)
-{
-    MotorControlParams motors[1] = {
-        {MOTOR1_SLAVE_ADDR, MOTOR1_CTRL_REG1, MOTOR_HOME_POSITION_LOW_WORD, MOTOR_HOME_POSITION_HIGH_WORD}
-    };
-    return MotorControl_BatchMove(motors, 1U, NULL);
-}
-//运动到位置136000
-uint8_t Battery_8(void)
-{
-    MotorControlParams motors[1] = {
-        {MOTOR1_SLAVE_ADDR, MOTOR1_CTRL_REG1, MOTOR1_MOVE_POS_136000_LOW_WORD, MOTOR1_MOVE_POS_136000_HIGH_WORD}
-    };
-    return MotorControl_BatchMove(motors, 1U, NULL);
-}
-//电机2运动到位置361000
-uint8_t Battery_9(void)
-{
-    MotorControlParams motors[1] = {
-        {MOTOR2_SLAVE_ADDR, MOTOR2_CTRL_REG1, MOTOR2_MOVE_POS_361000_LOW_WORD, MOTOR2_MOVE_POS_361000_HIGH_WORD}
-    };
-    return MotorControl_BatchMove(motors, 1U, NULL);
-}
-//夹爪松开
-uint8_t Battery_10(void)
-{
-    return Motor_Control(MOTOR_CLAMP_ID, 1U, MOTOR_CLAMP_CMD_RELEASE);
-}
-//移动至位置370000
-uint8_t Battery_11(void)
-{
-    MotorControlParams motors[1] = {
-        {MOTOR2_SLAVE_ADDR, MOTOR2_CTRL_REG1, MOTOR2_MOVE_POS_370000_LOW_WORD, MOTOR2_MOVE_POS_370000_HIGH_WORD}
-    };
-    return MotorControl_BatchMove(motors, 1U, NULL);
-}
-
-//MOTOR2_SLAVE_ADDR回到零点
-uint8_t Battery_12(void)
-{
-    MotorControlParams motors[1] = {
-        {MOTOR2_SLAVE_ADDR, MOTOR2_CTRL_REG1, MOTOR_HOME_POSITION_LOW_WORD, MOTOR_HOME_POSITION_HIGH_WORD}
-    };
-    return MotorControl_BatchMove(motors, 1U, NULL);
-}
-//MOTOR1_SLAVE_ADDR回到零点
-uint8_t Battery_13(void)
-{
-    MotorControlParams motors[1] = {
-        {MOTOR1_SLAVE_ADDR, MOTOR1_CTRL_REG1, MOTOR_HOME_POSITION_LOW_WORD, MOTOR_HOME_POSITION_HIGH_WORD}
-    };
-    return MotorControl_BatchMove(motors, 1U, NULL);
-}
-//MOTOR1_SLAVE_ADDR上升到位置2000
-uint8_t Battery_14(void)
-{
-    MotorControlParams motors[1] = {
-        {MOTOR1_SLAVE_ADDR, MOTOR1_CTRL_REG1, MOTOR1_MOVE_POS_2000_LOW_WORD, MOTOR1_MOVE_POS_2000_HIGH_WORD}
-    };
-    return MotorControl_BatchMove(motors, 1U, NULL);
-}
-//电机3回零
-uint8_t Battery_15(void)
-{
-    MotorControlParams motors[1] = {
-        {MOTOR1_SLAVE_ADDR, MOTOR1_CTRL_REG1, 
-            MOTOR_HOME_POSITION_LOW_WORD, 
-            MOTOR_HOME_POSITION_HIGH_WORD}
-    };
-    return MotorControl_BatchMove(motors, 1U, NULL);
-}
-//电机2移动至位置314000
-uint8_t Battery_16(void)
-{
-    MotorControlParams motors[1] = {
-        {MOTOR2_SLAVE_ADDR, MOTOR2_CTRL_REG1, MOTOR2_MOVE_POS_314000_LOW_WORD, MOTOR2_MOVE_POS_314000_HIGH_WORD}
-    };
-    return MotorControl_BatchMove(motors, 1U, NULL);
-}
-//电机2移动至位置299000
-uint8_t Battery_17(void)
-{
-    MotorControlParams motors[1] = {
-        {MOTOR2_SLAVE_ADDR, MOTOR2_CTRL_REG1, MOTOR2_MOVE_POS_299000_LOW_WORD, MOTOR2_MOVE_POS_299000_HIGH_WORD}
-    };
-    return MotorControl_BatchMove(motors, 1U, NULL);
-}
-//电机2移动到位置303000
-uint8_t Battery_18(void)
-{
-    MotorControlParams motors[1] = {
-        {MOTOR2_SLAVE_ADDR, MOTOR2_CTRL_REG1, OPEN_UAV_BATTERY_POS_LOW_WORD, OPEN_UAV_BATTERY_POS_HIGH_WORD}
-    };
-    return MotorControl_BatchMove(motors, 1U, NULL);
-}
-//电机2移动到位置293000
-uint8_t Battery_19(void)
-{
-    MotorControlParams motors[1] = {
-        {MOTOR2_SLAVE_ADDR, MOTOR2_CTRL_REG1, NEAR_UAV_BATTERY_POS_LOW_WORD, NEAR_UAV_BATTERY_POS_HIGH_WORD}
-    };
-    return MotorControl_BatchMove(motors, 1U, NULL);
-}
-//MOTOR2_SLAVE_ADDR回零位
-uint8_t Battery_20(void)
-{
-    MotorControlParams motors[1] = {
-        {MOTOR2_SLAVE_ADDR, MOTOR2_CTRL_REG1, MOTOR_HOME_POSITION_LOW_WORD, MOTOR_HOME_POSITION_HIGH_WORD}
-    };
-    return MotorControl_BatchMove(motors, 1U, NULL);
-}
-//飞机前进
-//MOTOR5_SLAVE_ADDR和MOTOR6_SLAVE_ADDR移动到位置207000
-//MOTOR7_SLAVE_ADDR和MOTOR8_SLAVE_ADDR移动到位置150000
-uint8_t Battery_21(void)
-{
-    MotorControlParams motors[4] = {
-        {MOTOR5_SLAVE_ADDR, MOTOR5_CTRL_REG1, MOTOR56_MOVE_POS_207000_LOW_WORD, MOTOR56_MOVE_POS_207000_HIGH_WORD},
-        {MOTOR6_SLAVE_ADDR, MOTOR5_CTRL_REG1, MOTOR56_MOVE_POS_207000_LOW_WORD, MOTOR56_MOVE_POS_207000_HIGH_WORD},
-        {MOTOR7_SLAVE_ADDR, MOTOR5_CTRL_REG1, MOTOR78_MOVE_POS_150000_LOW_WORD, MOTOR78_MOVE_POS_150000_HIGH_WORD},
-        {MOTOR8_SLAVE_ADDR, MOTOR5_CTRL_REG1, MOTOR78_MOVE_POS_150000_LOW_WORD, MOTOR78_MOVE_POS_150000_HIGH_WORD}
-    };
-    return MotorControl_BatchMove(motors, 4U, NULL);
-}
-//电机2回零
-uint8_t Battery_22(void)
-{
-    MotorControlParams motors[1] = {
-        {MOTOR2_SLAVE_ADDR, MOTOR2_CTRL_REG1, MOTOR_HOME_POSITION_LOW_WORD, MOTOR_HOME_POSITION_HIGH_WORD}
-    };
-    return MotorControl_BatchMove(motors, 1U, NULL);
-}
-//移动到位置69000
-uint8_t Battery_23(void)
-{
-    MotorControlParams motors[1] = {
-        {MOTOR1_SLAVE_ADDR, MOTOR1_CTRL_REG1, MOTOR1_MOVE_POS_69000_LOW_WORD, MOTOR1_MOVE_POS_69000_HIGH_WORD}
-    };
-    return MotorControl_BatchMove(motors, 1U, NULL);
-}
-//MOTOR1_SLAVE_ADDR回零
-uint8_t Battery_24(void)
-{
-    MotorControlParams motors[1] = {
-        {MOTOR1_SLAVE_ADDR, MOTOR1_CTRL_REG1, MOTOR_HOME_POSITION_LOW_WORD, MOTOR_HOME_POSITION_HIGH_WORD}
-    };
-    return MotorControl_BatchMove(motors, 1U, NULL);
-}
-
-//移动至原点位置0
-uint8_t Battery_25(void)
-{
-    MotorControlParams motors[1] = {
-        {MOTOR2_SLAVE_ADDR, MOTOR2_CTRL_REG1, MOTOR_HOME_POSITION_LOW_WORD, MOTOR_HOME_POSITION_HIGH_WORD}
-    };
-    return MotorControl_BatchMove(motors, 1U, NULL);
-}
-//移动至290000
-uint8_t Battery_26(void)
-{
-    MotorControlParams motors[1] = {
-        {MOTOR2_SLAVE_ADDR, MOTOR2_CTRL_REG1, MOTOR2_MOVE_POS_290000_LOW_WORD, MOTOR2_MOVE_POS_290000_HIGH_WORD}
-    };
-    return MotorControl_BatchMove(motors, 1U, NULL);
-}
-/* 电机3移动到绝对位置329000。 */
-uint8_t Battery_27(void)
-{
-    MotorControlParams motors[1] = {
-        {MOTOR1_SLAVE_ADDR, MOTOR1_CTRL_REG1, MOTOR1_MOVE_POS_329000_LOW_WORD, MOTOR1_MOVE_POS_329000_HIGH_WORD}
-    };
-    return MotorControl_BatchMove(motors, 1U, NULL);
-}
-//电机2移动到位置293000
-uint8_t Battery_28(void)
-{
-    MotorControlParams motors[1] = {
-        {MOTOR2_SLAVE_ADDR, MOTOR2_CTRL_REG1, MOTOR2_MOVE_POS_293000_LOW_WORD, MOTOR2_MOVE_POS_293000_HIGH_WORD}
-    };
-    return MotorControl_BatchMove(motors, 1U, NULL);
-}
-
-//电机3移动到位置293000
-uint8_t Battery_29(void)
-{
-    MotorControlParams motors[1] = {
-        {MOTOR1_SLAVE_ADDR, MOTOR1_CTRL_REG1, MOTOR1_MOVE_POS_293000_LOW_WORD, MOTOR1_MOVE_POS_293000_HIGH_WORD}
-    };
-    return MotorControl_BatchMove(motors, 1U, NULL);
+    return MoveArrayToAbsPos(leave_center_motors,
+                             EXEC_ARRAY_COUNT(leave_center_motors));
 }
 
 uint8_t CloseDr(void)
@@ -534,413 +319,92 @@ const StepDef closedr_steps[] =
 };
 const uint8_t CLOSEDR_STEP_COUNT = (uint8_t)(sizeof(closedr_steps) / sizeof(closedr_steps[0]));
 
-// 飞机开机步骤表
-const StepDef openfly_steps[] =
-{
-      {Center_1, 0, STATUS_REG_NONE, 0},        //1.左右居中
-			{Center_2, 0, REG_CENTER_ROD_STATE, 4},       //2.前后居中
-            //电机3移动到位置329000
-			/* 电机3移动到绝对位置329000。 */
-			{Battery_27, 0, STATUS_REG_NONE, 0},      //3.电机1上升  
-            //飞机前进,4电机共同运动          
-			{Battery_2, 0, STATUS_REG_NONE, 0},       //4.飞机前进
-            //电机2移动到位置293000
-			{Battery_28, 0, STATUS_REG_NONE, 0},      //5.电机2前进
-
-            //电机2正向相对移动10000，移动到位置303000
-			{Battery_18, 0, STATUS_REG_NONE, 0},      //27.电机2前进
-            //电机2负向相对移动10000，移动到位置293000
-			//电机2移动到位置293000
-			{Battery_19, 0, STATUS_REG_NONE, 0},      //28.电机2后退            
-			//电机2移动到位置303000
-			{Battery_18, 0, STATUS_REG_NONE, 0},      //29.电机2前进
-            //电机2移动至原点位置
-			{Battery_25, 0, STATUS_REG_NONE, 0},     //30.电机2后退
-            //飞机后退
-			//待修改
-			{Battery_6, 0, STATUS_REG_NONE, 0},       //31.飞机后退
-            //电机3回零位
-			//电机回零位
-			{Battery_7, 0, STATUS_REG_NONE, 0},      //32.电机1下降
-			//飞机前进
-			{Battery_21, 0, STATUS_REG_NONE, 0},     //33.飞机前进
-			{LeaveCenter, 0, REG_CENTER_ROD_STATE, 2},    //34.居中杆释放
-
-};
-const uint8_t OPENFLY_STEP_COUNT = (uint8_t)(sizeof(openfly_steps) / sizeof(openfly_steps[0]));
-
-// 飞机关机步骤表
-const StepDef closefly_steps[] =
-{
-
-            {Center_1, 0, STATUS_REG_NONE, 0},        //1.左右居中
-			{Center_2, 0, REG_CENTER_ROD_STATE, 4},       //2.前后居中
-			//电机1移动到绝对位置329000
-            /* 电机3移动到绝对位置329000。 */
-            {Battery_27, 0, STATUS_REG_NONE, 0},      //3.电机1上升
-			//飞机前进
-            {Battery_2, 0, STATUS_REG_NONE, 0},       //4.飞机前进
-			//电机2移动到位置293000
-            {Battery_28, 0, STATUS_REG_NONE, 0},      //5.电机2前进
-			//电机2移动到位置303000
-            {Battery_18, 0, STATUS_REG_NONE, 0},      //27.电机2前进
-			//电机2移动到位置293000
-            {Battery_19, 0, STATUS_REG_NONE, 0},      //28.电机2后退
-			//电机2移动到位置303000
-            {Battery_18, 0, STATUS_REG_NONE, 0},      //29.电机2前进
-			//电机2回零
-            //移动至原点位置0
-            {Battery_25, 0, STATUS_REG_NONE, 0},     //30.电机2后退			
-            //待修改
-            {Battery_6, 0, STATUS_REG_NONE, 0},       //31.飞机后退
-			//电机3回零
-            {Battery_7, 0, STATUS_REG_NONE, 0},      //32.电机1下降
-			//飞机前进
-			{Battery_21, 0, STATUS_REG_NONE, 0},     //33.飞机前进
-			{LeaveCenter, 0, REG_CENTER_ROD_STATE, 2},    //34.居中杆释放
-
-};
-const uint8_t CLOSEFLY_STEP_COUNT = (uint8_t)(sizeof(closefly_steps) / sizeof(closefly_steps[0]));
-
-// 一键起飞步骤表(只将飞机开机)
-const StepDef takeoff_steps_1[] =
+// 一键起飞完整步骤表；中间步骤同时供飞机开机、关机流程复用
+const StepDef takeoff_steps[] =
 {
 	    {OpenDr, 15250, REG_DOOR_STATE, 2},     	  //1.打开舱门
 //			{StopDr, 1000, REG_DOOR_STATE, 2},      		  //2.停止
 			{CloseAC, 500, STATUS_REG_NONE, 0},            // 关闭空调
             {Center_1, 0, STATUS_REG_NONE, 0},        //1.左右居中
 			{Center_2, 0, REG_CENTER_ROD_STATE, 4},     	  //2.前后居中
-			/* 电机3移动到绝对位置329000。 */
-			{Battery_27, 0, STATUS_REG_NONE, 0},      //3.电机1上升
+
+			/* 电机1移动到起降抬升标定位置。 */
+			EXEC_MOVE_ABS_STEP(MOTOR1_SLAVE_ADDR, CALIB_MOTOR1_FLY_LIFT_POS, 0, STATUS_REG_NONE, 0),      //3.电机1上升
 			//飞机前进
-			{Battery_2, 0, STATUS_REG_NONE, 0},       //4.飞机前进
-			//电机2移动到位置293000
-			{Battery_28, 0, STATUS_REG_NONE, 0},      //5.电机2前进
-			//电机2移动到位置303000
-			{Battery_18, 0, STATUS_REG_NONE, 0},      //27.电机2前进
-			//电机2移动到位置293000
-			{Battery_19, 0, STATUS_REG_NONE, 0},      //28.电机2后退
-			//电机2移动到位置303000
-			{Battery_18, 0, STATUS_REG_NONE, 0},      //29.电机2前进
+			{MovePlaneTransferIn, 0, STATUS_REG_NONE, 0},       //4.飞机前进
+			// 电机2移动到无人机电池靠近标定位置
+			EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, CALIB_MOTOR2_FLY_NEAR_POS, 0, STATUS_REG_NONE, 0),      //5.电机2前进
+			// 电机2移动到无人机电池远端标定位置
+			EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, CALIB_MOTOR2_FLY_FAR_POS, 0, STATUS_REG_NONE, 0),      //27.电机2前进
+			// 电机2移动到无人机电池靠近标定位置
+			EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, CALIB_MOTOR2_FLY_NEAR_POS, 0, STATUS_REG_NONE, 0),      //28.电机2后退
+			// 电机2移动到无人机电池远端标定位置
+			EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, CALIB_MOTOR2_FLY_FAR_POS, 0, STATUS_REG_NONE, 0),      //29.电机2前进
 			//移动至原点位置0
-			{Battery_25, 0, STATUS_REG_NONE, 0},     //30.电机2后退
+			EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, MOTOR_HOME_POS, 0, STATUS_REG_NONE, 0),     //30.电机2后退
 			//待修改
-			{Battery_6, 0, STATUS_REG_NONE, 0},       //31.飞机后退
+			{Center_2, 0, STATUS_REG_NONE, 0},       //31.飞机后退
 			//电机回零位
-			{Battery_7, 0, STATUS_REG_NONE, 0},      //32.电机1下降
+			EXEC_MOVE_ABS_STEP(MOTOR1_SLAVE_ADDR, MOTOR_HOME_POS, 0, STATUS_REG_NONE, 0),      //32.电机1下降
 			//飞机前进
-			{Battery_21, 0, STATUS_REG_NONE, 0},     //33.飞机前进
+			EXEC_MOVE_ABS_ARRAY_STEP(plane_transfer_out_motors, 0, STATUS_REG_NONE, 0),     //33.飞机前进
+
 			{LeaveCenter, 0, REG_CENTER_ROD_STATE, 2},   	  //34.居中杆释放
 			{CloseAC, 16000, STATUS_REG_NONE, 0},            // 关闭空调
 //      {CheckAndCloseDoor, 16250, STATUS_REG_NONE, 0},     	  //1.关闭舱门
 			{StopDr, 1000, REG_DOOR_STATE, 4},      		  //2.停止
 
 };
-const uint8_t TAKEOFF_STEPS_1_COUNT = (uint8_t)(sizeof(takeoff_steps_1) / sizeof(takeoff_steps_1[0]));
-
-
-// 一键起飞步骤表(只将飞机开机)
-const StepDef takeoff_steps_2[] =
-{
-	    {OpenDr, 15250, REG_DOOR_STATE, 2},     	  //1.打开舱门
-//			{StopDr, 1000, REG_DOOR_STATE, 2},      		  //2.停止
-			{CloseAC, 500, STATUS_REG_NONE, 0},            // 关闭空调
-            {Center_1, 0, STATUS_REG_NONE, 0},        //1.左右居中
-			{Center_2, 0, REG_CENTER_ROD_STATE, 4},     	  //2.前后居中
-			/* 电机3移动到绝对位置329000。 */
-			{Battery_27, 0, STATUS_REG_NONE, 0},      //3.电机1上升
-			//飞机前进
-			{Battery_2, 0, STATUS_REG_NONE, 0},       //4.飞机前进
-			//电机2移动到位置293000
-			{Battery_28, 0, STATUS_REG_NONE, 0},      //5.电机2前进
-			//电机2移动到位置303000
-			{Battery_18, 0, STATUS_REG_NONE, 0},      //27.电机2前进
-			//电机2移动到位置293000
-			{Battery_19, 0, STATUS_REG_NONE, 0},      //28.电机2后退
-			//电机2移动到位置303000
-			{Battery_18, 0, STATUS_REG_NONE, 0},      //29.电机2前进
-			//电机2移动至原点位置0
-			{Battery_25, 0, STATUS_REG_NONE, 0},     //30.电机2后退
-			//待修改
-			{Battery_6, 0, STATUS_REG_NONE, 0},       //31.飞机后退
-			//电机回零位
-			{Battery_7, 0, STATUS_REG_NONE, 0},      //32.电机1下降
-			//飞机前进
-			{Battery_21, 0, STATUS_REG_NONE, 0},     //33.飞机前进
-			{LeaveCenter, 0, REG_CENTER_ROD_STATE, 2},   	  //34.居中杆释放
-			{CloseAC, 16000, STATUS_REG_NONE, 0},            // 关闭空调
-//      {CheckAndCloseDoor, 16250, STATUS_REG_NONE, 0},     	  //1.关闭舱门
-			{StopDr, 1000, REG_DOOR_STATE, 4},      		  //2.停止
-};
-const uint8_t TAKEOFF_STEPS_2_COUNT = (uint8_t)(sizeof(takeoff_steps_2) / sizeof(takeoff_steps_2[0]));
-
-
-// 一键起飞步骤表(只将飞机开机)
-const StepDef takeoff_steps_3[] =
-{
-	    {OpenDr, 15250, REG_DOOR_STATE, 2},     	  //1.打开舱门
-//			{StopDr, 1000, REG_DOOR_STATE, 2},      		  //2.停止
-			{CloseAC, 500, STATUS_REG_NONE, 0},            // 关闭空调
-			{StopDr, 1000, REG_DOOR_STATE, 2},      		  //2.停止
-      {Center_1, 0, STATUS_REG_NONE, 0},        //1.左右居中
-			{Center_2, 0, REG_CENTER_ROD_STATE, 4},     	  //2.前后居中
-			/* 电机3移动到绝对位置329000。 */
-			{Battery_27, 0, STATUS_REG_NONE, 0},      //3.电机1上升
-			//飞机前进
-			{Battery_2, 0, STATUS_REG_NONE, 0},       //4.飞机前进
-			//电机2移动到位置293000
-			{Battery_28, 0, STATUS_REG_NONE, 0},      //5.电机2前进
-			//电机2移动到位置303000
-			{Battery_18, 0, STATUS_REG_NONE, 0},      //27.电机2前进
-			//电机2移动到位置293000
-			{Battery_19, 0, STATUS_REG_NONE, 0},      //28.电机2后退
-			//电机2移动到位置303000
-			{Battery_18, 0, STATUS_REG_NONE, 0},      //29.电机2前进
-			//电机2移动至原点位置0
-			{Battery_25, 0, STATUS_REG_NONE, 0},     //30.电机2后退
-			//待修改
-			{Battery_6, 0, STATUS_REG_NONE, 0},       //31.飞机后退
-			//电机3回零位
-			{Battery_7, 0, STATUS_REG_NONE, 0},      //32.电机1下降
-			//飞机前进
-			{Battery_21, 0, STATUS_REG_NONE, 0},     //33.飞机前进
-			{LeaveCenter, 0, REG_CENTER_ROD_STATE, 2},   	  //34.居中杆释放
-			{CloseAC, 18000, STATUS_REG_NONE, 0},            // 关闭空调
-//      {CheckAndCloseDoor, 16250, STATUS_REG_NONE, 0},     	  //1.关闭舱门
-			{StopDr, 1000, REG_DOOR_STATE, 4},      		  //2.停止
-
-};
-const uint8_t TAKEOFF_STEPS_3_COUNT = (uint8_t)(sizeof(takeoff_steps_3) / sizeof(takeoff_steps_3[0]));
+const uint8_t TAKEOFF_STEP_COUNT = (uint8_t)(sizeof(takeoff_steps) / sizeof(takeoff_steps[0]));
 
 // 降落完成步骤表（取电换电都完成）
-const StepDef landing_steps_1[] =
+const StepDef landing_steps[] =
 {
-			//下电池步骤（1号空仓，将飞机电池放入1号仓）（取电装电都完成）
-            {Center_1, 0, STATUS_REG_NONE, 0},        //1.左右居中
-			{Center_2, 0, REG_CENTER_ROD_STATE, 4},      		//2.前后居中
-			//电机3运动到330000
-            {Battery_1, 0, STATUS_REG_NONE, 0},      //3.电机1上升
-			//飞机前进
-			{Battery_2, 0, STATUS_REG_NONE, 0},       //4.飞机前进
-			//电机2运动到315000
-            {Battery_3, 0, STATUS_REG_NONE, 0},      //5.电机2前进            
-            //电机夹紧
-            {Battery_4, 1000, STATUS_REG_NONE, 0},       //6.电机3夹紧
-			//电机2回到零位
-            //回到零位
-            {Battery_5, 0, STATUS_REG_NONE, 0},      //7.电机2后退
-			//待修改
-			{Battery_6, 0, STATUS_REG_NONE, 0},       //8.飞机后退
-            //电机3回到0位，可省略
-			//{Battery_7, 0, STATUS_REG_NONE, 0},      //9.电机1下降
-            //电机3运动到位置136000
-			//运动到位置136000
-			{Battery_8, 0, STATUS_REG_NONE, 0},      //10.电机1上升
-            //电机2运动到361000
-			//电机2运动到位置361000
-			{Battery_9, 0, STATUS_REG_NONE, 0},      //11.电机2前进
-			//夹爪松开
-			{Battery_10, 1000, STATUS_REG_NONE, 0},       //12.电机3松开
-            //电机2前移9000，移动至370000
-            //移动至位置370000
-            {Battery_11, 0, STATUS_REG_NONE, 0},      //13.电机2前进
-            //电机2回到零点
-			//MOTOR2_SLAVE_ADDR回到零点
-			{Battery_12, 0, STATUS_REG_NONE, 0},     //14.电机2后退
-            //电机3下移136000，可省略
-			//MOTOR1_SLAVE_ADDR回到零点
-			//{Battery_13, 0, REG_SWAP_MECH_STATE, 2},     //15.电机1下降
-                                                        //装电池步骤(从2号仓取电池)
-            //电机3移动到位置69000
-			//移动到位置69000
-			{Battery_23, 0, STATUS_REG_NONE, 0},      //16.电机1上升
-            //电机2运动到位置361000
-			{Battery_9, 0, STATUS_REG_NONE, 0},      //17.电机2前进
-			//电机夹紧
-			{Battery_4, 1000, STATUS_REG_NONE, 0},       //18.电机3夹紧
-			//电机2运动到363000,电机回零，可省略
-            //电机2回零
-            {Battery_22, 0, STATUS_REG_NONE, 0},     //19.电机2后退
-			//电机3回零，可省略
-            //{Battery_24, 0, STATUS_REG_NONE, 0},      //20.电机1下降
-            //电机3运动到330000
-			{Battery_1, 0, STATUS_REG_NONE, 0},      //21.电机1上升
-            //飞机前进
-            {Battery_2, 0, STATUS_REG_NONE, 0},       //22.飞机前进
-			//电机2移动至290000
-            //移动至290000
-            {Battery_26, 0, STATUS_REG_NONE, 0},      //23.电机2前进
-			//夹爪松开
-			{Battery_10, 1000, STATUS_REG_NONE, 0},      //24.电机3松开
-			//电机2前进24000，移动至位置314000
-            //电机2移动至位置314000
-            {Battery_16, 0, STATUS_REG_NONE, 0},      //25.电机2前进
-			//电机2后退308000，回零位
-            //MOTOR2_SLAVE_ADDR回零位
-            {Battery_20, 0, STATUS_REG_NONE, 0},     //7.电机2后退
-			//待修改
-			{Battery_6, 0, STATUS_REG_NONE, 0},       //31.飞机后退
-            //电机下降
-			//电机回零位
-			{Battery_7, 0, STATUS_REG_NONE, 0},      //32.电机1下降
-			//飞机前进
-			{Battery_21, 0, REG_SWAP_MECH_STATE, 4},     	//33.飞机前进
-			{LeaveCenter, 0, REG_CENTER_ROD_STATE, 2},   		//34.居中杆释放
-      {CloseDr, 16250, REG_DOOR_STATE, 4},     	  //1.关闭舱门
-//			{StopDr, 1000, REG_DOOR_STATE, 4},        		//2.停止
-			{OpenAC, 500, STATUS_REG_NONE, 0},             // 打开空调
-			{UpdateEmptyBay, 500, STATUS_REG_NONE, 0},     // 最后一步更新空仓号
+    {Center_1, 0, STATUS_REG_NONE, 0},
+    {Center_2, 0, REG_CENTER_ROD_STATE, 4},
+    EXEC_MOVE_ABS_STEP(MOTOR1_SLAVE_ADDR, CALIB_MOTOR1_TRANSFER_LIFT_POS, 0, STATUS_REG_NONE, 0),
+    {MovePlaneTransferIn, 0, STATUS_REG_NONE, 0},
+    EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, CALIB_MOTOR2_AIRCRAFT_WORK_POS, 0, STATUS_REG_NONE, 0),
+    {Motor3Clamp, 1000, STATUS_REG_NONE, 0},
+    EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, MOTOR_HOME_POS, 0, STATUS_REG_NONE, 0),
+    {Center_2, 0, STATUS_REG_NONE, 0},
 
+    /* 根据序列启动时锁定的空仓号选择旧电池存放位置。 */
+    {NULL, 0, STATUS_REG_NONE, 0, MoveMotor1ToSelectedBay,
+     &battery_bay_current},
+    EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, CALIB_MOTOR2_BAY_WORK_POS, 0, STATUS_REG_NONE, 0),
+    {Motor3Lossen, 1000, STATUS_REG_NONE, 0},
+    EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, CALIB_MOTOR2_BAY_RELEASE_POS, 0, STATUS_REG_NONE, 0),
+    EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, MOTOR_HOME_POS, 0, STATUS_REG_NONE, 0),
+
+    /* 根据同一个空仓号选择新电池取出位置。 */
+    {NULL, 0, STATUS_REG_NONE, 0, MoveMotor1ToSelectedBay,
+     &battery_bay_next},
+    EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, CALIB_MOTOR2_BAY_WORK_POS, 0, STATUS_REG_NONE, 0),
+    {Motor3Clamp, 1000, STATUS_REG_NONE, 0},
+    EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, MOTOR_HOME_POS, 0, STATUS_REG_NONE, 0),
+    EXEC_MOVE_ABS_STEP(MOTOR1_SLAVE_ADDR, CALIB_MOTOR1_TRANSFER_LIFT_POS, 0, STATUS_REG_NONE, 0),
+    {MovePlaneTransferIn, 0, STATUS_REG_NONE, 0},
+    EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, CALIB_MOTOR2_AIRCRAFT_RELEASE_POS, 0, STATUS_REG_NONE, 0),
+    {Motor3Lossen, 1000, STATUS_REG_NONE, 0},
+    EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, CALIB_MOTOR2_AIRCRAFT_CLEAR_POS, 0, STATUS_REG_NONE, 0),
+    EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, MOTOR_HOME_POS, 0, STATUS_REG_NONE, 0),
+    {Center_2, 0, STATUS_REG_NONE, 0},
+    EXEC_MOVE_ABS_STEP(MOTOR1_SLAVE_ADDR, MOTOR_HOME_POS, 0, STATUS_REG_NONE, 0),
+    EXEC_MOVE_ABS_ARRAY_STEP(plane_transfer_out_motors, 0, REG_SWAP_MECH_STATE, 4),
+    {LeaveCenter, 0, REG_CENTER_ROD_STATE, 2},
+    {CloseDr, 16250, REG_DOOR_STATE, 4},
+    {OpenAC, 500, STATUS_REG_NONE, 0},
+    {UpdateEmptyBay, 500, STATUS_REG_NONE, 0}
 };
-const uint8_t LANDING_STEPS_1_COUNT = (uint8_t)(sizeof(landing_steps_1) / sizeof(landing_steps_1[0]));
-
-// 降落完成步骤表（2号空仓，将飞机电池放入2号仓）（取电装电都完成）
-const StepDef landing_steps_2[] =
-{
-			//下电池步骤(放入2号仓)
-      {Center_1, 0, STATUS_REG_NONE, 0},        //1.左右居中
-			{Center_2, 0, REG_CENTER_ROD_STATE, 4},        //2.前后居中
-			//电机3运动到330000
-            {Battery_1, 0, STATUS_REG_NONE, 0},      //3.电机1上升
-			//飞机前进
-			{Battery_2, 0, STATUS_REG_NONE, 0},       //4.飞机前进
-			//电机2运动到315000
-			{Battery_3, 0, STATUS_REG_NONE, 0},      //5.电机2前进
-			//电机夹紧
-			{Battery_4, 1000, STATUS_REG_NONE, 0},        //6.电机3夹紧
-			//回到零位
-			{Battery_5, 0, STATUS_REG_NONE, 0},      //7.电机2后退
-			//待修改
-			{Battery_6, 0, STATUS_REG_NONE, 0},       //8.飞机后退
-			//电机回零位
-			//{Battery_7, 0, STATUS_REG_NONE, 0},      //9.电机1下降
-			//移动到位置69000
-			{Battery_23, 0, STATUS_REG_NONE, 0},       //10.电机1上升
-			//电机2运动到位置361000
-			{Battery_9, 0, STATUS_REG_NONE, 0},      //11.电机2前进
-			//夹爪松开
-			{Battery_10, 1000, STATUS_REG_NONE, 0},       //12.电机3松开
-			//移动至位置370000
-			{Battery_11, 0, STATUS_REG_NONE, 0},      //13.电机2前进
-			//MOTOR2_SLAVE_ADDR回到零点
-			{Battery_12, 0, STATUS_REG_NONE, 0},     //14.电机2后退
-			//MOTOR1_SLAVE_ADDR回零
-			//{Battery_24, 0, REG_SWAP_MECH_STATE, 2},      //15.电机1下降
-			//装电池步骤(从3号仓取电池)
-		  //MOTOR1_SLAVE_ADDR上升到位置2000
-		  {Battery_14, 0, STATUS_REG_NONE, 0},       //16.电机1上升
-			//电机2运动到位置361000
-			{Battery_9, 0, STATUS_REG_NONE, 0},       //17.电机2前进
-			//电机夹紧
-			{Battery_4, 1000, STATUS_REG_NONE, 0},         //18.电机3夹紧
-			//电机2回零
-			{Battery_22, 0, STATUS_REG_NONE, 0},       //19.电机2后退
-			//电机3回零
-			//{Battery_15, 0, STATUS_REG_NONE, 0},       //20.电机1下降
-			//电机3运动到330000
-			{Battery_1, 0, STATUS_REG_NONE, 0},       //21.电机1上升
-      //飞机前进
-      {Battery_2, 0, STATUS_REG_NONE, 0},        //22.飞机前进
-			//移动至290000
-			{Battery_26, 0, STATUS_REG_NONE, 0},       //23.电机2前进
-			//夹爪松开
-			{Battery_10, 1000, STATUS_REG_NONE, 0},        //24.电机3松开
-			//电机2移动至位置314000
-			{Battery_16, 0, STATUS_REG_NONE, 0},       //25.电机2前进
-			//MOTOR2_SLAVE_ADDR回零位
-			{Battery_20, 0, STATUS_REG_NONE, 0},      //7.电机2后退
-			//待修改
-			{Battery_6, 0, STATUS_REG_NONE, 0},        //31.飞机后退
-			//电机回零位
-			{Battery_7, 0, STATUS_REG_NONE, 0},        //32.电机1下降
-			//飞机前进
-			{Battery_21, 0, REG_SWAP_MECH_STATE, 4},      //33.飞机前进
-
-			{LeaveCenter, 0, REG_CENTER_ROD_STATE, 2},     //34.居中杆释放
-      {CloseDr, 16250, REG_DOOR_STATE, 4},     	  //1.关闭舱门
-//			{StopDr, 1000, REG_DOOR_STATE, 4},        		//2.停止
-			{OpenAC, 500, STATUS_REG_NONE, 0},           // 打开空调
-			{UpdateEmptyBay, 500, STATUS_REG_NONE, 0},   // 最后一步更新空仓号
-
-};
-const uint8_t LANDING_STEPS_2_COUNT = (uint8_t)(sizeof(landing_steps_2) / sizeof(landing_steps_2[0]));
-
-// 降落完成步骤表（3号空仓，将飞机电池放入3号仓）（取电装电都完成）
-const StepDef landing_steps_3[] =
-{
-			//下电池步骤(放入3号仓)
-      {Center_1, 0, STATUS_REG_NONE, 0},        //1.左右居中
-			{Center_2, 0, REG_CENTER_ROD_STATE, 4},       //2.前后居中
-			//电机3运动到330000
-			{Battery_1, 0, STATUS_REG_NONE, 0},      //3.电机1上升
-			//飞机前进
-			{Battery_2, 0, STATUS_REG_NONE, 0},       //4.飞机前进
-			//电机2运动到315000
-			{Battery_3, 0, STATUS_REG_NONE, 0},      //5.电机2前进
-			//电机夹紧
-			{Battery_4, 1000, STATUS_REG_NONE, 0},        //6.电机3夹紧
-			//回到零位
-			{Battery_5, 0, STATUS_REG_NONE, 0},      //7.电机2后退
-			//待修改
-			{Battery_6, 0, STATUS_REG_NONE, 0},       //8.飞机后退
-			//电机回零位
-			//{Battery_7, 0, STATUS_REG_NONE, 0},      //9.电机1下降
-			//MOTOR1_SLAVE_ADDR上升到位置2000
-			{Battery_14, 0, STATUS_REG_NONE, 0},       //10.电机1上升
-			//电机2运动到位置361000
-			{Battery_9, 0, STATUS_REG_NONE, 0},      //11.电机2前进
-			//夹爪松开
-			{Battery_10, 1000, STATUS_REG_NONE, 0},       //12.电机3松开
-			//移动至位置370000
-			{Battery_11, 0, STATUS_REG_NONE, 0},      //13.电机2前进
-			//MOTOR2_SLAVE_ADDR回到零点
-			{Battery_12, 0, STATUS_REG_NONE, 0},     //14.电机2后退
-			//电机3回零
-			//{Battery_15, 0, REG_SWAP_MECH_STATE, 2},      //15.电机1下降
-			//装电池步骤(从1号仓取电池)
-			//运动到位置136000
-			{Battery_8, 0, STATUS_REG_NONE, 0},       //16.电机1上升
-			//电机2运动到位置361000
-			{Battery_9, 0, STATUS_REG_NONE, 0},       //17.电机2前进
-			//电机夹紧
-			{Battery_4, 1000, STATUS_REG_NONE, 0},         //18.电机3夹紧
-			//电机2回零
-			{Battery_22, 0, STATUS_REG_NONE, 0},       //19.电机2后退
-			//MOTOR1_SLAVE_ADDR回到零点
-			//{Battery_13, 0, STATUS_REG_NONE, 0},       //20.电机1下降
-			//电机3运动到330000
-			{Battery_1, 0, STATUS_REG_NONE, 0},       //21.电机1上升
-      //飞机前进
-      {Battery_2, 0, STATUS_REG_NONE, 0},        //22.飞机前进
-			//移动至290000
-			{Battery_26, 0, STATUS_REG_NONE, 0},       //23.电机2前进
-			//夹爪松开
-			{Battery_10, 1000, STATUS_REG_NONE, 0},        //24.电机3松开
-			//电机2移动至位置314000
-			{Battery_16, 0, STATUS_REG_NONE, 0},       //25.电机2前进
-			//MOTOR2_SLAVE_ADDR回零位
-			{Battery_20, 0, STATUS_REG_NONE, 0},      //7.电机2后退
-			//待修改
-			{Battery_6, 0, STATUS_REG_NONE, 0},        //31.飞机后退
-			//电机回零位
-			{Battery_7, 0, STATUS_REG_NONE, 0},        //32.电机1下降
-
-			//飞机前进
-			{Battery_21, 0, REG_SWAP_MECH_STATE, 4},      //33.飞机前进
-			{LeaveCenter, 0, REG_CENTER_ROD_STATE, 2},     //34.居中杆释放
-            {CloseDr, 16250, REG_DOOR_STATE, 4},     	  //1.关闭舱门
-//			{StopDr, 1000, REG_DOOR_STATE, 4},        		//2.停止
-			{OpenAC, 500, STATUS_REG_NONE, 0},             // 打开空调
-			{UpdateEmptyBay, 500, STATUS_REG_NONE, 0},   // 最后一步更新空仓号
-
-};
-const uint8_t LANDING_STEPS_3_COUNT = (uint8_t)(sizeof(landing_steps_3) / sizeof(landing_steps_3[0]));
+const uint8_t LANDING_STEP_COUNT =
+    (uint8_t)(sizeof(landing_steps) / sizeof(landing_steps[0]));
 
 // 居中步骤
 const StepDef closecenter_steps[] =
 {
 		{Center_1, 0, STATUS_REG_NONE, 0},
-    {Center_2, 0, REG_CENTER_ROD_STATE, 4},
+        {Center_2, 0, REG_CENTER_ROD_STATE, 4},
 };
 const uint8_t CLOSECENTER_STEP_COUNT = (uint8_t)(sizeof(closecenter_steps) / sizeof(closecenter_steps[0]));
 
@@ -952,252 +416,59 @@ const StepDef leavecenter_steps[] =
 };
 const uint8_t LEAVECENTER_STEP_COUNT = (uint8_t)(sizeof(leavecenter_steps) / sizeof(leavecenter_steps[0]));
 
-// 装电池步骤（取1号仓电池）
-const StepDef loadbattery_steps_1[] =
+// 装电池公共步骤（按序列启动时锁定的空仓号取电池）
+const StepDef loadbattery_steps[] =
 {
-		{Center_1, 0, STATUS_REG_NONE, 0},        //1.左右居中
-		{Center_2, 0, REG_CENTER_ROD_STATE, 4},       //2.前后居中
-        //电机3移动到136000
-		//运动到位置136000
-		{Battery_8, 0, STATUS_REG_NONE, 0},       //16.电机1上升
-        //电机2移动到361000
-		//电机2运动到位置361000
-		{Battery_9, 0, STATUS_REG_NONE, 0},       //17.电机2前进		
-        //电机夹紧
-        {Battery_4, 1000, STATUS_REG_NONE, 0},         //18.电机3夹紧
-        //电机2回到限位
-		//电机2回零
-		{Battery_22, 0, STATUS_REG_NONE, 0},       //19.电机2后退
-        //电机3下降到136000，此步骤可省略
-		//MOTOR1_SLAVE_ADDR回到零点
-		//{Battery_13, 0, STATUS_REG_NONE, 0},       //20.电机1下降
-        //电机3移动到330000
-		//电机3运动到330000
-		{Battery_1, 0, STATUS_REG_NONE, 0},       //21.电机1上升        
-		//飞机前进
-		{Battery_2, 0, STATUS_REG_NONE, 0},        //22.飞机前进
-        //电机2移动到315000
-		//电机2运动到315000
-		{Battery_3, 0, STATUS_REG_NONE, 0},       //23.电机2前进
-		//夹爪松开
-		{Battery_10, 1000, STATUS_REG_NONE, 0},        //24.电机3松开
-        //电机2移动到24000
-		//电机2移动至位置314000
-		{Battery_16, 0, STATUS_REG_NONE, 0},       //25.电机2前进
-        //电机2后退15000脉冲
-		//电机2移动至位置299000
-		{Battery_17, 0, STATUS_REG_NONE, 0},        //26.电机2后退
-        //电机2回原点，需修改
-		//回到零位
-		{Battery_5, 0, STATUS_REG_NONE, 0},      //7.电机2后退
+    {Center_1, 0, STATUS_REG_NONE, 0},
+    {Center_2, 0, REG_CENTER_ROD_STATE, 4},
 
-		//待修改
-		{Battery_6, 0, STATUS_REG_NONE, 0},        //31.飞机后退
-        //电机3回原点，需修改
-		//电机回零位
-		{Battery_7, 0, STATUS_REG_NONE, 0},        //32.电机1下降
-		//飞机前进
-		{Battery_21, 0, REG_SWAP_MECH_STATE, 4},      //33.飞机前进
-		{LeaveCenter, 0, REG_CENTER_ROD_STATE, 2},     //34.居中杆释放
+    /* 根据序列启动时锁定的空仓号选择电池仓位置。 */
+    {NULL, 0, STATUS_REG_NONE, 0, MoveMotor1ToSelectedBay,
+     &battery_bay_current},
+    EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, CALIB_MOTOR2_BAY_WORK_POS, 0, STATUS_REG_NONE, 0),
+    {Motor3Clamp, 1000, STATUS_REG_NONE, 0},
+    EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, MOTOR_HOME_POS, 0, STATUS_REG_NONE, 0),
+    EXEC_MOVE_ABS_STEP(MOTOR1_SLAVE_ADDR, CALIB_MOTOR1_TRANSFER_LIFT_POS, 0, STATUS_REG_NONE, 0),
+    {MovePlaneTransferIn, 0, STATUS_REG_NONE, 0},
+    EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, CALIB_MOTOR2_AIRCRAFT_WORK_POS, 0, STATUS_REG_NONE, 0),
+    {Motor3Lossen, 1000, STATUS_REG_NONE, 0},
+    EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, CALIB_MOTOR2_AIRCRAFT_CLEAR_POS, 0, STATUS_REG_NONE, 0),
+    EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, CALIB_MOTOR2_LOAD_RETRACT_POS, 0, STATUS_REG_NONE, 0),
+    EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, MOTOR_HOME_POS, 0, STATUS_REG_NONE, 0),
+    {Center_2, 0, STATUS_REG_NONE, 0},
+    EXEC_MOVE_ABS_STEP(MOTOR1_SLAVE_ADDR, MOTOR_HOME_POS, 0, STATUS_REG_NONE, 0),
+    EXEC_MOVE_ABS_ARRAY_STEP(plane_transfer_out_motors, 0, REG_SWAP_MECH_STATE, 4),
+    {LeaveCenter, 0, REG_CENTER_ROD_STATE, 2}
 };
-const uint8_t LOADBATTERY_STEPS_1_COUNT = (uint8_t)(sizeof(loadbattery_steps_1) / sizeof(loadbattery_steps_1[0]));
+const uint8_t LOADBATTERY_STEP_COUNT =
+    (uint8_t)(sizeof(loadbattery_steps) / sizeof(loadbattery_steps[0]));
 
 
-
-// 装电池步骤（取2号仓电池）
-const StepDef loadbattery_steps_2[] =
+// 下电池公共步骤（按序列启动时锁定的空仓号存放电池）
+const StepDef downbattery_steps[] =
 {
-		{Center_1, 0, STATUS_REG_NONE, 0},        //1.左右居中
-		{Center_2, 0, REG_CENTER_ROD_STATE, 4},       //2.前后居中
-		//电机2移动到位置69000
-		{Battery_23, 0, STATUS_REG_NONE, 0},       //16.电机1上升
-		//电机2运动到位置361000
-		{Battery_9, 0, STATUS_REG_NONE, 0},       //17.电机2前进
-		//电机夹紧
-		{Battery_4, 1000, STATUS_REG_NONE, 0},         //18.电机3夹紧
-		//电机2回零
-		{Battery_22, 0, STATUS_REG_NONE, 0},       //19.电机2后退
-		//MOTOR1_SLAVE_ADDR回零
-		//{Battery_24, 0, STATUS_REG_NONE, 0},       //20.电机1下降
-		//电机3运动到330000
-		{Battery_1, 0, STATUS_REG_NONE, 0},       //21.电机1上升
-		//飞机前进
-		{Battery_2, 0, STATUS_REG_NONE, 0},        //22.飞机前进
-		//电机2运动到315000
-		{Battery_3, 0, STATUS_REG_NONE, 0},       //23.电机2前进
-		//夹爪松开
-		{Battery_10, 1000, STATUS_REG_NONE, 0},        //24.电机3松开
-		//电机2移动至位置314000
-		{Battery_16, 0, STATUS_REG_NONE, 0},       //25.电机2前进
-		//电机2移动至位置299000
-		{Battery_17, 0, STATUS_REG_NONE, 0},        //26.电机2后退
-		//回到零位
-		{Battery_5, 0, STATUS_REG_NONE, 0},      //7.电机2后退
-		//待修改
-		{Battery_6, 0, STATUS_REG_NONE, 0},        //31.飞机后退
-		//电机回零位
-		{Battery_7, 0, STATUS_REG_NONE, 0},        //32.电机1下降
-		//飞机前进
-		{Battery_21, 0, REG_SWAP_MECH_STATE, 4},      //33.飞机前进
-		{LeaveCenter, 0, REG_CENTER_ROD_STATE, 2},     //34.居中杆释放
+    {Center_1, 0, STATUS_REG_NONE, 0},
+    {Center_2, 0, REG_CENTER_ROD_STATE, 4},
+    EXEC_MOVE_ABS_STEP(MOTOR1_SLAVE_ADDR, CALIB_MOTOR1_TRANSFER_LIFT_POS, 0, STATUS_REG_NONE, 0),
+    {MovePlaneTransferIn, 0, STATUS_REG_NONE, 0},
+    EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, CALIB_MOTOR2_AIRCRAFT_WORK_POS, 0, STATUS_REG_NONE, 0),
+    {Motor3Clamp, 1000, STATUS_REG_NONE, 0},
+    EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, MOTOR_HOME_POS, 0, STATUS_REG_NONE, 0),
+    {Center_2, 0, STATUS_REG_NONE, 0},
+
+    /* 根据序列启动时锁定的空仓号选择旧电池存放位置。 */
+    {NULL, 0, STATUS_REG_NONE, 0, MoveMotor1ToSelectedBay,
+     &battery_bay_current},
+    EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, CALIB_MOTOR2_BAY_WORK_POS, 0, STATUS_REG_NONE, 0),
+    {Motor3Lossen, 1000, STATUS_REG_NONE, 0},
+    EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, CALIB_MOTOR2_BAY_RELEASE_POS, 0, STATUS_REG_NONE, 0),
+    EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, MOTOR_HOME_POS, 0, STATUS_REG_NONE, 0),
+    EXEC_MOVE_ABS_STEP(MOTOR1_SLAVE_ADDR, MOTOR_HOME_POS, 0, STATUS_REG_NONE, 0),
+    EXEC_MOVE_ABS_ARRAY_STEP(plane_transfer_out_motors, 0, REG_SWAP_MECH_STATE, 2),
+    {LeaveCenter, 0, REG_CENTER_ROD_STATE, 2}
 };
-const uint8_t LOADBATTERY_STEPS_2_COUNT = (uint8_t)(sizeof(loadbattery_steps_2) / sizeof(loadbattery_steps_2[0]));
-
-
-// 装电池步骤（取3号仓电池）
-const StepDef loadbattery_steps_3[] =
-{
-      {Center_1, 0, STATUS_REG_NONE, 0},        //1.左右居中
-			{Center_2, 0, REG_CENTER_ROD_STATE, 4},       //2.前后居中
-            //电机3上升到位置2000
-            //MOTOR1_SLAVE_ADDR上升到位置2000
-            {Battery_14, 0, STATUS_REG_NONE, 0},       //16.电机1上升
-            //电机2运动到位置361000
-			{Battery_9, 0, STATUS_REG_NONE, 0},       //17.电机2前进
-			//电机夹紧
-			{Battery_4, 1000, STATUS_REG_NONE, 0},         //18.电机3夹紧
-            //电机2回零
-			{Battery_22, 0, STATUS_REG_NONE, 0},       //19.电机2后退
-            //电机3回零
-			//{Battery_15, 0, STATUS_REG_NONE, 0},       //20.电机1下降
-            //电机3运动到330000
-			{Battery_1, 0, STATUS_REG_NONE, 0},       //21.电机1上升
-            //飞机前进
-            {Battery_2, 0, STATUS_REG_NONE, 0},        //22.飞机前进
-            //电机2运动到315000
-			{Battery_3, 0, STATUS_REG_NONE, 0},       //23.电机2前进
-			//夹爪松开
-			{Battery_10, 1000, STATUS_REG_NONE, 0},        //24.电机3松开
-            //电机2移动至位置314000
-			{Battery_16, 0, STATUS_REG_NONE, 0},       //25.电机2前进
-            //电机2后退15000，到位置299000
-			//电机2移动至位置299000
-			{Battery_17, 0, STATUS_REG_NONE, 0},        //26.电机2后退
-			//回到零位
-			{Battery_5, 0, STATUS_REG_NONE, 0},      //7.电机2后退
-			//待修改
-			{Battery_6, 0, STATUS_REG_NONE, 0},        //31.飞机后退
-			//电机回零位
-			{Battery_7, 0, STATUS_REG_NONE, 0},        //32.电机1下降
-			//飞机前进
-			{Battery_21, 0, REG_SWAP_MECH_STATE, 4},      //33.飞机前进
-			{LeaveCenter, 0, REG_CENTER_ROD_STATE, 2},     //34.居中杆释放
-};
-const uint8_t LOADBATTERY_STEPS_3_COUNT = (uint8_t)(sizeof(loadbattery_steps_3) / sizeof(loadbattery_steps_3[0]));
-
-
-// 下电池步骤(放入1号仓)
-const StepDef downbattery_steps_1[] =
-{
-            {Center_1, 0, STATUS_REG_NONE, 0},        //1.左右居中
-			{Center_2, 0, REG_CENTER_ROD_STATE, 4},       //2.前后居中
-			//电机3运动到330000
-			{Battery_1, 0, STATUS_REG_NONE, 0},      //3.电机1上升
-			//飞机前进
-			{Battery_2, 0, STATUS_REG_NONE, 0},       //4.飞机前进
-			//电机2运动到315000
-			{Battery_3, 0, STATUS_REG_NONE, 0},      //5.电机2前进
-			//电机夹紧
-			{Battery_4, 1000, STATUS_REG_NONE, 0},        //6.电机3夹紧
-			//回到零位
-			{Battery_5, 0, STATUS_REG_NONE, 0},      //7.电机2后退
-			//待修改
-			{Battery_6, 0, STATUS_REG_NONE, 0},       //8.飞机后退
-
-			//电机回零位
-			//{Battery_7, 0, STATUS_REG_NONE, 0},      //9.电机1下降
-			//运动到位置136000
-			{Battery_8, 0, STATUS_REG_NONE, 0},       //10.电机1上升
-			//电机2运动到位置361000
-			{Battery_9, 0, STATUS_REG_NONE, 0},      //11.电机2前进
-			//夹爪松开
-			{Battery_10, 1000, STATUS_REG_NONE, 0},       //12.电机3松开
-			//移动至位置370000
-			{Battery_11, 0, STATUS_REG_NONE, 0},      //13.电机2前进
-			//MOTOR2_SLAVE_ADDR回到零点
-			{Battery_12, 0, STATUS_REG_NONE, 0},     //14.电机2后退
-			//MOTOR1_SLAVE_ADDR回到零点
-			{Battery_13, 0, STATUS_REG_NONE, 0},      //15.电机1下降
-			//飞机前进
-			{Battery_21, 0, REG_SWAP_MECH_STATE, 2},      //33.飞机前进
-
-			{LeaveCenter, 0, REG_CENTER_ROD_STATE, 2},     //34.居中杆释放
-};
-const uint8_t DOWNBATTERY_STEPS_1_COUNT = (uint8_t)(sizeof(downbattery_steps_1) / sizeof(downbattery_steps_1[0]));
-
-// 下电池步骤(放入2号仓)
-const StepDef downbattery_steps_2[] =
-{
-      {Center_1, 0, STATUS_REG_NONE, 0},        //1.左右居中
-			{Center_2, 0, REG_CENTER_ROD_STATE, 4},       //2.前后居中
-			//电机3运动到330000
-			{Battery_1, 0, STATUS_REG_NONE, 0},      //3.电机1上升
-			//飞机前进
-			{Battery_2, 0, STATUS_REG_NONE, 0},       //4.飞机前进
-			//电机2运动到315000
-			{Battery_3, 0, STATUS_REG_NONE, 0},      //5.电机2前进
-			//电机夹紧
-			{Battery_4, 1000, STATUS_REG_NONE, 0},        //6.电机3夹紧
-			//回到零位
-			{Battery_5, 0, STATUS_REG_NONE, 0},      //7.电机2后退
-			//待修改
-			{Battery_6, 0, STATUS_REG_NONE, 0},       //8.飞机后退
-			//电机回零位
-			//{Battery_7, 0, STATUS_REG_NONE, 0},      //9.电机1下降
-			//移动到位置69000
-			{Battery_23, 0, STATUS_REG_NONE, 0},       //10.电机1上升
-			//电机2运动到位置361000
-			{Battery_9, 0, STATUS_REG_NONE, 0},      //11.电机2前进
-			//夹爪松开
-			{Battery_10, 1000, STATUS_REG_NONE, 0},       //12.电机3松开
-			//移动至位置370000
-			{Battery_11, 0, STATUS_REG_NONE, 0},      //13.电机2前进
-			//MOTOR2_SLAVE_ADDR回到零点
-			{Battery_12, 0, STATUS_REG_NONE, 0},     //14.电机2后退
-			//MOTOR1_SLAVE_ADDR回零
-			{Battery_24, 0, STATUS_REG_NONE, 0},      //15.电机1下降
-			//飞机前进
-			{Battery_21, 0, REG_SWAP_MECH_STATE, 2},      //33.飞机前进
-			{LeaveCenter, 0, REG_CENTER_ROD_STATE, 2},     //34.居中杆释放
-};
-const uint8_t DOWNBATTERY_STEPS_2_COUNT = (uint8_t)(sizeof(downbattery_steps_2) / sizeof(downbattery_steps_2[0]));
-
-// 下电池步骤(放入3号仓)
-const StepDef downbattery_steps_3[] =
-{
-      {Center_1, 0, STATUS_REG_NONE, 0},        //1.左右居中
-			{Center_2, 0, REG_CENTER_ROD_STATE, 4},       //2.前后居中
-			//电机3运动到330000
-			{Battery_1, 0, STATUS_REG_NONE, 0},      //3.电机1上升
-			//飞机前进
-			{Battery_2, 0, STATUS_REG_NONE, 0},       //4.飞机前进
-			//电机2运动到315000
-			{Battery_3, 0, STATUS_REG_NONE, 0},      //5.电机2前进
-			//电机夹紧
-			{Battery_4, 1000, STATUS_REG_NONE, 0},        //6.电机3夹紧
-			//回到零位
-			{Battery_5, 0, STATUS_REG_NONE, 0},      //7.电机2后退
-			//待修改
-			{Battery_6, 0, STATUS_REG_NONE, 0},       //8.飞机后退
-			//电机回零位
-			//{Battery_7, 0, STATUS_REG_NONE, 0},      //9.电机1下降
-			//MOTOR1_SLAVE_ADDR上升到位置2000
-			{Battery_14, 0, STATUS_REG_NONE, 0},       //10.电机1上升
-			//电机2运动到位置361000
-			{Battery_9, 0, STATUS_REG_NONE, 0},      //11.电机2前进
-			//夹爪松开
-			{Battery_10, 1000, STATUS_REG_NONE, 0},       //12.电机3松开
-			//移动至位置370000
-			{Battery_11, 0, STATUS_REG_NONE, 0},      //13.电机2前进
-			//MOTOR2_SLAVE_ADDR回到零点
-			{Battery_12, 0, STATUS_REG_NONE, 0},     //14.电机2后退
-			//电机3回零
-			{Battery_15, 0, STATUS_REG_NONE, 0},      //15.电机1下降
-			//飞机前进
-			{Battery_21, 0, REG_SWAP_MECH_STATE, 2},      //33.飞机前进
-			{LeaveCenter, 0, REG_CENTER_ROD_STATE, 2},     //34.居中杆释放
-};
-const uint8_t DOWNBATTERY_STEPS_3_COUNT = (uint8_t)(sizeof(downbattery_steps_3) / sizeof(downbattery_steps_3[0]));
+const uint8_t DOWNBATTERY_STEP_COUNT =
+    (uint8_t)(sizeof(downbattery_steps) / sizeof(downbattery_steps[0]));
 
 // 全局变量记录当前是否有旧电池（由主站轮询或状态寄存器更新）
 extern uint8_t g_has_old_battery;   // 1:有电池, 0:无电池
