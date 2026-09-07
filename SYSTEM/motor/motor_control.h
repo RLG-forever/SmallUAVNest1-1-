@@ -27,7 +27,7 @@
     ((((uint8_t)(result) & 0xF0U) == MOTOR_CONTROL_RESULT_ALARM_BASE) ? 1U : 0U)
 
 /* 到位检测参数；位置和容差的单位均为电机脉冲数。 */
-#define MOTOR_CONTROL_POSITION_TOLERANCE          1000L
+#define MOTOR_CONTROL_POSITION_TOLERANCE          2000L
 #define MOTOR_CONTROL_POSITION_POLL_INTERVAL_MS   1000U
 #define MOTOR_CONTROL_MOVE_TIMEOUT_MS             30000U
 

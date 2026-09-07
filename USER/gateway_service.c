@@ -313,9 +313,14 @@ static void GatewayService_FinishActive(CommandState state,
         LOG_INFO("GATEWAY", "command finished: reg=0x%04X, value=0x%04X\r\n",
                  (unsigned int)register_address, (unsigned int)value);
     } else {
-        LOG_ERROR("GATEWAY", "command ended: reg=0x%04X, state=%u, fault=%u, step=%u\r\n",
-                  (unsigned int)register_address, (unsigned int)state,
-                  (unsigned int)fault_code, (unsigned int)step);
+        LOG_ERROR("GW_TRACE",
+                  "command ended: reg=0x%04X, value=0x%04X, state=%u, fault=0x%04X, step=%u, uav_status=%u, sequence_result=%u, sequence_error=0x%04X\r\n",
+                  (unsigned int)register_address, (unsigned int)value,
+                  (unsigned int)state,
+                  (unsigned int)fault_code, (unsigned int)step,
+                  (unsigned int)StatusRegs_Get(REG_RESERVED4),
+                  (unsigned int)Sequence_GetLastResult(),
+                  (unsigned int)Sequence_GetLastError());
     }
 }
 
@@ -390,6 +395,10 @@ static uint8_t GatewayService_ExecuteWrite(uint16_t register_address,
             break;
         case GATEWAY_CMD_OPEN_FLY:
             result = GatewayService_StartSequence(SEQ_ID_OPENFLY);
+            LOG_INFO("GW_TRACE",
+                     "0x50 open-fly decision: start_result=%u, sequence_busy=%u\r\n",
+                     (unsigned int)result,
+                     (unsigned int)Sequence_IsBusy());
             break;
         case GATEWAY_CMD_CLOSE_FLY:
             result = GatewayService_StartSequence(SEQ_ID_CLOSEFLY);
@@ -399,6 +408,13 @@ static uint8_t GatewayService_ExecuteWrite(uint16_t register_address,
         {
             uint16_t uav_status = StatusRegs_Get(REG_RESERVED4);
 
+            LOG_INFO("GW_TRACE",
+                     "0x38 takeoff processing: uav_status=%u, power_ready=%u, wait_open_fly=%u, sequence_busy=%u\r\n",
+                     (unsigned int)uav_status,
+                     (unsigned int)takeoff_power_ready,
+                     (unsigned int)wait_open_fly,
+                     (unsigned int)Sequence_IsBusy());
+
             GatewayService_CancelRemotePowerOff();
             if (uav_status == 0U && !takeoff_power_ready) {
                 result = ModbusMaster_06_WriteSingleReg(
@@ -406,6 +422,9 @@ static uint8_t GatewayService_ExecuteWrite(uint16_t register_address,
                     UAV_CONTROLLER_SLAVE,
                     UAV_POWER_CTRL_REG,
                     UAV_POWER_ON_VALUE);
+                LOG_INFO("GW_TRACE",
+                         "0x38 UAV power-on write: result=%u\r\n",
+                         (unsigned int)result);
                 if (result != MODBUS_RESULT_OK) {
                     break;
                 }
@@ -414,8 +433,14 @@ static uint8_t GatewayService_ExecuteWrite(uint16_t register_address,
             if (uav_status == 1U) {
                 wait_open_fly = 1U;
                 result = MODBUS_RESULT_OK;
+                LOG_WARN("GW_TRACE",
+                         "0x38 deferred: current uav_status=1; waiting for another 0x60=1 report\r\n");
             } else {
                 result = GatewayService_StartSequence(SEQ_ID_TAKEOFF);
+                LOG_INFO("GW_TRACE",
+                         "0x38 full sequence start attempted: result=%u, sequence_busy=%u\r\n",
+                         (unsigned int)result,
+                         (unsigned int)Sequence_IsBusy());
                 if (result == MODBUS_RESULT_OK) {
                     takeoff_power_ready = 0U;
                 }
@@ -475,6 +500,12 @@ static uint8_t GatewayService_ExecuteWrite(uint16_t register_address,
             break;
 
         case GATEWAY_CMD_UAV_STATUS:
+            LOG_INFO("GW_TRACE",
+                     "0x60 UAV status received: old=%u, new=%u, wait_open_fly=%u, sequence_busy=%u\r\n",
+                     (unsigned int)StatusRegs_Get(REG_RESERVED4),
+                     (unsigned int)value,
+                     (unsigned int)wait_open_fly,
+                     (unsigned int)Sequence_IsBusy());
             StatusRegs_Update(REG_RESERVED4, value);
             if (!control_enabled) {
                 result = MODBUS_RESULT_OK;
@@ -485,6 +516,9 @@ static uint8_t GatewayService_ExecuteWrite(uint16_t register_address,
                 result = MODBUS_RESULT_OK;
             } else if (value == 1U && wait_open_fly && !Sequence_IsBusy()) {
                 result = GatewayService_StartSequence(SEQ_ID_TAKEOFF);
+                LOG_INFO("GW_TRACE",
+                         "0x60 triggered deferred 0x38 sequence: result=%u\r\n",
+                         (unsigned int)result);
                 if (result == MODBUS_RESULT_OK) {
                     wait_open_fly = 0U;
                 }
@@ -604,6 +638,15 @@ static uint8_t GatewayService_HandleControlCommand(
 {
     uint8_t step = 0U;
 
+    LOG_WARN("GW_TRACE",
+             "control command received: reg=0x%04X, value=0x%04X, active=%u, type=%u, sequence_busy=%u, step=%u\r\n",
+             (unsigned int)request->start_register,
+             (unsigned int)request->value,
+             (unsigned int)active_command.active,
+             (unsigned int)active_command.type,
+             (unsigned int)Sequence_IsBusy(),
+             (unsigned int)Sequence_GetCurrentStep());
+
     /* 未配置可靠的回原点停止命令，运行期间不接受暂停或取消。 */
     if (!control_enabled || MotorControl_HomeIsBusy()) {
         return ModbusSlave_SendException(request, 0x06U) != 0U;
@@ -712,6 +755,15 @@ static uint8_t GatewayService_Handle03(const ModbusSlaveRequest *request)
 
 static uint8_t GatewayService_Handle06(const ModbusSlaveRequest *request)
 {
+    LOG_INFO("GW_TRACE",
+             "FC06 received: reg=0x%04X, value=0x%04X, active=%u, active_reg=0x%04X, active_type=%u, sequence_busy=%u\r\n",
+             (unsigned int)request->start_register,
+             (unsigned int)request->value,
+             (unsigned int)active_command.active,
+             (unsigned int)active_command.register_address,
+             (unsigned int)active_command.type,
+             (unsigned int)Sequence_IsBusy());
+
     if (GatewayService_IsSameActive(request->start_register,
                                     request->value)) {
         LOG_DEBUG("GATEWAY", "active duplicate acknowledged: reg=0x%04X, value=0x%04X\r\n",
@@ -725,6 +777,12 @@ static uint8_t GatewayService_Handle06(const ModbusSlaveRequest *request)
     }
 
     if (active_command.active) {
+        LOG_WARN("GW_TRACE",
+                 "FC06 rejected busy: incoming_reg=0x%04X, active_reg=0x%04X, active_type=%u, step=%u\r\n",
+                 (unsigned int)request->start_register,
+                 (unsigned int)active_command.register_address,
+                 (unsigned int)active_command.type,
+                 (unsigned int)Sequence_GetCurrentStep());
         return ModbusSlave_SendException(request, 0x06U) != 0U;
     }
 
@@ -749,6 +807,13 @@ static uint8_t GatewayService_Handle10(const ModbusSlaveRequest *request)
     uint8_t result;
 
     if (!active) {
+        LOG_INFO("GW_TRACE",
+                 "FC10 received: start_reg=0x%04X, count=%u, first_value=0x%04X, active_command=%u, sequence_busy=%u\r\n",
+                 (unsigned int)request->start_register,
+                 (unsigned int)request->register_count,
+                 (unsigned int)Modbus_GetU16BE(request->write_data),
+                 (unsigned int)active_command.active,
+                 (unsigned int)Sequence_IsBusy());
         active = 1U;
         index = 0U;
     }
@@ -764,6 +829,12 @@ static uint8_t GatewayService_Handle10(const ModbusSlaveRequest *request)
     }
 
     if (active_command.active) {
+        LOG_WARN("GW_TRACE",
+                 "FC10 rejected busy: incoming_reg=0x%04X, active_reg=0x%04X, active_type=%u, step=%u\r\n",
+                 (unsigned int)register_address,
+                 (unsigned int)active_command.register_address,
+                 (unsigned int)active_command.type,
+                 (unsigned int)Sequence_GetCurrentStep());
         active = 0U;
         index = 0U;
         if (request->register_count == 1U &&

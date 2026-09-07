@@ -778,9 +778,16 @@ static uint8_t MotorControl_FinishBatch(uint8_t result, uint8_t *results,
         }
     }
 
-    LOG_INFO("MOTOR", "batch finished: count=%u, result=%u\r\n",
-                      (unsigned int)motor_batch.count,
-                      (unsigned int)result);
+    LOG_INFO("MOTOR_TRACE",
+             "batch finished: count=%u, result=0x%02X, phase=%u, index=%u, slave=0x%02X, reached_mask=0x%02X, failures=%u\r\n",
+             (unsigned int)motor_batch.count,
+             (unsigned int)result,
+             (unsigned int)motor_batch.phase,
+             (unsigned int)motor_batch.index,
+             (unsigned int)(motor_batch.index < motor_batch.count
+                 ? motor_batch.motors[motor_batch.index].slave_addr : 0U),
+             (unsigned int)motor_batch.reached_mask,
+             (unsigned int)motor_batch.failures);
     if (results != NULL) {
         memcpy(results, motor_batch.results,
                motor_batch.count * sizeof(motor_batch.results[0]));

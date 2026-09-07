@@ -50,13 +50,13 @@ typedef struct {
 #define MOTOR_HOME_POS                           0L
 #define CALIB_MOTOR1_RECOVERY_POS                315000L
 #define CALIB_MOTOR1_AUX_POS                     9000L
-#define CALIB_MOTOR1_FLY_LIFT_POS                329000L
-#define CALIB_MOTOR1_TRANSFER_LIFT_POS           330000L
+#define CALIB_MOTOR1_FLY_LIFT_POS                333000L
+#define CALIB_MOTOR1_TRANSFER_LIFT_POS           (330000L + 2000L)
 
 #define CALIB_MOTOR2_RECOVERY_FORWARD_POS        136000L
 #define CALIB_MOTOR2_FLY_NEAR_POS                293000L
-#define CALIB_MOTOR2_FLY_FAR_POS                 303000L
-#define CALIB_MOTOR2_AIRCRAFT_WORK_POS           315000L
+#define MOTOR2_FLY_FAR_RELA_POS                    8000L
+#define CALIB_MOTOR2_AIRCRAFT_WORK_POS           (315000L + 0L)
 #define CALIB_MOTOR2_BAY_WORK_POS                361000L
 #define CALIB_MOTOR2_BAY_RELEASE_POS             370000L
 #define CALIB_MOTOR2_AIRCRAFT_RELEASE_POS        290000L
@@ -68,7 +68,7 @@ typedef struct {
 #define CALIB_BATTERY_BAY3_POS                   2000L
 
 #define CALIB_PLANE_TRANSFER_IN_MOTOR56_POS      183000L
-#define CALIB_PLANE_TRANSFER_IN_MOTOR78_POS      174000L
+#define CALIB_PLANE_TRANSFER_IN_MOTOR78_POS      172000L
 #define CALIB_PLANE_TRANSFER_OUT_MOTOR56_POS     207000L
 #define CALIB_PLANE_TRANSFER_OUT_MOTOR78_POS     150000L
 #define CALIB_PLANE_BASE_POS                     176000L
@@ -76,7 +76,7 @@ typedef struct {
 
 #define CALIB_CENTER_FRONT_POS                   7000L
 #define CALIB_CENTER_REAR_POS                    350000L
-#define CALIB_CENTER_SIDE_A_POS                  90000L
+#define CALIB_CENTER_SIDE_A_POS                  91000L
 #define CALIB_CENTER_SIDE_B_POS                  99000L
 #define CALIB_CENTER_RELEASE_POS                 10000L
 

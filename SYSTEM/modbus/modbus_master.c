@@ -12,6 +12,16 @@
 #define MODBUS_MASTER_BITS_PER_CHAR  10U
 #define MODBUS_MASTER_TIMEOUT_MS   500U
 
+/*
+ * 这两个执行器可能已执行写命令，但不会返回 RTU 应答。
+ * 因此写命令首次等待应答超时后即结束事务：释放主站总线，
+ * 并让调用该命令的动作序列继续执行。读命令、异常应答以及其他
+ * 从站仍按原有重试策略处理。
+ * sequence_steps.h 中的 MOTOR_CLAMP_ID 对应从站地址 0x01。
+ */
+#define MODBUS_MASTER_NO_REPLY_CLAMP_SLAVE  0x01U
+#define MODBUS_MASTER_NO_REPLY_REMOTE_SLAVE 0x14U
+
 /* 主站内部状态不对外暴露，调用方通过 ModbusMaster_IsBusy() 查询。 */
 typedef enum {
     MASTER_IDLE,
@@ -254,8 +264,31 @@ static void ModbusMaster_SetResult(uint8_t result)
     ModbusMaster_ResetRx();
 }
 
+static uint8_t ModbusMaster_IsNoReplyWriteTarget(void)
+{
+    if (master_transaction.function != 0x06U &&
+        master_transaction.function != 0x10U) {
+        return 0U;
+    }
+
+    return master_transaction.slave == MODBUS_MASTER_NO_REPLY_CLAMP_SLAVE ||
+           master_transaction.slave == MODBUS_MASTER_NO_REPLY_REMOTE_SLAVE;
+}
+
 static void ModbusMaster_RetryOrFinish(uint8_t result)
 {
+    if (result == MODBUS_RESULT_TIMEOUT &&
+        ModbusMaster_IsNoReplyWriteTarget()) {
+        LOG_WARN("MODBUS",
+                 "no-reply write accepted: slave=0x%02X, fn=0x%02X, reg=0x%04X; continuing after attempt %u\r\n",
+                 (unsigned int)master_transaction.slave,
+                 (unsigned int)master_transaction.function,
+                 (unsigned int)master_transaction.start_reg,
+                 (unsigned int)master_transaction.attempts);
+        ModbusMaster_SetResult(MODBUS_RESULT_OK);
+        return;
+    }
+
     if (master_transaction.attempts < MODBUS_MASTER_MAX_RETRIES) {
         LOG_WARN("MODBUS", "retry scheduled: slave=0x%02X, fn=0x%02X, attempt=%u/%u, result=%u\r\n",
                  (unsigned int)master_transaction.slave,

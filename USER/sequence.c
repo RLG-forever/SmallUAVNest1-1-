@@ -35,7 +35,35 @@ struct {
     uint8_t current_step_retry_count;
     uint8_t last_step;
     uint16_t last_error;
+    uint8_t step_trace_started;
+    uint8_t step_pending_logged;
+    uint32_t step_start_tick;
 } seq_runner;
+
+static const char *Sequence_GetTraceStepName(SeqId id, uint8_t step_index)
+{
+    static const char *const takeoff_step_names[] = {
+        "open-door", "close-ac", "center-1", "center-2",
+        "motor1-fly-lift", "plane-transfer-in", "motor2-near-1",
+        "motor2-far-1", "motor2-near-2", "motor2-far-2",
+        "motor2-home", "center-2-return", "motor1-home",
+        "plane-transfer-out", "leave-center", "close-ac-final",
+        "stop-door"
+    };
+    uint8_t full_index = step_index;
+
+    if (id == SEQ_ID_OPENFLY || id == SEQ_ID_CLOSEFLY) {
+        full_index = (uint8_t)(step_index + OPENFLY_STEP_OFFSET);
+    } else if (id != SEQ_ID_TAKEOFF) {
+        return "generic-action";
+    }
+
+    if (full_index >= (uint8_t)(sizeof(takeoff_step_names) /
+                                sizeof(takeoff_step_names[0]))) {
+        return "invalid-step";
+    }
+    return takeoff_step_names[full_index];
+}
 
 static uint8_t Sequence_IsTimeReached(uint32_t now, uint32_t deadline)
 {
@@ -44,10 +72,17 @@ static uint8_t Sequence_IsTimeReached(uint32_t now, uint32_t deadline)
 
 static void Sequence_Finish(SequenceResult result)
 {
-    LOG_INFO("SEQUENCE", "finished: id=%u, step=%u, result=%u\r\n",
+    LOG_INFO("SEQ_TRACE",
+             "sequence finished: id=%u, step=%u/%u, name=%s, result=%u, error=0x%04X, elapsed=%lu ms\r\n",
              (unsigned int)seq_runner.id,
              (unsigned int)seq_runner.current_index,
-             (unsigned int)result);
+             (unsigned int)seq_runner.step_count,
+             Sequence_GetTraceStepName(seq_runner.id,
+                                       seq_runner.current_index),
+             (unsigned int)result,
+             (unsigned int)seq_runner.last_error,
+             (unsigned long)(seq_runner.step_trace_started
+                 ? (GetTick() - seq_runner.step_start_tick) : 0U));
     seq_runner.last_step = seq_runner.current_index;
     seq_runner.id = SEQ_ID_INVALID;
     seq_runner.steps = NULL;
@@ -59,12 +94,27 @@ static void Sequence_Finish(SequenceResult result)
     seq_runner.last_result = result;
     seq_runner.delay_deadline = 0U;
     seq_runner.current_step_retry_count = 0U;
+    seq_runner.step_trace_started = 0U;
+    seq_runner.step_pending_logged = 0U;
+    seq_runner.step_start_tick = 0U;
     StatusRegs_ReleaseSnapshot();
 }
 
 static void Sequence_CompleteCurrentStep(void)
 {
     const StepDef *step = &seq_runner.steps[seq_runner.current_index];
+
+    LOG_INFO("SEQ_TRACE",
+             "step completed: id=%u, step=%u/%u, name=%s, elapsed=%lu ms, completion_reg=0x%02X, completion_value=%u\r\n",
+             (unsigned int)seq_runner.id,
+             (unsigned int)seq_runner.current_index,
+             (unsigned int)seq_runner.step_count,
+             Sequence_GetTraceStepName(seq_runner.id,
+                                       seq_runner.current_index),
+             (unsigned long)(seq_runner.step_trace_started
+                 ? (GetTick() - seq_runner.step_start_tick) : 0U),
+             (unsigned int)step->completion_reg,
+             (unsigned int)step->completion_value);
 
     if (step->completion_reg != STATUS_REG_NONE) {
         StatusRegs_Update(step->completion_reg, step->completion_value);
@@ -73,6 +123,9 @@ static void Sequence_CompleteCurrentStep(void)
     seq_runner.current_index++;
     seq_runner.current_step_retry_count = 0U;
     seq_runner.delay_deadline = 0U;
+    seq_runner.step_trace_started = 0U;
+    seq_runner.step_pending_logged = 0U;
+    seq_runner.step_start_tick = 0U;
 
     if (seq_runner.current_index >= seq_runner.step_count) {
         Sequence_Finish(SEQUENCE_RESULT_SUCCESS);
@@ -247,6 +300,9 @@ SequenceStartResult Sequence_Start(SeqId id)
     seq_runner.last_error = 0U;
     seq_runner.delay_deadline = 0U;
     seq_runner.current_step_retry_count = 0U;   // 重置重试计数
+    seq_runner.step_trace_started = 0U;
+    seq_runner.step_pending_logged = 0U;
+    seq_runner.step_start_tick = 0U;
     LOG_INFO("SEQUENCE", "started: id=%u, bay=%u, steps=%u\r\n",
              (unsigned int)id, (unsigned int)empty_bay,
              (unsigned int)seq_runner.step_count);
@@ -265,6 +321,20 @@ static void Sequence_ExecuteCurrentStep(void)
     const StepDef *step = &seq_runner.steps[seq_runner.current_index];
     uint8_t ret;
 
+    if (!seq_runner.step_trace_started) {
+        seq_runner.step_trace_started = 1U;
+        seq_runner.step_pending_logged = 0U;
+        seq_runner.step_start_tick = GetTick();
+        LOG_INFO("SEQ_TRACE",
+                 "step entered: id=%u, step=%u/%u, name=%s, delay=%lu ms\r\n",
+                 (unsigned int)seq_runner.id,
+                 (unsigned int)seq_runner.current_index,
+                 (unsigned int)seq_runner.step_count,
+                 Sequence_GetTraceStepName(seq_runner.id,
+                                           seq_runner.current_index),
+                 (unsigned long)step->post_delay_ms);
+    }
+
     if (step->run_with_context != NULL) {
         ret = step->run_with_context(step->context);
     } else if (step->run != NULL) {
@@ -274,6 +344,17 @@ static void Sequence_ExecuteCurrentStep(void)
     }
 
     if (ret == MODBUS_RESULT_PENDING || MotorControl_IsBusy()) {
+        if (!seq_runner.step_pending_logged) {
+            seq_runner.step_pending_logged = 1U;
+            LOG_INFO("SEQ_TRACE",
+                     "step pending: id=%u, step=%u, name=%s, action_result=%u, motor_busy=%u\r\n",
+                     (unsigned int)seq_runner.id,
+                     (unsigned int)seq_runner.current_index,
+                     Sequence_GetTraceStepName(seq_runner.id,
+                                               seq_runner.current_index),
+                     (unsigned int)ret,
+                     (unsigned int)MotorControl_IsBusy());
+        }
         return;
     }
 
@@ -281,9 +362,13 @@ static void Sequence_ExecuteCurrentStep(void)
         if (step->post_delay_ms > 0U) {
             seq_runner.delay_deadline = GetTick() + step->post_delay_ms;
             seq_runner.state = SEQUENCE_STATE_WAITING;
-            LOG_DEBUG("SEQUENCE", "step %u completed; delay=%lu ms\r\n",
-                      (unsigned int)seq_runner.current_index,
-                      (unsigned long)step->post_delay_ms);
+            LOG_INFO("SEQ_TRACE",
+                     "step action accepted: id=%u, step=%u, name=%s; waiting delay=%lu ms\r\n",
+                     (unsigned int)seq_runner.id,
+                     (unsigned int)seq_runner.current_index,
+                     Sequence_GetTraceStepName(seq_runner.id,
+                                               seq_runner.current_index),
+                     (unsigned long)step->post_delay_ms);
         } else {
             Sequence_CompleteCurrentStep();
         }
@@ -308,9 +393,15 @@ static void Sequence_ExecuteCurrentStep(void)
         return;
     }
 
-    LOG_ERROR("SEQUENCE", "step %u failed: result=%u\r\n",
+    LOG_ERROR("SEQ_TRACE",
+              "step failed: id=%u, step=%u/%u, name=%s, result=%u, elapsed=%lu ms\r\n",
+              (unsigned int)seq_runner.id,
               (unsigned int)seq_runner.current_index,
-              (unsigned int)ret);
+              (unsigned int)seq_runner.step_count,
+              Sequence_GetTraceStepName(seq_runner.id,
+                                        seq_runner.current_index),
+              (unsigned int)ret,
+              (unsigned long)(GetTick() - seq_runner.step_start_tick));
     seq_runner.last_error = ret;
     Sequence_Finish(SEQUENCE_RESULT_ACTION_FAILED);
 }
@@ -443,9 +534,20 @@ uint16_t Sequence_GetLastError(void)
 void Sequence_Stop(void)
 {
     if (!Sequence_IsBusy()) {
+        LOG_WARN("SEQ_TRACE", "stop requested while sequence is idle\r\n");
         return;
     }
 
+    LOG_WARN("SEQ_TRACE",
+             "external stop requested: id=%u, step=%u/%u, name=%s, state=%u, elapsed=%lu ms\r\n",
+             (unsigned int)seq_runner.id,
+             (unsigned int)seq_runner.current_index,
+             (unsigned int)seq_runner.step_count,
+             Sequence_GetTraceStepName(seq_runner.id,
+                                       seq_runner.current_index),
+             (unsigned int)seq_runner.state,
+             (unsigned long)(seq_runner.step_trace_started
+                 ? (GetTick() - seq_runner.step_start_tick) : 0U));
     MotorControl_Cancel();
     Sequence_Finish(SEQUENCE_RESULT_CANCELLED);
 }
