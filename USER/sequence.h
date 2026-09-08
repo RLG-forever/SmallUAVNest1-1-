@@ -53,6 +53,8 @@ SequenceStartResult Sequence_Start(SeqId id);
 
 // 查询是否有序列正在执行
 uint8_t Sequence_IsBusy(void);
+/* 自动告警恢复（松开夹紧、回原点或重启序列）进行中时返回 1。 */
+uint8_t Sequence_IsRecovering(void);
 
 // 序列处理函数（需在主循环中周期性调用）
 void Sequence_Process(void);

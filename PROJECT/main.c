@@ -234,12 +234,13 @@ int main(void)
 			}
 
 			GatewayService_Process();
+			/* 自动告警恢复中的序列需要在全回原点失败后完成收尾。 */
+			Sequence_Process();
 			if (normal_operations_enabled) {
-				Sequence_Process();   	// 处理序列（一键起飞/降落完成）
 				SwapState_TrySave();   // 延迟保存（Flash 写入过程仍为同步执行）
 				StallRecovery_Task();
 				/* 后台轮询优先级最低，避免抢在控制命令之前占用主站总线。 */
-				MasterPolling_Task();
+				//MasterPolling_Task();
 			}
 		}
 }

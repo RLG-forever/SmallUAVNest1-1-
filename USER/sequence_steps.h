@@ -8,6 +8,7 @@ typedef uint8_t (*StepFunc)(void);
 typedef uint8_t (*StepContextFunc)(const void *context);
 
 #define STEP_RESULT_RETRY 0x80U
+#define STEP_RESULT_WAIT  0x81U
 
 typedef struct {
     StepFunc run;
@@ -16,6 +17,7 @@ typedef struct {
     uint16_t completion_value;
     StepContextFunc run_with_context;
     const void *context;
+    uint32_t wait_timeout_ms;
 } StepDef;
 
 
@@ -50,7 +52,7 @@ typedef struct {
 #define MOTOR_HOME_POS                           0L
 #define CALIB_MOTOR1_RECOVERY_POS                315000L
 #define CALIB_MOTOR1_AUX_POS                     9000L
-#define CALIB_MOTOR1_FLY_LIFT_POS                333000L
+#define CALIB_MOTOR1_FLY_LIFT_POS                (333000L - 1000L)
 #define CALIB_MOTOR1_TRANSFER_LIFT_POS           (330000L + 2000L)
 
 #define CALIB_MOTOR2_RECOVERY_FORWARD_POS        136000L
@@ -76,8 +78,8 @@ typedef struct {
 
 #define CALIB_CENTER_FRONT_POS                   7000L
 #define CALIB_CENTER_REAR_POS                    350000L
-#define CALIB_CENTER_SIDE_A_POS                  91000L
-#define CALIB_CENTER_SIDE_B_POS                  99000L
+#define CALIB_CENTER_SIDE_A_POS                  (91000L - 2000L)
+#define CALIB_CENTER_SIDE_B_POS                  (99000L + 2000L)
 #define CALIB_CENTER_RELEASE_POS                 10000L
 
 // 06功能码帧长度（固定8字节）
@@ -389,8 +391,10 @@ extern const StepDef recovery_without_battery_steps[];
 extern const uint8_t OPENDR1_STEP_COUNT;
 extern const uint8_t OPENDR_STEP_COUNT;
 extern const uint8_t CLOSEDR_STEP_COUNT;
-#define OPENFLY_STEP_OFFSET  2U
-#define OPENFLY_STEP_COUNT   13U
+#define OPENFLY_STEP_OFFSET             0U
+#define OPENFLY_TRAILING_EXCLUDED_STEPS 3U
+#define OPENFLY_STEP_COUNT                                              \
+    ((uint8_t)(TAKEOFF_STEP_COUNT - OPENFLY_TRAILING_EXCLUDED_STEPS))
 extern const uint8_t TAKEOFF_STEP_COUNT;
 extern const uint8_t LANDING_STEP_COUNT;
 extern const uint8_t CLOSECENTER_STEP_COUNT;

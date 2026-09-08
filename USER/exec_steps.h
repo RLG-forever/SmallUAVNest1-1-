@@ -24,7 +24,8 @@ uint8_t ExecSteps_MoveToAbsPos(const void *context);
                                  completion_value)                        \
     {NULL, (delay_ms), (completion_reg), (completion_value),               \
      ExecSteps_MoveToAbsPos,                                              \
-     &(const ExecMoveAbsPosParams){(motors), EXEC_ARRAY_COUNT(motors)}}
+     &(const ExecMoveAbsPosParams){(motors), EXEC_ARRAY_COUNT(motors)},    \
+     0U}
 
 /* 单电机：直接传入从站地址和绝对位置。 */
 #define EXEC_MOVE_ABS_STEP(slave, position, delay_ms, completion_reg,      \
@@ -34,6 +35,7 @@ uint8_t ExecSteps_MoveToAbsPos(const void *context);
      &(const ExecMoveAbsPosParams){                                       \
          (const MotorMoveAbsPosParams[]){                                 \
              EXEC_ABS_POS((slave), (position))},                          \
-         1U}}
+         1U},                                                             \
+     0U}
 
 #endif /* EXEC_STEPS_H */

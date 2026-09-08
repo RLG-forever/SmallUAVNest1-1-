@@ -93,6 +93,10 @@ typedef enum {
 
 typedef enum {
     MOTOR_FULL_HOME_STATE_IDLE = 0,
+    MOTOR_FULL_HOME_STATE_CHECK_ALL_ALARMS,
+    MOTOR_FULL_HOME_STATE_CLEAR_ALARM,
+    MOTOR_FULL_HOME_STATE_VERIFY_ALARM_CLEAR,
+    MOTOR_FULL_HOME_STATE_START_INITIAL_HOMING,
     MOTOR_FULL_HOME_STATE_INITIAL_HOMING,
     MOTOR_FULL_HOME_STATE_CHECK_MOTOR2_HOME,
     MOTOR_FULL_HOME_STATE_CHECK_MOTOR1_HOME,
@@ -126,6 +130,8 @@ uint8_t Motor_Batch_Control(uint8_t slave_addr, uint16_t start_reg,
 
 uint8_t MotorControl_IsBusy(void);
 void MotorControl_Cancel(void);
+/* 最近一次批量动作失败的从站地址；成功或尚无失败时返回 0。 */
+uint8_t MotorControl_GetLastFailedSlave(void);
 
 /*
  * 非阻塞回原点服务；Start 只创建任务，Process 在主循环中持续推进。
