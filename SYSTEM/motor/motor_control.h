@@ -29,6 +29,7 @@
 /* 到位检测参数；位置和容差的单位均为电机脉冲数。 */
 #define MOTOR_CONTROL_POSITION_TOLERANCE          2000L
 #define MOTOR_CONTROL_POSITION_POLL_INTERVAL_MS   1000U
+#define MOTOR_POSITION_CHECKPOINT_INTERVAL_MS     1000U
 #define MOTOR_CONTROL_MOVE_TIMEOUT_MS             30000U
 
 /* 回原点协议：向 0x00C9 写速度命令，读取 0x0006~0x0007 的运行状态。 */

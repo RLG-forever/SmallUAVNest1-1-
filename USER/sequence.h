@@ -74,6 +74,8 @@ SequenceStartResult Sequence_StartRecovery(void);
 SeqId Sequence_GetCurrentId(void);
 uint8_t Sequence_GetCurrentStep(void);
 uint8_t Sequence_GetSelectedBay(void);
+/* 获取本次落地流程启动时锁定的目标空机位；非落地流程返回 0。 */
+uint8_t Sequence_GetTargetEmptyBay(void);
 const uint8_t *Sequence_GetCurrentStepMotors(void);
 SequenceResult Sequence_GetLastResult(void);
 uint8_t Sequence_GetLastStep(void);

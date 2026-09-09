@@ -20,6 +20,12 @@ typedef enum {
     MOTOR_BATCH_PHASE_VERIFY_ALARM
 } MotorBatchPhase;
 
+typedef enum {
+    MOTOR_BATCH_CHECKPOINT_IDLE = 0,
+    MOTOR_BATCH_CHECKPOINT_READ_MOTOR7,
+    MOTOR_BATCH_CHECKPOINT_READ_MOTOR8
+} MotorBatchCheckpointState;
+
 /* 物理总线为串行总线，因此多电机命令按事务依次执行。 */
 typedef struct {
     uint8_t active;
@@ -30,13 +36,18 @@ typedef struct {
     uint8_t failures;
     uint8_t first_failure;
     uint8_t reached_mask;
+    uint8_t checkpoint_mask;
+    MotorBatchCheckpointState checkpoint_state;
     uint16_t position_words[MOTOR_CONTROL_POSITION_REG_COUNT];
+    uint16_t checkpoint_words[MOTOR_CONTROL_POSITION_REG_COUNT];
     uint16_t alarm_status_word;
     uint32_t next_poll_tick;
     uint32_t verify_deadline;
+    uint32_t next_checkpoint_tick;
     int32_t current_position;
     int32_t target_positions[MODBUS_BATCH_MAX_MOTORS];
     int32_t reached_positions[MODBUS_BATCH_MAX_MOTORS];
+    int32_t checkpoint_positions[2];
     uint8_t results[MODBUS_BATCH_MAX_MOTORS];
     MotorControlParams motors[MODBUS_BATCH_MAX_MOTORS];
 } MotorBatchContext;
@@ -94,6 +105,7 @@ typedef struct {
     uint16_t position_words[MOTOR_CONTROL_POSITION_REG_COUNT];
     uint32_t next_poll_tick;
     uint32_t timeout_deadline;
+    uint32_t next_checkpoint_tick;
 } MotorPreHomeContext;
 
 typedef struct {
@@ -384,6 +396,11 @@ static void MotorControl_PreHomeSetReady(void)
                                  MODBUS_RESULT_ECHO);
         return;
     }
+    if (!MotorPositionStore_EndMotion()) {
+        MotorControl_PreHomeFail(motor_prehome.current_slave,
+                                 MODBUS_RESULT_ECHO);
+        return;
+    }
 
     motor_prehome.state = MOTOR_PREHOME_STATE_READY;
     motor_prehome.current_slave = 0U;
@@ -399,7 +416,53 @@ static void MotorControl_PreHomeBeginStableCheck(void)
     motor_prehome.stable_sample_count = 0U;
     motor_prehome.next_poll_tick = now + MOTOR_PREHOME_POLL_INTERVAL_MS;
     motor_prehome.timeout_deadline = now + MOTOR_PREHOME_TIMEOUT_MS;
+    motor_prehome.next_checkpoint_tick =
+        now + MOTOR_POSITION_CHECKPOINT_INTERVAL_MS;
     motor_prehome.state = MOTOR_PREHOME_STATE_WAIT_POLL;
+}
+
+static void MotorControl_PreHomeSaveCheckpoint(void)
+{
+    const uint8_t slave_addrs[2] = {
+        MOTOR7_SLAVE_ADDR, MOTOR8_SLAVE_ADDR
+    };
+    int32_t positions[2];
+    int64_t restored_position;
+    uint8_t index;
+
+    /* 无Flash基准时驱动器计数不能表示绝对机械位置，不创建错误快照。 */
+    if (!motor_prehome.saved_position_valid ||
+        !MotorControl_IsTimeReached(
+            GetTick(), motor_prehome.next_checkpoint_tick)) {
+        return;
+    }
+
+    for (index = 0U; index < 2U; index++) {
+        restored_position =
+            (int64_t)motor_prehome.saved_positions[index] +
+            ((int64_t)motor_prehome.sampled_positions[index] -
+             (int64_t)motor_prehome.initial_positions[index]);
+        if (restored_position > (int64_t)INT32_MAX ||
+            restored_position < (int64_t)INT32_MIN) {
+            LOG_ERROR("MOTOR_POS",
+                      "pre-home checkpoint overflow: slave=0x%02X\r\n",
+                      (unsigned int)slave_addrs[index]);
+            motor_prehome.next_checkpoint_tick =
+                GetTick() + MOTOR_POSITION_CHECKPOINT_INTERVAL_MS;
+            return;
+        }
+        positions[index] = (int32_t)restored_position;
+    }
+
+    if (!MotorPositionStore_UpdateBatch(slave_addrs, positions, 2U)) {
+        LOG_ERROR("MOTOR_POS", "pre-home checkpoint save failed\r\n");
+    } else {
+        LOG_DEBUG("MOTOR_POS",
+                  "pre-home checkpoint saved: motor7=%ld, motor8=%ld\r\n",
+                  (long)positions[0], (long)positions[1]);
+    }
+    motor_prehome.next_checkpoint_tick =
+        GetTick() + MOTOR_POSITION_CHECKPOINT_INTERVAL_MS;
 }
 
 static void MotorControl_PreHomeAdvanceAlarmCheck(void)
@@ -451,6 +514,11 @@ static uint8_t MotorControl_PreHomeStartInternal(
     if (MotorControl_PreHomeIsBusy() || MotorControl_HomeIsBusy() ||
         motor_batch.active || ModbusMaster_IsBusy()) {
         return MODBUS_RESULT_BUSY;
+    }
+    if (!MotorPositionStore_PrepareJournal()) {
+        LOG_ERROR("MOTOR_POS",
+                  "journal preparation failed before pre-home\r\n");
+        return MODBUS_RESULT_ECHO;
     }
 
     memset(&motor_prehome, 0, sizeof(motor_prehome));
@@ -633,6 +701,11 @@ void MotorControl_PreHomeProcess(void)
             MotorControl_PreHomeSetReady();
             return;
         }
+        if (!MotorPositionStore_BeginMotion()) {
+            MotorControl_PreHomeFail(MOTOR7_SLAVE_ADDR,
+                                     MODBUS_RESULT_ECHO);
+            return;
+        }
         LOG_INFO("PREHOME", "relative distances: motor7=%lu, motor8=%lu\r\n",
                  (unsigned long)motor_prehome.relative_distances[0],
                  (unsigned long)motor_prehome.relative_distances[1]);
@@ -805,6 +878,7 @@ void MotorControl_PreHomeProcess(void)
                 motor_prehome.last_positions[1]));
         motor_prehome.last_positions[0] = motor_prehome.sampled_positions[0];
         motor_prehome.last_positions[1] = motor_prehome.sampled_positions[1];
+        MotorControl_PreHomeSaveCheckpoint();
         if (stable) {
             motor_prehome.stable_sample_count++;
         } else {
@@ -880,6 +954,11 @@ static uint8_t MotorControl_FinishBatch(uint8_t result, uint8_t *results,
             result = MODBUS_RESULT_ECHO;
         }
     }
+    if (result == MODBUS_RESULT_OK &&
+        motor_batch.checkpoint_mask != 0U &&
+        !MotorPositionStore_EndMotion()) {
+        result = MODBUS_RESULT_ECHO;
+    }
 
     if (result != MODBUS_RESULT_OK && motor_batch.index < motor_batch.count) {
         motor_last_failed_slave = motor_batch.motors[motor_batch.index].slave_addr;
@@ -935,6 +1014,98 @@ static uint8_t MotorControl_ReadCurrentPosition(int32_t *position)
         }
     }
     return result;
+}
+
+/*
+ * 普通绝对位置批次中，7/8轴每秒各读一次并追加一条
+ * Flash快照。仅在主站无未完成事务时启动快照读取，避免抢占
+ * 批处理状态机正在等待的Modbus事务。
+ */
+static uint8_t MotorControl_BatchCheckpointProcess(void)
+{
+    const uint8_t slave_addrs[2] = {
+        MOTOR7_SLAVE_ADDR, MOTOR8_SLAVE_ADDR
+    };
+    uint8_t save_addrs[2];
+    int32_t save_positions[2];
+    uint8_t save_count = 0U;
+    uint8_t result;
+    uint8_t index;
+    uint8_t slave_addr;
+    uint32_t now;
+
+    if (motor_batch.checkpoint_mask == 0U) {
+        return 0U;
+    }
+
+    now = GetTick();
+    if (motor_batch.checkpoint_state == MOTOR_BATCH_CHECKPOINT_IDLE) {
+        if (!MotorControl_IsTimeReached(
+                now, motor_batch.next_checkpoint_tick) ||
+            ModbusMaster_IsBusy()) {
+            return 0U;
+        }
+        motor_batch.checkpoint_state =
+            (motor_batch.checkpoint_mask & 0x01U) != 0U
+                ? MOTOR_BATCH_CHECKPOINT_READ_MOTOR7
+                : MOTOR_BATCH_CHECKPOINT_READ_MOTOR8;
+    }
+
+    index = motor_batch.checkpoint_state ==
+                MOTOR_BATCH_CHECKPOINT_READ_MOTOR7
+                ? 0U : 1U;
+    slave_addr = slave_addrs[index];
+    result = ModbusMaster_03_ReadHoldReg(
+        MODBUS_MASTER_CLIENT_MOTOR_CONTROL,
+        slave_addr,
+        MOTOR_CONTROL_DRIVER_POSITION_REG,
+        MOTOR_CONTROL_POSITION_REG_COUNT,
+        motor_batch.checkpoint_words);
+    if (result == MODBUS_RESULT_PENDING || result == MODBUS_RESULT_BUSY) {
+        return 1U;
+    }
+    if (result != MODBUS_RESULT_OK) {
+        LOG_WARN("MOTOR_POS",
+                 "checkpoint read failed: slave=0x%02X, result=%u\r\n",
+                 (unsigned int)slave_addr, (unsigned int)result);
+        motor_batch.checkpoint_state = MOTOR_BATCH_CHECKPOINT_IDLE;
+        motor_batch.next_checkpoint_tick =
+            GetTick() + MOTOR_POSITION_CHECKPOINT_INTERVAL_MS;
+        return 1U;
+    }
+
+    motor_batch.checkpoint_positions[index] =
+        MotorControl_CombinePosition(
+            motor_batch.checkpoint_words[1],
+            motor_batch.checkpoint_words[0]);
+    if (index == 0U &&
+        (motor_batch.checkpoint_mask & 0x02U) != 0U) {
+        motor_batch.checkpoint_state =
+            MOTOR_BATCH_CHECKPOINT_READ_MOTOR8;
+        return 1U;
+    }
+
+    for (index = 0U; index < 2U; index++) {
+        if ((motor_batch.checkpoint_mask & (uint8_t)(1U << index)) != 0U) {
+            save_addrs[save_count] = slave_addrs[index];
+            save_positions[save_count] =
+                motor_batch.checkpoint_positions[index];
+            save_count++;
+        }
+    }
+    if (!MotorPositionStore_UpdateBatch(save_addrs, save_positions,
+                                        save_count)) {
+        LOG_ERROR("MOTOR_POS", "periodic checkpoint save failed\r\n");
+    } else {
+        LOG_DEBUG("MOTOR_POS",
+                  "checkpoint saved: motor7=%ld, motor8=%ld\r\n",
+                  (long)motor_batch.checkpoint_positions[0],
+                  (long)motor_batch.checkpoint_positions[1]);
+    }
+    motor_batch.checkpoint_state = MOTOR_BATCH_CHECKPOINT_IDLE;
+    motor_batch.next_checkpoint_tick =
+        GetTick() + MOTOR_POSITION_CHECKPOINT_INTERVAL_MS;
+    return 1U;
 }
 
 /* 堵转状态由电机服务模块统一持有，避免头文件静态变量产生多个副本。 */
@@ -1751,6 +1922,10 @@ uint8_t MotorControl_FullHomeStart(uint8_t saved_position_valid,
     motor_full_home.speed_command = speed_command;
     motor_full_home.current_slave = motor_full_home_alarm_addresses[0];
     motor_full_home.state = MOTOR_FULL_HOME_STATE_CHECK_ALL_ALARMS;
+    if (MotorPositionStore_WasMotionInterrupted()) {
+        LOG_WARN("MOTOR",
+                 "full homing is using the last periodic checkpoint after an interrupted motor7/8 move\r\n");
+    }
     LOG_INFO("MOTOR", "full homing started: clearing all motor alarms first\r\n");
     return MODBUS_RESULT_OK;
 }
@@ -2261,6 +2436,7 @@ static uint8_t MotorControl_BatchMoveInternal(
     uint8_t result;
     uint8_t alarm_status;
     uint8_t index;
+    uint8_t checkpoint_mask = 0U;
     uint32_t now;
 
     if (MotorControl_HomeIsBusy() || MotorControl_PreHomeIsBusy()) {
@@ -2280,8 +2456,27 @@ static uint8_t MotorControl_BatchMoveInternal(
                 (unsigned int)motors[index].register_address);
             return MODBUS_RESULT_PARAM;
         }
+        if (check_position &&
+            motors[index].slave_addr == MOTOR7_SLAVE_ADDR) {
+            checkpoint_mask |= 0x01U;
+        } else if (check_position &&
+                   motors[index].slave_addr == MOTOR8_SLAVE_ADDR) {
+            checkpoint_mask |= 0x02U;
+        }
     }
     if (!motor_batch.active) {
+        if (checkpoint_mask != 0U &&
+            !MotorPositionStore_PrepareJournal()) {
+            LOG_ERROR("MOTOR_POS",
+                      "journal preparation failed before motor7/8 move\r\n");
+            return MODBUS_RESULT_ECHO;
+        }
+        if (checkpoint_mask != 0U &&
+            !MotorPositionStore_BeginMotion()) {
+            LOG_ERROR("MOTOR_POS",
+                      "failed to mark motor7/8 movement start\r\n");
+            return MODBUS_RESULT_ECHO;
+        }
         memcpy(motor_batch.motors, motors,
                count * sizeof(MotorControlParams));
         memset(motor_batch.results, MODBUS_RESULT_PENDING,
@@ -2293,6 +2488,10 @@ static uint8_t MotorControl_BatchMoveInternal(
         motor_batch.index = 0U;
         motor_batch.failures = 0U;
         motor_batch.first_failure = MODBUS_RESULT_OK;
+        motor_batch.checkpoint_mask = checkpoint_mask;
+        motor_batch.checkpoint_state = MOTOR_BATCH_CHECKPOINT_IDLE;
+        motor_batch.next_checkpoint_tick =
+            GetTick() + MOTOR_POSITION_CHECKPOINT_INTERVAL_MS;
         for (index = 0U; index < count; index++) {
             motor_batch.target_positions[index] =
                 MotorControl_CommandPosition(&motor_batch.motors[index]);
@@ -2307,6 +2506,10 @@ static uint8_t MotorControl_BatchMoveInternal(
     } else if (!MotorControl_RequestMatches(motors, count, check_position)) {
         LOG_WARN("MOTOR", "batch request rejected: another batch is active\r\n");
         return MODBUS_RESULT_BUSY;
+    }
+
+    if (MotorControl_BatchCheckpointProcess()) {
+        return MODBUS_RESULT_PENDING;
     }
 
     switch (motor_batch.phase) {

@@ -11,8 +11,17 @@
 /* 存储地址直接使用宏计算 */
 #define SWAP_STATE_ADDR (FLASH_SIZE - 512)
 
-/* 电机5~12位置记录独占倒数第二个4KB扇区，避免与空仓状态互相影响。 */
+/*
+ * 电机位置旧格式保留在倒数第二个4KB扇区，用于升级兼容。
+ * 新格式在其前面使用16个4KB扇区作为追加式循环日志，避免每次保存都擦除同一扇区。
+ */
 #define MOTOR_POSITION_STATE_ADDR (FLASH_SIZE - 8192UL)
+#define MOTOR_POSITION_JOURNAL_SECTOR_SIZE 4096UL
+#define MOTOR_POSITION_JOURNAL_SECTOR_COUNT 16UL
+#define MOTOR_POSITION_JOURNAL_SIZE \
+    (MOTOR_POSITION_JOURNAL_SECTOR_SIZE * MOTOR_POSITION_JOURNAL_SECTOR_COUNT)
+#define MOTOR_POSITION_JOURNAL_ADDR \
+    (MOTOR_POSITION_STATE_ADDR - MOTOR_POSITION_JOURNAL_SIZE)
 #define MOTOR_POSITION_STATE_MAGIC 0x4D503738UL
 #define MOTOR_POSITION_STATE_VERSION 2U
 #define MOTOR_POSITION_STORE_FIRST_SLAVE 5U
@@ -39,6 +48,7 @@ void SwapState_Save(void);              // 保存当前状态到Flash
 uint8_t SwapState_GetEmptyBay(void);    // 获取当前空仓号
 void SwapState_SetEmptyBay(uint8_t bay); // 设置空仓号并保存
 void BatterySwap_Perform(void);         // 执行一次换电操作（由外部触发）
+/* 按当前落地序列锁定的目标机位提交状态，并立即保存到 Flash。 */
 uint8_t UpdateEmptyBay(void);
 void SwapState_TrySave(void);
 void MotorPositionStore_Init(void);
@@ -51,5 +61,10 @@ uint8_t MotorPositionStore_GetAll(
 uint8_t MotorPositionStore_UpdateBatch(const uint8_t *slave_addrs,
                                        const int32_t *positions,
                                        uint8_t count);
+/* 在电机启动前预先擦好下一个循环日志扇区，运动中只做小块页编程。 */
+uint8_t MotorPositionStore_PrepareJournal(void);
+uint8_t MotorPositionStore_BeginMotion(void);
+uint8_t MotorPositionStore_EndMotion(void);
+uint8_t MotorPositionStore_WasMotionInterrupted(void);
 
 #endif

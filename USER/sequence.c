@@ -34,6 +34,7 @@ struct {
     uint8_t step_count;
     uint8_t current_index;
     uint8_t selected_bay;
+    uint8_t target_empty_bay;
     SequenceState state;
     SequenceState resume_state;
     SequenceResult last_result;
@@ -101,6 +102,7 @@ static void Sequence_Finish(SequenceResult result)
     seq_runner.step_count = 0U;
     seq_runner.current_index = 0U;
     seq_runner.selected_bay = 0U;
+    seq_runner.target_empty_bay = 0U;
     seq_runner.state = SEQUENCE_STATE_IDLE;
     seq_runner.resume_state = SEQUENCE_STATE_IDLE;
     seq_runner.last_result = result;
@@ -214,6 +216,8 @@ uint8_t Sequence_IsRecovering(void)
 }
 SequenceStartResult Sequence_Start(SeqId id)
 {
+    uint8_t target_empty_bay = 0U;
+
     if (Sequence_IsBusy()) {
         LOG_WARN("SEQUENCE", "start rejected: busy, requested_id=%u\r\n",
                  (unsigned int)id);
@@ -280,8 +284,13 @@ SequenceStartResult Sequence_Start(SeqId id)
                 case SEQ_ID_LANDING:
                     seq_runner.steps = landing_steps;
                     seq_runner.step_count = LANDING_STEP_COUNT;
+                    /*
+                     * 在流程启动时锁定换电完成后的空机位。
+                     * 告警恢复会从第 0 步重跑，但该目标值不会随当前状态再次递增。
+                     */
+                    target_empty_bay = (uint8_t)((empty_bay % BAY_COUNT) + 1U);
                     LOG_INFO("SEQUENCE", "landing sequence selected: bay=%u\r\n",
-                             (unsigned int)empty_bay);
+                              (unsigned int)empty_bay);
                 break;
 				case SEQ_ID_OPENFLY:
                     seq_runner.steps = &takeoff_steps[OPENFLY_STEP_OFFSET];
@@ -319,6 +328,7 @@ SequenceStartResult Sequence_Start(SeqId id)
 
     seq_runner.id = id;
     seq_runner.selected_bay = empty_bay;
+    seq_runner.target_empty_bay = target_empty_bay;
     seq_runner.current_index = 0U;
     seq_runner.state = SEQUENCE_STATE_RUNNING;
     seq_runner.resume_state = SEQUENCE_STATE_IDLE;
@@ -336,8 +346,9 @@ SequenceStartResult Sequence_Start(SeqId id)
     seq_runner.recovery_alarm_result = 0U;
     seq_runner.recovery_finish_after_release = 0U;
     seq_runner.recovery_deadline = 0U;
-    LOG_INFO("SEQUENCE", "started: id=%u, bay=%u, steps=%u\r\n",
+    LOG_INFO("SEQUENCE", "started: id=%u, bay=%u, target_bay=%u, steps=%u\r\n",
              (unsigned int)id, (unsigned int)empty_bay,
+             (unsigned int)target_empty_bay,
              (unsigned int)seq_runner.step_count);
     return SEQ_START_OK;
 }
@@ -686,6 +697,8 @@ SequenceStartResult Sequence_StartRecovery(void)
 
     StatusRegs_TakeSnapshot();
     seq_runner.id = SEQ_ID_RECOVERY;
+    seq_runner.selected_bay = 0U;
+    seq_runner.target_empty_bay = 0U;
     seq_runner.current_index = 0U;
     seq_runner.state = SEQUENCE_STATE_RUNNING;
     seq_runner.resume_state = SEQUENCE_STATE_IDLE;
@@ -718,6 +731,11 @@ uint8_t Sequence_GetCurrentStep(void)
 uint8_t Sequence_GetSelectedBay(void)
 {
     return seq_runner.selected_bay;
+}
+
+uint8_t Sequence_GetTargetEmptyBay(void)
+{
+    return seq_runner.target_empty_bay;
 }
 
 const uint8_t *Sequence_GetCurrentStepMotors(void)
