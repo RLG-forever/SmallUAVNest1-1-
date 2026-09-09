@@ -696,6 +696,76 @@ void MotorControl_PreHomeProcess(void)
             return;
         }
         motor_prehome.current_slave = MOTOR7_SLAVE_ADDR;
+        motor_prehome.state =
+            MOTOR_PREHOME_STATE_CHECK_RUNNING_ALARM_MOTOR7;
+        return;
+    }
+
+    if (motor_prehome.state ==
+        MOTOR_PREHOME_STATE_CHECK_RUNNING_ALARM_MOTOR7) {
+        motor_prehome.current_slave = MOTOR7_SLAVE_ADDR;
+        result = ModbusMaster_03_ReadHoldReg(
+            MODBUS_MASTER_CLIENT_MOTOR_CONTROL,
+            MOTOR7_SLAVE_ADDR,
+            MOTOR_CONTROL_ALARM_STATUS_REG,
+            1U,
+            &motor_prehome.alarm_status_word);
+        if (result == MODBUS_RESULT_PENDING || result == MODBUS_RESULT_BUSY) {
+            return;
+        }
+        if (result != MODBUS_RESULT_OK) {
+            MotorControl_PreHomeFail(MOTOR7_SLAVE_ADDR, result);
+            return;
+        }
+        alarm_status = (uint8_t)(motor_prehome.alarm_status_word &
+                                 MOTOR_CONTROL_ALARM_STATUS_MASK);
+        if (alarm_status != 0U) {
+            LOG_ERROR("PREHOME",
+                      "pre-home aborted by running alarm: slave=0x%02X, alarm=%u, raw=0x%04X\r\n",
+                      (unsigned int)MOTOR7_SLAVE_ADDR,
+                      (unsigned int)alarm_status,
+                      (unsigned int)motor_prehome.alarm_status_word);
+            MotorControl_PreHomeFail(
+                MOTOR7_SLAVE_ADDR,
+                MOTOR_CONTROL_RESULT_ALARM(alarm_status));
+            return;
+        }
+        motor_prehome.current_slave = MOTOR8_SLAVE_ADDR;
+        motor_prehome.state =
+            MOTOR_PREHOME_STATE_CHECK_RUNNING_ALARM_MOTOR8;
+        return;
+    }
+
+    if (motor_prehome.state ==
+        MOTOR_PREHOME_STATE_CHECK_RUNNING_ALARM_MOTOR8) {
+        motor_prehome.current_slave = MOTOR8_SLAVE_ADDR;
+        result = ModbusMaster_03_ReadHoldReg(
+            MODBUS_MASTER_CLIENT_MOTOR_CONTROL,
+            MOTOR8_SLAVE_ADDR,
+            MOTOR_CONTROL_ALARM_STATUS_REG,
+            1U,
+            &motor_prehome.alarm_status_word);
+        if (result == MODBUS_RESULT_PENDING || result == MODBUS_RESULT_BUSY) {
+            return;
+        }
+        if (result != MODBUS_RESULT_OK) {
+            MotorControl_PreHomeFail(MOTOR8_SLAVE_ADDR, result);
+            return;
+        }
+        alarm_status = (uint8_t)(motor_prehome.alarm_status_word &
+                                 MOTOR_CONTROL_ALARM_STATUS_MASK);
+        if (alarm_status != 0U) {
+            LOG_ERROR("PREHOME",
+                      "pre-home aborted by running alarm: slave=0x%02X, alarm=%u, raw=0x%04X\r\n",
+                      (unsigned int)MOTOR8_SLAVE_ADDR,
+                      (unsigned int)alarm_status,
+                      (unsigned int)motor_prehome.alarm_status_word);
+            MotorControl_PreHomeFail(
+                MOTOR8_SLAVE_ADDR,
+                MOTOR_CONTROL_RESULT_ALARM(alarm_status));
+            return;
+        }
+        motor_prehome.current_slave = MOTOR7_SLAVE_ADDR;
         motor_prehome.state = MOTOR_PREHOME_STATE_READ_STABLE_MOTOR7;
         return;
     }
@@ -1444,6 +1514,38 @@ void MotorControl_HomeProcess(void)
 
     if (motor_home.state == MOTOR_HOME_STATE_WAIT_POLL) {
         if (!MotorControl_IsTimeReached(now, motor_home.next_poll_tick)) {
+            return;
+        }
+        motor_home.state = MOTOR_HOME_STATE_CHECK_RUNNING_ALARM;
+        return;
+    }
+
+    if (motor_home.state == MOTOR_HOME_STATE_CHECK_RUNNING_ALARM) {
+        slave_addr = motor_home.addresses[motor_home.status_index];
+        motor_home.current_slave = slave_addr;
+        result = ModbusMaster_03_ReadHoldReg(
+            MODBUS_MASTER_CLIENT_MOTOR_CONTROL,
+            slave_addr,
+            MOTOR_CONTROL_ALARM_STATUS_REG,
+            1U,
+            &motor_home.alarm_status_word);
+        if (result == MODBUS_RESULT_PENDING || result == MODBUS_RESULT_BUSY) {
+            return;
+        }
+        if (result != MODBUS_RESULT_OK) {
+            MotorControl_HomeFail(slave_addr, result);
+            return;
+        }
+        alarm_status = (uint8_t)(motor_home.alarm_status_word &
+                                 MOTOR_CONTROL_ALARM_STATUS_MASK);
+        if (alarm_status != 0U) {
+            LOG_ERROR("MOTOR",
+                      "homing aborted by running alarm: slave=0x%02X, alarm=%u, raw=0x%04X\r\n",
+                      (unsigned int)slave_addr,
+                      (unsigned int)alarm_status,
+                      (unsigned int)motor_home.alarm_status_word);
+            MotorControl_HomeFail(
+                slave_addr, MOTOR_CONTROL_RESULT_ALARM(alarm_status));
             return;
         }
         motor_home.state = MOTOR_HOME_STATE_READ_STATUS;
