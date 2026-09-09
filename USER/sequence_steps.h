@@ -52,7 +52,7 @@ typedef struct {
 #define MOTOR_HOME_POS                           0L
 #define CALIB_MOTOR1_RECOVERY_POS                315000L
 #define CALIB_MOTOR1_AUX_POS                     9000L
-#define CALIB_MOTOR1_FLY_LIFT_POS                (333000L - 1000L)
+#define CALIB_MOTOR1_FLY_LIFT_POS                332500L
 #define CALIB_MOTOR1_TRANSFER_LIFT_POS           (330000L + 2000L)
 
 #define CALIB_MOTOR2_RECOVERY_FORWARD_POS        136000L
@@ -372,6 +372,7 @@ uint8_t OpenDr(void);
 uint8_t CloseDr(void);
 uint8_t StopDr(void);
 uint8_t CheckAndCloseDoor(void);
+uint8_t WaitForUavPowerOn(void);
 uint8_t OpenAC(void);
 uint8_t CloseAC(void);
 
@@ -391,6 +392,7 @@ extern const StepDef recovery_without_battery_steps[];
 extern const uint8_t OPENDR1_STEP_COUNT;
 extern const uint8_t OPENDR_STEP_COUNT;
 extern const uint8_t CLOSEDR_STEP_COUNT;
+#define TAKEOFF_UAV_POWER_CHECK_STEP_INDEX 9U
 #define OPENFLY_STEP_OFFSET             0U
 #define OPENFLY_TRAILING_EXCLUDED_STEPS 3U
 #define OPENFLY_STEP_COUNT                                              \

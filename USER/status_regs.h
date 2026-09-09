@@ -62,6 +62,8 @@ void StatusRegs_Update(StatusRegAddr addr, uint16_t value);
 void StatusRegs_UpdateBatch(uint16_t start_addr, const uint16_t *values, uint8_t count);
 // 获取寄存器值（供从站读取）
 uint16_t StatusRegs_Get(StatusRegAddr addr);
+// 获取寄存器实时值（忽略序列快照，用于0x60等运行中动态状态）
+uint16_t StatusRegs_GetLive(StatusRegAddr addr);
 void StatusRegs_TakeSnapshot(void);
 void StatusRegs_ReleaseSnapshot(void);
 uint8_t StatusRegs_IsSnapshotActive(void);

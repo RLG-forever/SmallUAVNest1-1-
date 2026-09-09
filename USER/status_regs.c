@@ -83,6 +83,20 @@ uint16_t StatusRegs_Get(StatusRegAddr addr)
     return value;
 }
 
+uint16_t StatusRegs_GetLive(StatusRegAddr addr)
+{
+    uint32_t primask;
+    uint16_t value = 0U;
+
+    if ((uint16_t)addr >= STATUS_REG_COUNT) {
+        return 0U;
+    }
+    primask = StatusRegs_EnterCritical();
+    value = status_regs[addr];
+    StatusRegs_ExitCritical(primask);
+    return value;
+}
+
 void StatusRegs_TakeSnapshot(void)
 {
     uint32_t primask = StatusRegs_EnterCritical();
