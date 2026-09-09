@@ -382,6 +382,10 @@ static uint8_t GatewayService_ExecuteWrite(uint16_t register_address,
     if (!control_enabled &&
         register_address != GATEWAY_CMD_HOME_ALL &&
         register_address != GATEWAY_CMD_UAV_STATUS) {
+        LOG_WARN("GW_TRACE",
+                 "command rejected: control disabled, reg=0x%04X, value=0x%04X\r\n",
+                 (unsigned int)register_address,
+                 (unsigned int)value);
         return MODBUS_RESULT_BUSY;
     }
 
@@ -1036,13 +1040,14 @@ static uint8_t GatewayService_Handle03(const ModbusSlaveRequest *request)
 static uint8_t GatewayService_Handle06(const ModbusSlaveRequest *request)
 {
     LOG_INFO("GW_TRACE",
-             "FC06 received: reg=0x%04X, value=0x%04X, active=%u, active_reg=0x%04X, active_type=%u, sequence_busy=%u\r\n",
+             "FC06 received: reg=0x%04X, value=0x%04X, control_enabled=%u, active=%u, active_reg=0x%04X, active_type=%u, sequence_busy=%u\r\n",
              (unsigned int)request->start_register,
-              (unsigned int)request->value,
-              (unsigned int)active_command.active,
-              (unsigned int)active_command.register_address,
-              (unsigned int)active_command.type,
-              (unsigned int)Sequence_IsBusy());
+             (unsigned int)request->value,
+             (unsigned int)control_enabled,
+             (unsigned int)active_command.active,
+             (unsigned int)active_command.register_address,
+             (unsigned int)active_command.type,
+             (unsigned int)Sequence_IsBusy());
 
     if (request->start_register == GATEWAY_CMD_UAV_STATUS) {
         return GatewayService_HandleUavStatusWrite(request);
