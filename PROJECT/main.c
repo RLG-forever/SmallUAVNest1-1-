@@ -155,6 +155,7 @@ int main(void)
 	LOG_INFO("MAIN", "initialization completed\r\n");
   __enable_irq();  /* 开启全局中断 */
 	delay_ms(1000);
+
 	saved_position_valid = MotorPositionStore_Get(
 		&saved_motor7_position, &saved_motor8_position);
 	home_start_result = MotorControl_FullHomeStart(
@@ -175,8 +176,6 @@ int main(void)
 	}
 //	Motor_Reset(MOTOR1_SLAVE_ADDR, MOTOR1_CTRL_REG1, 8);
 	// 复位前确保主站状态空闲
-	
-
 
 //printf("\r\n============= MCU RESET DETECTED =============\r\n");
 		while(1)

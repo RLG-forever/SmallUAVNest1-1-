@@ -319,8 +319,8 @@ const uint8_t OPENDR1_STEP_COUNT = (uint8_t)(sizeof(opendr1_steps) / sizeof(open
 // 打开舱门步骤表
 const StepDef opendr_steps[] =
 {
-      //{OpenDr, 15250, REG_DOOR_STATE, 2},      //1.打开舱门
-      {OpenDr, 500, REG_DOOR_STATE, 2},      //1.打开舱门
+      {OpenDr, 15250, REG_DOOR_STATE, 2},      //1.打开舱门
+      //{OpenDr, 500, REG_DOOR_STATE, 2},      //1.打开舱门
 //			{StopDr, 1000, REG_DOOR_STATE, 2},       //2.停止
 			{CloseAC, 0, STATUS_REG_NONE, 0},   // 关闭空调
 
@@ -357,6 +357,7 @@ const StepDef takeoff_steps[] =
         EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, CALIB_MOTOR2_FLY_NEAR_POS + MOTOR2_FLY_FAR_RELA_POS, 0, STATUS_REG_NONE, 0),      //29.电机2前进
         //移动至原点位置0
         EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, MOTOR_HOME_POS, 0, STATUS_REG_NONE, 0),     //30.电机2后退
+        
         {WaitForUavPowerOn, 0, STATUS_REG_NONE, 0, NULL, NULL,  UAV_POWER_ON_WAIT_TIMEOUT_MS},   //等待无人机开机
         //待修改
         {Center_2, 0, STATUS_REG_NONE, 0},       //31.飞机后退
@@ -367,8 +368,8 @@ const StepDef takeoff_steps[] =
 
         {LeaveCenter, 0, REG_CENTER_ROD_STATE, 2},   	  //34.居中杆释放
 
-        //{OpenDr, 15250, REG_DOOR_STATE, 2},     	  //1.打开舱门
-        {OpenDr, 500, REG_DOOR_STATE, 2},     	  //1.打开舱门
+        {OpenDr, 15250, REG_DOOR_STATE, 2},     	  //1.打开舱门
+        //{OpenDr, 500, REG_DOOR_STATE, 2},     	  //1.打开舱门
         {CloseAC, 500, STATUS_REG_NONE, 0},            // 关闭空调
 
         {CheckAndCloseDoor, 16250, STATUS_REG_NONE, 0, NULL, NULL, UAV_DEPARTURE_WAIT_TIMEOUT_MS},                  // 等待无人机离巢后关闭舱门

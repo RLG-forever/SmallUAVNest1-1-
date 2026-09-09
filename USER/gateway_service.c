@@ -15,7 +15,7 @@
 #include <string.h>
 
 #define GATEWAY_DUPLICATE_WINDOW_MS          5000U
-#define GATEWAY_REMOTE_ON_RETRY_INTERVAL_MS 40000U
+#define GATEWAY_REMOTE_ON_RETRY_INTERVAL_MS 60000U
 #define GATEWAY_REMOTE_ON_MAX_ATTEMPTS          3U
 #define GATEWAY_TAKEOFF_MAX_ATTEMPTS            3U
 #define GATEWAY_REMOTE_OFF_DELAY_MS          (120UL * 60UL * 1000UL)
@@ -679,9 +679,10 @@ static void GatewayService_ProcessActiveCommand(void)
                 GATEWAY_REMOTE_ON_RETRY_INTERVAL_MS;
             takeoff_state = GATEWAY_TAKEOFF_STATE_WAIT_REMOTE;
             LOG_WARN("GW_TRACE",
-                     "remote power-on attempt completed: %u/%u; waiting 30 seconds\r\n",
+                     "remote power-on attempt completed: %u/%u; waiting %lu seconds\r\n",
                      (unsigned int)takeoff_remote_attempt_count,
-                     (unsigned int)GATEWAY_REMOTE_ON_MAX_ATTEMPTS);
+                     (unsigned int)GATEWAY_REMOTE_ON_MAX_ATTEMPTS,
+                     (unsigned long)(GATEWAY_REMOTE_ON_RETRY_INTERVAL_MS / 1000U));
             return;
         }
 
