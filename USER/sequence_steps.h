@@ -48,23 +48,8 @@ typedef struct {
 #define MOTOR14_SLAVE_ADDR 0x14   // 电机14从站地址(控制遥控器的舵机)
 #define MOTOR15_SLAVE_ADDR 0x13   // 电机15从站地址(电池充电空开)
 
-/* Common calibration values shared by all devices. */
-#define MOTOR_HOME_POS                           0L
-#define CALIB_MOTOR1_RECOVERY_POS                315000L
-#define CALIB_MOTOR1_AUX_POS                     9000L
-#define CALIB_MOTOR2_RECOVERY_FORWARD_POS        136000L
-#define MOTOR2_FLY_FAR_RELA_POS                    8000L
-
-/* Per-device calibration values selected by the build target. */
+/* Device calibration values selected by the build target. */
 #include "config/device_profile.h"
-
-#define CALIB_PLANE_TRANSFER_OUT_MOTOR56_POS     207000L
-#define CALIB_PLANE_TRANSFER_OUT_MOTOR78_POS     150000L
-#define CALIB_PLANE_BASE_POS                     176000L
-#define CALIB_PLANE_OFFSET_POS                   176384L
-
-//电机5和6的center2夹紧位置
-#define CALIB_CENTER_FRONT_POS                   7000L
 
 // 06功能码帧长度（固定8字节）
 // ======================== 步进电机控制寄存器映射 ========================
