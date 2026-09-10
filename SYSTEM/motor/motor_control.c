@@ -16,8 +16,10 @@ typedef enum {
     MOTOR_BATCH_PHASE_IDLE = 0,
     MOTOR_BATCH_PHASE_WRITE,
     MOTOR_BATCH_PHASE_WAIT_POLL,
+    MOTOR_BATCH_PHASE_SCAN_ALARMS,
     MOTOR_BATCH_PHASE_VERIFY_POSITION,
-    MOTOR_BATCH_PHASE_VERIFY_ALARM
+    MOTOR_BATCH_PHASE_VERIFY_ALARM,
+    MOTOR_BATCH_PHASE_STOP_PAIRED_MOTOR
 } MotorBatchPhase;
 
 typedef enum {
@@ -33,6 +35,7 @@ typedef struct {
     MotorBatchPhase phase;
     uint8_t count;
     uint8_t index;
+    uint8_t alarm_index;
     uint8_t failures;
     uint8_t first_failure;
     uint8_t reached_mask;
@@ -122,10 +125,18 @@ typedef struct {
     uint16_t status_words[MOTOR_HOME_STATUS_REG_COUNT];
 } MotorFullHomeContext;
 
+typedef struct {
+    uint8_t active;
+    uint8_t fault_slave;
+    uint8_t peer_slave;
+    uint8_t original_error;
+} MotorPairEmergencyStopContext;
+
 static MotorBatchContext motor_batch;
 static MotorHomeContext motor_home;
 static MotorPreHomeContext motor_prehome;
 static MotorFullHomeContext motor_full_home;
+static MotorPairEmergencyStopContext motor_pair_emergency_stop;
 static uint8_t motor2_home_completed;
 /* 批处理结束后上下文会被清空，单独保留失败从站供上层生成故障码。 */
 static uint8_t motor_last_failed_slave;
@@ -238,6 +249,82 @@ static int64_t MotorControl_AbsI64(int64_t value)
     return value < 0 ? -value : value;
 }
 
+static uint8_t MotorControl_GetPairedSlave(uint8_t slave_addr)
+{
+    switch (slave_addr) {
+        case MOTOR5_SLAVE_ADDR:
+            return MOTOR6_SLAVE_ADDR;
+        case MOTOR6_SLAVE_ADDR:
+            return MOTOR5_SLAVE_ADDR;
+        case MOTOR7_SLAVE_ADDR:
+            return MOTOR8_SLAVE_ADDR;
+        case MOTOR8_SLAVE_ADDR:
+            return MOTOR7_SLAVE_ADDR;
+        case MOTOR9_SLAVE_ADDR:
+            return MOTOR10_SLAVE_ADDR;
+        case MOTOR10_SLAVE_ADDR:
+            return MOTOR9_SLAVE_ADDR;
+        case MOTOR11_SLAVE_ADDR:
+            return MOTOR12_SLAVE_ADDR;
+        case MOTOR12_SLAVE_ADDR:
+            return MOTOR11_SLAVE_ADDR;
+        default:
+            return 0U;
+    }
+}
+
+static uint8_t MotorControl_StartPairedEmergencyStop(uint8_t fault_slave,
+                                                      uint8_t error)
+{
+    uint8_t peer_slave = MotorControl_GetPairedSlave(fault_slave);
+
+    if (peer_slave == 0U || motor_pair_emergency_stop.active) {
+        return 0U;
+    }
+
+    motor_pair_emergency_stop.active = 1U;
+    motor_pair_emergency_stop.fault_slave = fault_slave;
+    motor_pair_emergency_stop.peer_slave = peer_slave;
+    motor_pair_emergency_stop.original_error = error;
+    LOG_WARN("MOTOR",
+             "paired motor alarm: fault=0x%02X, emergency stopping peer=0x%02X\r\n",
+             (unsigned int)fault_slave,
+             (unsigned int)peer_slave);
+    return 1U;
+}
+
+static uint8_t MotorControl_ProcessPairedEmergencyStop(void)
+{
+    uint8_t result;
+
+    if (!motor_pair_emergency_stop.active) {
+        return MODBUS_RESULT_PARAM;
+    }
+
+    result = ModbusMaster_06_WriteSingleReg(
+        MODBUS_MASTER_CLIENT_MOTOR_CONTROL,
+        motor_pair_emergency_stop.peer_slave,
+        MOTOR_CONTROL_RUN_COMMAND_REG,
+        MOTOR_CONTROL_EMERGENCY_STOP_COMMAND);
+    if (result == MODBUS_RESULT_PENDING || result == MODBUS_RESULT_BUSY) {
+        return result;
+    }
+
+    if (result == MODBUS_RESULT_OK) {
+        LOG_WARN("MOTOR",
+                 "paired motor emergency stop completed: peer=0x%02X\r\n",
+                 (unsigned int)motor_pair_emergency_stop.peer_slave);
+    } else {
+        LOG_ERROR("MOTOR",
+                  "paired motor emergency stop failed: peer=0x%02X, result=%u\r\n",
+                  (unsigned int)motor_pair_emergency_stop.peer_slave,
+                  (unsigned int)result);
+    }
+    motor_pair_emergency_stop.active = 0U;
+    return result;
+}
+
+#if MOTOR_HOME_LEVEL_ENABLE
 static uint8_t MotorControl_HomeBatchContains(uint8_t slave_addr)
 {
     uint8_t index;
@@ -249,6 +336,7 @@ static uint8_t MotorControl_HomeBatchContains(uint8_t slave_addr)
     }
     return 0U;
 }
+#endif
 
 static uint8_t MotorControl_HomeReadPosition(uint8_t slave_addr,
                                              int32_t *position)
@@ -756,6 +844,18 @@ void MotorControl_PreHomeProcess(void)
         return;
     }
 
+    if (motor_prehome.state ==
+        MOTOR_PREHOME_STATE_STOP_PAIRED_MOTOR) {
+        result = MotorControl_ProcessPairedEmergencyStop();
+        if (result == MODBUS_RESULT_PENDING || result == MODBUS_RESULT_BUSY) {
+            return;
+        }
+        MotorControl_PreHomeFail(
+            motor_pair_emergency_stop.fault_slave,
+            motor_pair_emergency_stop.original_error);
+        return;
+    }
+
     now = GetTick();
     if (MotorControl_IsTimeReached(now, motor_prehome.timeout_deadline)) {
         ModbusMaster_Cancel();
@@ -798,9 +898,16 @@ void MotorControl_PreHomeProcess(void)
                       (unsigned int)MOTOR7_SLAVE_ADDR,
                       (unsigned int)alarm_status,
                       (unsigned int)motor_prehome.alarm_status_word);
-            MotorControl_PreHomeFail(
-                MOTOR7_SLAVE_ADDR,
-                MOTOR_CONTROL_RESULT_ALARM(alarm_status));
+            result = MOTOR_CONTROL_RESULT_ALARM(alarm_status);
+            if (MotorControl_StartPairedEmergencyStop(
+                    MOTOR7_SLAVE_ADDR, result)) {
+                motor_prehome.current_slave =
+                    motor_pair_emergency_stop.peer_slave;
+                motor_prehome.state =
+                    MOTOR_PREHOME_STATE_STOP_PAIRED_MOTOR;
+                return;
+            }
+            MotorControl_PreHomeFail(MOTOR7_SLAVE_ADDR, result);
             return;
         }
         motor_prehome.current_slave = MOTOR8_SLAVE_ADDR;
@@ -833,9 +940,16 @@ void MotorControl_PreHomeProcess(void)
                       (unsigned int)MOTOR8_SLAVE_ADDR,
                       (unsigned int)alarm_status,
                       (unsigned int)motor_prehome.alarm_status_word);
-            MotorControl_PreHomeFail(
-                MOTOR8_SLAVE_ADDR,
-                MOTOR_CONTROL_RESULT_ALARM(alarm_status));
+            result = MOTOR_CONTROL_RESULT_ALARM(alarm_status);
+            if (MotorControl_StartPairedEmergencyStop(
+                    MOTOR8_SLAVE_ADDR, result)) {
+                motor_prehome.current_slave =
+                    motor_pair_emergency_stop.peer_slave;
+                motor_prehome.state =
+                    MOTOR_PREHOME_STATE_STOP_PAIRED_MOTOR;
+                return;
+            }
+            MotorControl_PreHomeFail(MOTOR8_SLAVE_ADDR, result);
             return;
         }
         motor_prehome.current_slave = MOTOR7_SLAVE_ADDR;
@@ -1141,6 +1255,7 @@ static void MotorControl_HomeBeginCommandPhase(void)
 
 static void MotorControl_HomeSelectNextPair(void)
 {
+#if MOTOR_HOME_LEVEL_ENABLE
     while (motor_home.pair_index < MOTOR_HOME_LEVEL_PAIR_COUNT &&
            (!MotorControl_HomeBatchContains(
                 motor_home_level_pairs[motor_home.pair_index][0]) ||
@@ -1159,6 +1274,11 @@ static void MotorControl_HomeSelectNextPair(void)
     motor_home.current_slave =
         motor_home_level_pairs[motor_home.pair_index][0];
     motor_home.state = MOTOR_HOME_STATE_READ_PAIR_FIRST;
+#else
+    LOG_INFO("MOTOR",
+             "home leveling disabled; starting homing commands\r\n");
+    MotorControl_HomeBeginCommandPhase();
+#endif
 }
 
 static uint8_t MotorControl_HomeSaveCurrentPair(void)
@@ -1518,6 +1638,20 @@ void MotorControl_HomeProcess(void)
             return;
         }
 
+        if (MotorControl_AbsI64(position_difference) >
+            MOTOR_HOME_LEVEL_MAX_ADJUSTMENT) {
+            LOG_WARN(
+                "MOTOR",
+                "home leveling skipped: pair=0x%02X/0x%02X, diff=%ld, max=%ld; continuing homing\r\n",
+                (unsigned int)pair_first_slave,
+                (unsigned int)pair_second_slave,
+                (long)position_difference,
+                (long)MOTOR_HOME_LEVEL_MAX_ADJUSTMENT);
+            motor_home.pair_index++;
+            MotorControl_HomeSelectNextPair();
+            return;
+        }
+
         if (MotorControl_AbsI64(position_difference) <=
             MOTOR_HOME_LEVEL_ERROR_THRESHOLD) {
             if (!MotorControl_HomeSaveCurrentPair()) {
@@ -1620,9 +1754,20 @@ void MotorControl_HomeProcess(void)
         alarm_status = (uint8_t)(motor_home.alarm_status_word &
                                  MOTOR_CONTROL_ALARM_STATUS_MASK);
         if (alarm_status != 0U) {
-            MotorControl_HomeFail(
-                pair_second_slave,
-                MOTOR_CONTROL_RESULT_ALARM(alarm_status));
+            result = MOTOR_CONTROL_RESULT_ALARM(alarm_status);
+            LOG_ERROR("MOTOR",
+                      "home leveling aborted by alarm: slave=0x%02X, alarm=%u, raw=0x%04X\r\n",
+                      (unsigned int)pair_second_slave,
+                      (unsigned int)alarm_status,
+                      (unsigned int)motor_home.alarm_status_word);
+            if (MotorControl_StartPairedEmergencyStop(
+                    pair_second_slave, result)) {
+                motor_home.current_slave =
+                    motor_pair_emergency_stop.peer_slave;
+                motor_home.state = MOTOR_HOME_STATE_STOP_PAIRED_MOTOR;
+                return;
+            }
+            MotorControl_HomeFail(pair_second_slave, result);
             return;
         }
         motor_home.state = MOTOR_HOME_STATE_READ_PAIR_FIRST;
@@ -1674,6 +1819,17 @@ void MotorControl_HomeProcess(void)
         return;
     }
 
+    if (motor_home.state == MOTOR_HOME_STATE_STOP_PAIRED_MOTOR) {
+        result = MotorControl_ProcessPairedEmergencyStop();
+        if (result == MODBUS_RESULT_PENDING || result == MODBUS_RESULT_BUSY) {
+            return;
+        }
+        MotorControl_HomeFail(
+            motor_pair_emergency_stop.fault_slave,
+            motor_pair_emergency_stop.original_error);
+        return;
+    }
+
     now = GetTick();
     if (MotorControl_IsTimeReached(now, motor_home.timeout_deadline)) {
         slave_addr = motor_home.addresses[motor_home.status_index];
@@ -1715,8 +1871,15 @@ void MotorControl_HomeProcess(void)
                       (unsigned int)slave_addr,
                       (unsigned int)alarm_status,
                       (unsigned int)motor_home.alarm_status_word);
-            MotorControl_HomeFail(
-                slave_addr, MOTOR_CONTROL_RESULT_ALARM(alarm_status));
+            result = MOTOR_CONTROL_RESULT_ALARM(alarm_status);
+            if (MotorControl_StartPairedEmergencyStop(
+                    slave_addr, result)) {
+                motor_home.current_slave =
+                    motor_pair_emergency_stop.peer_slave;
+                motor_home.state = MOTOR_HOME_STATE_STOP_PAIRED_MOTOR;
+                return;
+            }
+            MotorControl_HomeFail(slave_addr, result);
             return;
         }
         motor_home.state = MOTOR_HOME_STATE_READ_STATUS;
@@ -2508,7 +2671,8 @@ static uint8_t MotorControl_BatchMoveInternal(
         return MODBUS_RESULT_BUSY;
     }
 
-    if (MotorControl_BatchCheckpointProcess()) {
+    if (motor_batch.phase != MOTOR_BATCH_PHASE_STOP_PAIRED_MOTOR &&
+        MotorControl_BatchCheckpointProcess()) {
         return MODBUS_RESULT_PENDING;
     }
 
@@ -2576,6 +2740,59 @@ static uint8_t MotorControl_BatchMoveInternal(
             if (!MotorControl_IsTimeReached(now, motor_batch.next_poll_tick)) {
                 return MODBUS_RESULT_PENDING;
             }
+            motor_batch.alarm_index = 0U;
+            motor_batch.phase = MOTOR_BATCH_PHASE_SCAN_ALARMS;
+            return MODBUS_RESULT_PENDING;
+
+        case MOTOR_BATCH_PHASE_SCAN_ALARMS:
+            result = ModbusMaster_03_ReadHoldReg(
+                MODBUS_MASTER_CLIENT_MOTOR_CONTROL,
+                motor_batch.motors[motor_batch.alarm_index].slave_addr,
+                MOTOR_CONTROL_ALARM_STATUS_REG,
+                1U,
+                &motor_batch.alarm_status_word);
+            if (result == MODBUS_RESULT_PENDING || result == MODBUS_RESULT_BUSY) {
+                return result;
+            }
+            if (result != MODBUS_RESULT_OK) {
+                motor_batch.index = motor_batch.alarm_index;
+                motor_batch.results[motor_batch.index] = result;
+                LOG_ERROR(
+                    "MOTOR",
+                    "batch alarm scan failed: slave=0x%02X, result=%u\r\n",
+                    (unsigned int)motor_batch.motors[
+                        motor_batch.index].slave_addr,
+                    (unsigned int)result);
+                return MotorControl_FinishBatch(result, results, positions);
+            }
+
+            alarm_status = (uint8_t)(motor_batch.alarm_status_word &
+                                     MOTOR_CONTROL_ALARM_STATUS_MASK);
+            if (alarm_status != 0U) {
+                motor_batch.index = motor_batch.alarm_index;
+                result = MOTOR_CONTROL_RESULT_ALARM(alarm_status);
+                motor_batch.results[motor_batch.index] = result;
+                LOG_ERROR(
+                    "MOTOR",
+                    "batch aborted by alarm scan: slave=0x%02X, alarm=%u, raw=0x%04X\r\n",
+                    (unsigned int)motor_batch.motors[
+                        motor_batch.index].slave_addr,
+                    (unsigned int)alarm_status,
+                    (unsigned int)motor_batch.alarm_status_word);
+                if (MotorControl_StartPairedEmergencyStop(
+                        motor_batch.motors[motor_batch.index].slave_addr,
+                        result)) {
+                    motor_batch.phase =
+                        MOTOR_BATCH_PHASE_STOP_PAIRED_MOTOR;
+                    return MODBUS_RESULT_PENDING;
+                }
+                return MotorControl_FinishBatch(result, results, positions);
+            }
+
+            motor_batch.alarm_index++;
+            if (motor_batch.alarm_index < motor_batch.count) {
+                return MODBUS_RESULT_PENDING;
+            }
             motor_batch.phase = MOTOR_BATCH_PHASE_VERIFY_POSITION;
             return MODBUS_RESULT_PENDING;
 
@@ -2629,6 +2846,13 @@ static uint8_t MotorControl_BatchMoveInternal(
                     (unsigned int)motor_batch.motors[motor_batch.index].slave_addr,
                     (unsigned int)alarm_status,
                     (unsigned int)motor_batch.alarm_status_word);
+                if (MotorControl_StartPairedEmergencyStop(
+                        motor_batch.motors[motor_batch.index].slave_addr,
+                        result)) {
+                    motor_batch.phase =
+                        MOTOR_BATCH_PHASE_STOP_PAIRED_MOTOR;
+                    return MODBUS_RESULT_PENDING;
+                }
                 return MotorControl_FinishBatch(result, results, positions);
             }
 
@@ -2676,6 +2900,16 @@ static uint8_t MotorControl_BatchMoveInternal(
                 now + MOTOR_CONTROL_POSITION_POLL_INTERVAL_MS;
             motor_batch.phase = MOTOR_BATCH_PHASE_WAIT_POLL;
             return MODBUS_RESULT_PENDING;
+
+        case MOTOR_BATCH_PHASE_STOP_PAIRED_MOTOR:
+            result = MotorControl_ProcessPairedEmergencyStop();
+            if (result == MODBUS_RESULT_PENDING ||
+                result == MODBUS_RESULT_BUSY) {
+                return result;
+            }
+            return MotorControl_FinishBatch(
+                motor_pair_emergency_stop.original_error,
+                results, positions);
 
         default:
             return MotorControl_FinishBatch(MODBUS_RESULT_PARAM, results,
