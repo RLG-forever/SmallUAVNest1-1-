@@ -366,9 +366,8 @@ const StepDef takeoff_steps[] =
         //飞机前进
         EXEC_MOVE_ABS_ARRAY_STEP(plane_transfer_out_motors, 0, STATUS_REG_NONE, 0),     //33.飞机前进
 
-        {LeaveCenter, 0, REG_CENTER_ROD_STATE, 2},   	  //34.居中杆释放
-
         {OpenDr, 15250, REG_DOOR_STATE, 2},     	  //1.打开舱门
+        {LeaveCenter, 0, REG_CENTER_ROD_STATE, 2},   	  //34.居中杆释放
         //{OpenDr, 500, REG_DOOR_STATE, 2},     	  //1.打开舱门
         {CloseAC, 500, STATUS_REG_NONE, 0},            // 关闭空调
 

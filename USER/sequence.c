@@ -60,7 +60,7 @@ static const char *Sequence_GetTraceStepName(SeqId id, uint8_t step_index)
         "plane-transfer-in", "motor2-near-1", "motor2-far-1",
         "motor2-near-2", "motor2-far-2", "motor2-home",
         "wait-uav-power-on", "center-2-return", "motor1-home",
-        "plane-transfer-out", "leave-center", "open-door", "close-ac",
+        "plane-transfer-out", "open-door", "leave-center", "close-ac",
         "wait-uav-away-close-door"
     };
     uint8_t full_index = step_index;
