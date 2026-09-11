@@ -57,6 +57,7 @@ static const MotorMoveAbsPosParams center_1_motors[] = {
 static const MotorMoveAbsPosParams center_2_motors[] = {
     EXEC_ABS_POS(MOTOR5_SLAVE_ADDR, CALIB_CENTER_FRONT_POS),
     EXEC_ABS_POS(MOTOR6_SLAVE_ADDR, CALIB_CENTER_FRONT_POS),
+    
     EXEC_ABS_POS(MOTOR7_SLAVE_ADDR, CALIB_CENTER_REAR_POS),
     EXEC_ABS_POS(MOTOR8_SLAVE_ADDR, CALIB_CENTER_REAR_POS)
 };

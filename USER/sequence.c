@@ -36,7 +36,7 @@ struct {
     uint8_t selected_bay;
     uint8_t target_empty_bay;
     SequenceState state;
-    SequenceState resume_state;
+    uint8_t pause_requested;
     SequenceResult last_result;
     uint32_t delay_deadline;
     uint8_t current_step_retry_count;
@@ -104,7 +104,7 @@ static void Sequence_Finish(SequenceResult result)
     seq_runner.selected_bay = 0U;
     seq_runner.target_empty_bay = 0U;
     seq_runner.state = SEQUENCE_STATE_IDLE;
-    seq_runner.resume_state = SEQUENCE_STATE_IDLE;
+    seq_runner.pause_requested = 0U;
     seq_runner.last_result = result;
     seq_runner.delay_deadline = 0U;
     seq_runner.current_step_retry_count = 0U;
@@ -149,6 +149,11 @@ static void Sequence_CompleteCurrentStep(void)
 
     if (seq_runner.current_index >= seq_runner.step_count) {
         Sequence_Finish(SEQUENCE_RESULT_SUCCESS);
+    } else if (seq_runner.pause_requested) {
+        seq_runner.state = SEQUENCE_STATE_PAUSED;
+        LOG_INFO("SEQUENCE", "paused at step boundary: id=%u, next_step=%u\r\n",
+                 (unsigned int)seq_runner.id,
+                 (unsigned int)seq_runner.current_index);
     } else {
         seq_runner.state = SEQUENCE_STATE_RUNNING;
         LOG_DEBUG("SEQUENCE", "advance to step %u/%u\r\n",
@@ -163,30 +168,48 @@ void Sequence_Pause(void)
         seq_runner.state != SEQUENCE_STATE_WAITING) {
         return;
     }
-    
-    seq_runner.resume_state = seq_runner.state;
-    seq_runner.state = SEQUENCE_STATE_PAUSED;
-    LOG_INFO("SEQUENCE", "paused: id=%u, step=%u\r\n",
+
+    if (seq_runner.pause_requested) {
+        return;
+    }
+
+    seq_runner.pause_requested = 1U;
+
+    /* No step has started yet, so this is already a safe step boundary. */
+    if (seq_runner.state == SEQUENCE_STATE_RUNNING &&
+        !seq_runner.step_trace_started) {
+        seq_runner.state = SEQUENCE_STATE_PAUSED;
+        LOG_INFO("SEQUENCE", "paused at step boundary: id=%u, next_step=%u\r\n",
+                 (unsigned int)seq_runner.id,
+                 (unsigned int)seq_runner.current_index);
+        return;
+    }
+
+    LOG_INFO("SEQUENCE", "pause requested: id=%u, active_step=%u\r\n",
              (unsigned int)seq_runner.id,
              (unsigned int)seq_runner.current_index);
 }
 
 void Sequence_Resume(void)
 {
-    if (seq_runner.state != SEQUENCE_STATE_PAUSED) {
+    if (seq_runner.state == SEQUENCE_STATE_PAUSED) {
+        seq_runner.pause_requested = 0U;
+        seq_runner.state = SEQUENCE_STATE_RUNNING;
+        LOG_INFO("SEQUENCE", "resumed: id=%u, step=%u\r\n",
+                 (unsigned int)seq_runner.id,
+                 (unsigned int)seq_runner.current_index);
         return;
     }
 
-    if (seq_runner.resume_state == SEQUENCE_STATE_WAITING) {
-        seq_runner.state = SEQUENCE_STATE_WAITING;
-    } else {
-        seq_runner.state = SEQUENCE_STATE_RUNNING;
+    if (seq_runner.pause_requested &&
+        (seq_runner.state == SEQUENCE_STATE_RUNNING ||
+         seq_runner.state == SEQUENCE_STATE_WAITING)) {
+        seq_runner.pause_requested = 0U;
+        LOG_INFO("SEQUENCE",
+                 "pause request cleared before boundary: id=%u, step=%u\r\n",
+                 (unsigned int)seq_runner.id,
+                 (unsigned int)seq_runner.current_index);
     }
-
-    seq_runner.resume_state = SEQUENCE_STATE_IDLE;
-    LOG_INFO("SEQUENCE", "resumed: id=%u, step=%u\r\n",
-             (unsigned int)seq_runner.id,
-             (unsigned int)seq_runner.current_index);
 }
 
 void Sequence_Init(void)
@@ -194,7 +217,6 @@ void Sequence_Init(void)
     memset(&seq_runner, 0, sizeof(seq_runner));
     seq_runner.id = SEQ_ID_INVALID;
     seq_runner.state = SEQUENCE_STATE_IDLE;
-    seq_runner.resume_state = SEQUENCE_STATE_IDLE;
     seq_runner.last_result = SEQUENCE_RESULT_NONE;
     seq_runner.last_step = SEQUENCE_STEP_INVALID;
     seq_runner.last_error = 0U;
@@ -205,6 +227,11 @@ void Sequence_Init(void)
 uint8_t Sequence_IsBusy(void)
 {
     return (seq_runner.state != SEQUENCE_STATE_IDLE) ? 1U : 0U;
+}
+
+uint8_t Sequence_IsPaused(void)
+{
+    return (seq_runner.state == SEQUENCE_STATE_PAUSED) ? 1U : 0U;
 }
 
 uint8_t Sequence_IsRecovering(void)
@@ -331,7 +358,7 @@ SequenceStartResult Sequence_Start(SeqId id)
     seq_runner.target_empty_bay = target_empty_bay;
     seq_runner.current_index = 0U;
     seq_runner.state = SEQUENCE_STATE_RUNNING;
-    seq_runner.resume_state = SEQUENCE_STATE_IDLE;
+    seq_runner.pause_requested = 0U;
     seq_runner.last_result = SEQUENCE_RESULT_NONE;
     seq_runner.last_step = SEQUENCE_STEP_INVALID;
     seq_runner.last_error = 0U;
@@ -371,7 +398,14 @@ static void Sequence_ResetForAlarmRestart(void)
     seq_runner.last_error = 0U;
     seq_runner.recovery_finish_after_release = 0U;
     seq_runner.recovery_deadline = 0U;
-    seq_runner.state = SEQUENCE_STATE_RUNNING;
+    if (seq_runner.pause_requested) {
+        seq_runner.state = SEQUENCE_STATE_PAUSED;
+        LOG_INFO("SEQUENCE",
+                 "paused after alarm recovery: id=%u, next_step=0\r\n",
+                 (unsigned int)seq_runner.id);
+    } else {
+        seq_runner.state = SEQUENCE_STATE_RUNNING;
+    }
 
     LOG_WARN("SEQ_TRACE",
              "alarm recovery restart: id=%u, attempt=%u/%u, restarting from step 0, bay=%u\r\n",
@@ -701,7 +735,7 @@ SequenceStartResult Sequence_StartRecovery(void)
     seq_runner.target_empty_bay = 0U;
     seq_runner.current_index = 0U;
     seq_runner.state = SEQUENCE_STATE_RUNNING;
-    seq_runner.resume_state = SEQUENCE_STATE_IDLE;
+    seq_runner.pause_requested = 0U;
     seq_runner.last_result = SEQUENCE_RESULT_NONE;
     seq_runner.last_step = SEQUENCE_STEP_INVALID;
     seq_runner.last_error = 0U;

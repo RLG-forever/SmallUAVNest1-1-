@@ -53,6 +53,8 @@ SequenceStartResult Sequence_Start(SeqId id);
 
 // 查询是否有序列正在执行
 uint8_t Sequence_IsBusy(void);
+/* 已完成当前步骤并停在下一步骤之前时返回 1。 */
+uint8_t Sequence_IsPaused(void);
 /* 自动告警恢复（松开夹紧、回原点或重启序列）进行中时返回 1。 */
 uint8_t Sequence_IsRecovering(void);
 
@@ -60,8 +62,8 @@ uint8_t Sequence_IsRecovering(void);
 void Sequence_Process(void);
 
 /*
- * 暂停只阻止状态机推进和新动作下发，不暂停已经开始的步骤等待计时。
- * 若等待在暂停期间到期，恢复后的下一次 Sequence_Process() 将立即推进。
+ * 暂停请求不会中断当前步骤；当前步骤及其监控完成后，序列停在下一步骤之前。
+ * 若当前步骤尚未开始，则立即停在当前步骤之前。
  */
 void Sequence_Pause(void);   // 暂停当前序列
 void Sequence_Resume(void);  // 恢复执行

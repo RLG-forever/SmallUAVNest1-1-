@@ -727,6 +727,10 @@ static void GatewayService_ProcessActiveCommand(void)
 
         if (takeoff_state == GATEWAY_TAKEOFF_STATE_SEQUENCE) {
             if (Sequence_IsBusy()) {
+                StatusRegs_Update(REG_COMMAND_STATE,
+                                  Sequence_IsPaused()
+                                      ? COMMAND_STATE_PAUSED
+                                      : COMMAND_STATE_EXECUTING);
                 StatusRegs_Update(REG_COMMAND_STEP,
                                   Sequence_GetCurrentStep());
                 return;
@@ -839,6 +843,10 @@ static void GatewayService_ProcessActiveCommand(void)
 
     if (active_command.type == GATEWAY_ACTIVE_SEQUENCE) {
         if (Sequence_IsBusy()) {
+            StatusRegs_Update(REG_COMMAND_STATE,
+                              Sequence_IsPaused()
+                                  ? COMMAND_STATE_PAUSED
+                                  : COMMAND_STATE_EXECUTING);
             StatusRegs_Update(REG_COMMAND_STEP, Sequence_GetCurrentStep());
             return;
         }
@@ -913,7 +921,10 @@ static uint8_t GatewayService_HandleControlCommand(
              active_command.type == GATEWAY_ACTIVE_TAKEOFF_POWER) &&
             Sequence_IsBusy()) {
             step = Sequence_GetCurrentStep();
-            StatusRegs_Update(REG_COMMAND_STATE, COMMAND_STATE_PAUSED);
+            StatusRegs_Update(REG_COMMAND_STATE,
+                              Sequence_IsPaused()
+                                  ? COMMAND_STATE_PAUSED
+                                  : COMMAND_STATE_EXECUTING);
             StatusRegs_Update(REG_COMMAND_STEP, step);
         }
     } else if (request->start_register == GATEWAY_CMD_RESUME) {
