@@ -226,8 +226,8 @@ uint8_t LeaveCenter(void)
 
 uint8_t CloseDr(void)
 {
-    //return Motor_Control(MOTOR_ID_4, 1U, MOTOR4_CMD_CLOSE);
-    return 0;
+    return Motor_Control(MOTOR_ID_4, 1U, MOTOR4_CMD_CLOSE);
+    //return 0;
 }
 
 uint8_t CheckAndCloseDoor(void)
@@ -265,14 +265,14 @@ uint8_t WaitForUavPowerOn(void)
 
 uint8_t StopDr(void)
 {
-    // return Motor_Control(MOTOR_ID_4, 1U, MOTOR4_CMD_STOP);
-    return 0;
+    return Motor_Control(MOTOR_ID_4, 1U, MOTOR4_CMD_STOP);
+    //return 0;
 }
 
 uint8_t OpenDr(void)
 {
-    //return Motor_Control(MOTOR_ID_4, 1U, MOTOR4_CMD_OPEN);
-    return 0;
+    return Motor_Control(MOTOR_ID_4, 1U, MOTOR4_CMD_OPEN);
+    //return 0;
 }
 
 uint8_t OpenAC(void)
@@ -368,7 +368,6 @@ const StepDef takeoff_steps[] =
 
         {OpenDr, 15250, REG_DOOR_STATE, 2},     	  //1.打开舱门
         {LeaveCenter, 0, REG_CENTER_ROD_STATE, 2},   	  //34.居中杆释放
-        //{OpenDr, 500, REG_DOOR_STATE, 2},     	  //1.打开舱门
         {CloseAC, 500, STATUS_REG_NONE, 0},            // 关闭空调
 
         {CheckAndCloseDoor, 16250, STATUS_REG_NONE, 0, NULL, NULL, UAV_DEPARTURE_WAIT_TIMEOUT_MS},                  // 等待无人机离巢后关闭舱门
@@ -423,10 +422,9 @@ const StepDef landing_steps[] =
     EXEC_MOVE_ABS_STEP(MOTOR1_SLAVE_ADDR, MOTOR_HOME_POS, 0, STATUS_REG_NONE, 0),
     EXEC_MOVE_ABS_ARRAY_STEP(plane_transfer_out_motors, 0, REG_SWAP_MECH_STATE, 4),
     
-    {LeaveCenter, 0, REG_CENTER_ROD_STATE, 2}
-    //{CloseDr, 16250, REG_DOOR_STATE, 4},
-    //{OpenAC, 500, STATUS_REG_NONE, 0},
-    
+    {LeaveCenter, 0, REG_CENTER_ROD_STATE, 2},
+    {CloseDr, 16250, REG_DOOR_STATE, 4},
+    {OpenAC, 500, STATUS_REG_NONE, 0},
 };
 const uint8_t LANDING_STEP_COUNT =
     (uint8_t)(sizeof(landing_steps) / sizeof(landing_steps[0]));
