@@ -11,11 +11,11 @@
 #define CALIB_MOTOR1_AUX_POS                     9000L
 
 //上下移电机 开飞机电池 高度位置
-#define CALIB_MOTOR1_FLY_LIFT_POS                327500L
+#define CALIB_MOTOR1_FLY_LIFT_POS                330500L
 //上下移电机 取飞机电池 高度位置
-#define CALIB_MOTOR1_TRANSFER_LIFT_POS           328000L
+#define CALIB_MOTOR1_TRANSFER_LIFT_POS           331000L
 //上下移电机 装飞机电池 高度位置
-#define CALIB_MOTOR1_LOAD_BATTERY_POS            329000L
+#define CALIB_MOTOR1_LOAD_BATTERY_POS            332000L
 
 // 横移电机 回收流程前进位置
 #define CALIB_MOTOR2_RECOVERY_FORWARD_POS        136000L
@@ -48,9 +48,9 @@
 #define CALIB_MOTOR2_AIRCRAFT_CLEAR_POS          323000L
 
 //让飞机前进时电机5和6移动到的位置
-#define CALIB_PLANE_TRANSFER_IN_MOTOR56_POS      172000L
+#define CALIB_PLANE_TRANSFER_IN_MOTOR56_POS      182000L
 //让飞机前进时电机7和8移动到的位置
-#define CALIB_PLANE_TRANSFER_IN_MOTOR78_POS      185000L
+#define CALIB_PLANE_TRANSFER_IN_MOTOR78_POS      175000L
 
 // 让飞机退出时电机5和6移动到的位置
 #define CALIB_PLANE_TRANSFER_OUT_MOTOR56_POS     207000L

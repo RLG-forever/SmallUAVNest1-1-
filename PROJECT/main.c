@@ -280,7 +280,7 @@ int main(void)
 				SwapState_TrySave();   // 延迟保存（Flash 写入过程仍为同步执行）
 				StallRecovery_Task();
 				/* 后台轮询优先级最低，避免抢在控制命令之前占用主站总线。 */
-				MasterPolling_Task();
+				//MasterPolling_Task();
 			}
 		}
 }

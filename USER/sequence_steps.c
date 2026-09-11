@@ -226,8 +226,8 @@ uint8_t LeaveCenter(void)
 
 uint8_t CloseDr(void)
 {
-    return Motor_Control(MOTOR_ID_4, 1U, MOTOR4_CMD_CLOSE);
-    //return 0;
+    //return Motor_Control(MOTOR_ID_4, 1U, MOTOR4_CMD_CLOSE);
+    return 0;
 }
 
 uint8_t CheckAndCloseDoor(void)
@@ -265,14 +265,14 @@ uint8_t WaitForUavPowerOn(void)
 
 uint8_t StopDr(void)
 {
-    return Motor_Control(MOTOR_ID_4, 1U, MOTOR4_CMD_STOP);
-    //return 0;
+    //return Motor_Control(MOTOR_ID_4, 1U, MOTOR4_CMD_STOP);
+    return 0;
 }
 
 uint8_t OpenDr(void)
 {
-    return Motor_Control(MOTOR_ID_4, 1U, MOTOR4_CMD_OPEN);
-    //return 0;
+    //return Motor_Control(MOTOR_ID_4, 1U, MOTOR4_CMD_OPEN);
+    return 0;
 }
 
 uint8_t OpenAC(void)
