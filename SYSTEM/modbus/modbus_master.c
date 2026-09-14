@@ -265,6 +265,16 @@ static void ModbusMaster_SetResult(uint8_t result)
     ModbusMaster_ResetRx();
 }
 
+static uint8_t ModbusMaster_IsClampWriteTarget(void)
+{
+    if (master_transaction.function != 0x06U &&
+        master_transaction.function != 0x10U) {
+        return 0U;
+    }
+
+    return master_transaction.slave == MODBUS_MASTER_NO_REPLY_CLAMP_SLAVE;
+}
+
 static uint8_t ModbusMaster_IsNoReplyWriteTarget(void)
 {
     if (master_transaction.function != 0x06U &&
@@ -272,7 +282,7 @@ static uint8_t ModbusMaster_IsNoReplyWriteTarget(void)
         return 0U;
     }
 
-    return master_transaction.slave == MODBUS_MASTER_NO_REPLY_CLAMP_SLAVE ||
+    return ModbusMaster_IsClampWriteTarget() ||
            master_transaction.slave == MODBUS_MASTER_NO_REPLY_REMOTE_SLAVE ||
            master_transaction.start_reg == MODBUS_MASTER_NO_REPLY_HOME_REG;
 }
@@ -391,7 +401,28 @@ void ModbusMaster_Process(void)
             }
             break;
         case MASTER_TXN_WAITING:
-            if (Master_FrameFlag) {
+            /*
+             * The clamp controller does not provide a reliable Modbus reply.
+             * Ignore every frame received during its complete response window,
+             * including apparently valid frames, CRC errors and short frames.
+             * When the fixed response timeout expires, RetryOrFinish() converts
+             * the timeout to success for this no-reply write target.
+             */
+            if (ModbusMaster_IsClampWriteTarget()) {
+                if (Master_FrameFlag) {
+                    ModbusMaster_LogRxFrame(Master_RX_BUFF, Master_RX_CNT);
+                    LOG_WARN("MODBUS",
+                             "clamp reply ignored: slave=0x%02X, fn=0x%02X, reg=0x%04X, length=%u\r\n",
+                             (unsigned int)master_transaction.slave,
+                             (unsigned int)master_transaction.function,
+                             (unsigned int)master_transaction.start_reg,
+                             (unsigned int)Master_RX_CNT);
+                    ModbusMaster_ResetRx();
+                }
+                if ((int32_t)(now - master_transaction.deadline) >= 0) {
+                    ModbusMaster_RetryOrFinish(MODBUS_RESULT_TIMEOUT);
+                }
+            } else if (Master_FrameFlag) {
                 ModbusMaster_LogRxFrame(Master_RX_BUFF, Master_RX_CNT);
                 result = ModbusMaster_ValidateResponse();
                 if (result == MODBUS_RESULT_OK || result == MODBUS_RESULT_EXCEPTION) {

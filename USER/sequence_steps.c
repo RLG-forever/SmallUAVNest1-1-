@@ -113,6 +113,13 @@ static const int32_t battery_bay_positions[3] = {
     CALIB_BATTERY_BAY3_POS
 };
 
+
+static const int32_t battery_get_bay_positions[3] = {
+    CALIB_BATTERY_GET_BAY1_POS,
+    CALIB_BATTERY_GET_BAY2_POS,
+    CALIB_BATTERY_GET_BAY3_POS
+};
+
 static const uint8_t battery_bay_current = BATTERY_BAY_CURRENT;
 static const uint8_t battery_bay_next = BATTERY_BAY_NEXT;
 
@@ -130,6 +137,22 @@ static uint8_t MoveMotor1ToSelectedBay(const void *context)
     position_index = (uint8_t)(((bay - 1U) + *bay_offset) % 3U);
     return MoveOneToAbsPos(MOTOR1_SLAVE_ADDR,
                            battery_bay_positions[position_index]);
+}
+
+static uint8_t MoveMotor1GetBayPos(const void *context)
+{
+    const uint8_t *bay_offset = (const uint8_t *)context;
+    uint8_t bay = Sequence_GetSelectedBay();
+    uint8_t position_index;
+
+    if (bay_offset == NULL || *bay_offset >= BATTERY_BAY_OFFSET_COUNT ||
+        bay < 1U || bay > 3U) {
+        return MODBUS_RESULT_PARAM;
+    }
+
+    position_index = (uint8_t)(((bay - 1U) + *bay_offset) % 3U);
+    return MoveOneToAbsPos(MOTOR1_SLAVE_ADDR,
+                           battery_get_bay_positions[position_index]);
 }
 
 // 电机1移动到回收流程标定位置
@@ -311,7 +334,7 @@ uint8_t CloseAC(void)
 /* Sequence step tables. */
 const StepDef opendr1_steps[] =
 {
-//      {OpenDr, 15250, STATUS_REG_NONE, 0},      //1.打开舱门
+        {OpenDr, 15250, STATUS_REG_NONE, 0},      //1.打开舱门
 			{StopDr, 1000, REG_DOOR_STATE, 2},       //2.停止
 			{CloseAC, 0, STATUS_REG_NONE, 0},   // 关闭空调
 
@@ -332,7 +355,7 @@ const uint8_t OPENDR_STEP_COUNT = (uint8_t)(sizeof(opendr_steps) / sizeof(opendr
 // 关闭舱门步骤表
 const StepDef closedr_steps[] =
 {
-    {CloseDr, 16250, REG_DOOR_STATE, 2},      //1.关闭舱门
+    {CloseDr, 16250, REG_DOOR_STATE, 4},      //1.关闭舱门
 //			{StopDr, 1000, REG_DOOR_STATE, 4},       //2.停止
 	{OpenAC, 0, STATUS_REG_NONE, 0},   // 打开空调
 
@@ -368,7 +391,9 @@ const StepDef takeoff_steps[] =
         EXEC_MOVE_ABS_ARRAY_STEP(plane_transfer_out_motors, 0, STATUS_REG_NONE, 0),     //33.飞机前进
 
         {OpenDr, 15250, REG_DOOR_STATE, 2},     	  //1.打开舱门
+
         {LeaveCenter, 0, REG_CENTER_ROD_STATE, 2},   	  //34.居中杆释放
+
         {CloseAC, 500, STATUS_REG_NONE, 0},            // 关闭空调
 
         {CheckAndCloseDoor, 16250, STATUS_REG_NONE, 0, NULL, NULL, UAV_DEPARTURE_WAIT_TIMEOUT_MS},                  // 等待无人机离巢后关闭舱门
@@ -399,22 +424,26 @@ const StepDef landing_steps[] =
     {Motor3Lossen, 1000, STATUS_REG_NONE, 0},
     //横移电机移动到电池仓推进电池位置
     EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, CALIB_MOTOR2_BAY_RELEASE_POS, 0, STATUS_REG_NONE, 0),
+    
     EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, MOTOR_HOME_POS, 0, STATUS_REG_NONE, 0),
 
     /* 根据同一个空仓号选择新电池取出位置。 */
-    {NULL, 0, STATUS_REG_NONE, 0, MoveMotor1ToSelectedBay,
-     &battery_bay_next},
+    {NULL, 0, STATUS_REG_NONE, 0, MoveMotor1GetBayPos,  &battery_bay_next},
     EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, CALIB_MOTOR2_BAY_LOAD_POS, 0, STATUS_REG_NONE, 0),
     {Motor3Clamp, 1000, STATUS_REG_NONE, 0},
+
     EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, MOTOR_HOME_POS, 0, STATUS_REG_NONE, 0),
     /* 新电池已从下一仓取出，该仓现在为空。 */
     {UpdateEmptyBay, 500, STATUS_REG_NONE, 0},
     //上升到装电池高度
     EXEC_MOVE_ABS_STEP(MOTOR1_SLAVE_ADDR, CALIB_MOTOR1_LOAD_BATTERY_POS, 0, STATUS_REG_NONE, 0),
     {MovePlaneTransferIn, 0, STATUS_REG_NONE, 0},
+
     //横移电机装飞机电池释放位置
     EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, CALIB_MOTOR2_AIRCRAFT_RELEASE_POS, 0, STATUS_REG_NONE, 0),
+
     {Motor3Lossen, 1000, STATUS_REG_NONE, 0},
+
     //横移电机推进去电池位置
     EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, CALIB_MOTOR2_AIRCRAFT_CLEAR_POS, 0, STATUS_REG_NONE, 0),
 
@@ -425,6 +454,7 @@ const StepDef landing_steps[] =
     
     {LeaveCenter, 0, REG_CENTER_ROD_STATE, 2},
     {CloseDr, 16250, REG_DOOR_STATE, 4},
+
     {OpenAC, 500, STATUS_REG_NONE, 0},
 };
 const uint8_t LANDING_STEP_COUNT =
@@ -453,7 +483,7 @@ const StepDef loadbattery_steps[] =
     {Center_2, 0, REG_CENTER_ROD_STATE, 4},
 
     /* 根据序列启动时锁定的空仓号选择电池仓位置。 */
-    {NULL, 0, STATUS_REG_NONE, 0, MoveMotor1ToSelectedBay,
+    {NULL, 0, STATUS_REG_NONE, 0, MoveMotor1GetBayPos,
      &battery_bay_current},
     //横移电机移动到电池仓取/装电池
     EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, CALIB_MOTOR2_BAY_LOAD_POS, 0, STATUS_REG_NONE, 0),

@@ -41,6 +41,13 @@
 // 电池3号仓位置
 #define CALIB_BATTERY_BAY3_POS                       2000L
 
+// 电池1号仓取电池位置
+#define CALIB_BATTERY_GET_BAY1_POS                  137000L
+// 电池2号仓取电池位置
+#define CALIB_BATTERY_GET_BAY2_POS                   71000L
+// 电池3号仓取电池位置
+#define CALIB_BATTERY_GET_BAY3_POS                    2000L
+
 // 横移电机 装飞机电池释放位置
 #define CALIB_MOTOR2_AIRCRAFT_RELEASE_POS          288000L
 // 横移电机 装飞机电池时推电池位置
