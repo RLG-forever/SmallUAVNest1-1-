@@ -248,12 +248,6 @@ uint8_t LeaveCenter(void)
                              EXEC_ARRAY_COUNT(leave_center_motors));
 }
 
-uint8_t CloseDr(void)
-{
-    //return Motor_Control(MOTOR_ID_4, 1U, MOTOR4_CMD_CLOSE);
-    return 0;
-}
-
 uint8_t CheckAndCloseDoor(void)
 {
     uint16_t uav_status = StatusRegs_GetLive(REG_RESERVED4);
@@ -287,16 +281,37 @@ uint8_t WaitForUavPowerOn(void)
     return STEP_RESULT_WAIT;
 }
 
+// uint8_t StopDr(void)
+// {
+//     //return Motor_Control(MOTOR_ID_4, 1U, MOTOR4_CMD_STOP);
+//     return 0;
+// }
+
+// uint8_t OpenDr(void)
+// {
+//     //return Motor_Control(MOTOR_ID_4, 1U, MOTOR4_CMD_OPEN);
+//     return 0;
+// }
+
+// uint8_t CloseDr(void)
+// {
+//     //return Motor_Control(MOTOR_ID_4, 1U, MOTOR4_CMD_CLOSE);
+//     return 0;
+// }
+
 uint8_t StopDr(void)
 {
-    //return Motor_Control(MOTOR_ID_4, 1U, MOTOR4_CMD_STOP);
-    return 0;
+    return Motor_Control(MOTOR_ID_4, 1U, MOTOR4_CMD_STOP);
 }
 
 uint8_t OpenDr(void)
 {
-    //return Motor_Control(MOTOR_ID_4, 1U, MOTOR4_CMD_OPEN);
-    return 0;
+    return Motor_Control(MOTOR_ID_4, 1U, MOTOR4_CMD_OPEN);
+}
+
+uint8_t CloseDr(void)
+{
+    return Motor_Control(MOTOR_ID_4, 1U, MOTOR4_CMD_CLOSE);
 }
 
 uint8_t OpenAC(void)
@@ -334,8 +349,8 @@ uint8_t CloseAC(void)
 /* Sequence step tables. */
 const StepDef opendr1_steps[] =
 {
-        {OpenDr, 15250, STATUS_REG_NONE, 0},      //1.打开舱门
-			{StopDr, 1000, REG_DOOR_STATE, 2},       //2.停止
+        {OpenDr, 16250, STATUS_REG_NONE, 0},      //1.打开舱门
+			//{StopDr, 1000, REG_DOOR_STATE, 2},       //2.停止
 			{CloseAC, 0, STATUS_REG_NONE, 0},   // 关闭空调
 
 };
@@ -343,7 +358,7 @@ const uint8_t OPENDR1_STEP_COUNT = (uint8_t)(sizeof(opendr1_steps) / sizeof(open
 // 打开舱门步骤表
 const StepDef opendr_steps[] =
 {
-      {OpenDr, 15250, REG_DOOR_STATE, 2},      //1.打开舱门
+      {OpenDr, 16250, REG_DOOR_STATE, 2},      //1.打开舱门
       //{OpenDr, 500, REG_DOOR_STATE, 2},      //1.打开舱门
 //			{StopDr, 1000, REG_DOOR_STATE, 2},       //2.停止
 			{CloseAC, 0, STATUS_REG_NONE, 0},   // 关闭空调
@@ -371,6 +386,9 @@ const StepDef takeoff_steps[] =
         EXEC_MOVE_ABS_STEP(MOTOR1_SLAVE_ADDR, CALIB_MOTOR1_FLY_LIFT_POS, 0, STATUS_REG_NONE, 0),      //3.电机1上升
         //飞机前进
         {MovePlaneTransferIn, 0, STATUS_REG_NONE, 0},       //4.飞机前进
+
+        {OpenDr, 20250, REG_DOOR_STATE, 2},      // 飞机前进完成后打开舱门
+
         // 电机2移动到无人机电池靠近标定位置
         EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, CALIB_MOTOR2_FLY_NEAR_POS, 0, STATUS_REG_NONE, 0),      //5.电机2前进
         // 电机2移动到无人机电池远端标定位置
@@ -389,8 +407,6 @@ const StepDef takeoff_steps[] =
         EXEC_MOVE_ABS_STEP(MOTOR1_SLAVE_ADDR, MOTOR_HOME_POS, 0, STATUS_REG_NONE, 0),      //32.电机1下降
         //飞机前进
         EXEC_MOVE_ABS_ARRAY_STEP(plane_transfer_out_motors, 0, STATUS_REG_NONE, 0),     //33.飞机前进
-
-        {OpenDr, 15250, REG_DOOR_STATE, 2},     	  //1.打开舱门
 
         {LeaveCenter, 0, REG_CENTER_ROD_STATE, 2},   	  //34.居中杆释放
 
@@ -591,18 +607,19 @@ static const StepMotorMap step_motor_map[] = {
     {0, 1, motors_center2},
     {0, 2, motors_battery1},   // motor 1 lift
     {0, 3, motors_battery4},   // plane transfer in
-    {0, 4, motors_battery2},   // motor 2 near
-    {0, 5, motors_battery2},   // motor 2 far
-    {0, 6, motors_battery2},   // motor 2 near
-    {0, 7, motors_battery2},   // motor 2 far
-    {0, 8, motors_battery2},   // motor 2 home
-    {0, 9, motors_center2},    // center return
-    {0,10, motors_battery1},   // motor 1 home
-    {0,11, motors_battery4},   // plane transfer out
-    {0,12, motors_leave},      // leave center
-    {0,13, motors_door},       // open door
-    {0,14, motors_none},       // close air conditioner
-    {0,15, motors_door},       // wait for UAV, then close door
+    {0, 4, motors_door},       // open door
+    {0, 5, motors_battery2},   // motor 2 near
+    {0, 6, motors_battery2},   // motor 2 far
+    {0, 7, motors_battery2},   // motor 2 near
+    {0, 8, motors_battery2},   // motor 2 far
+    {0, 9, motors_battery2},   // motor 2 home
+    {0,10, motors_none},       // wait for UAV power on
+    {0,11, motors_center2},    // center return
+    {0,12, motors_battery1},   // motor 1 home
+    {0,13, motors_battery4},   // plane transfer out
+    {0,14, motors_leave},      // leave center
+    {0,15, motors_none},       // close air conditioner
+    {0,16, motors_door},       // wait for UAV, then close door
 
     // ========== 序列1：降落 (LANDING) ==========
     {1, 0, motors_center1},
@@ -674,30 +691,32 @@ static const StepMotorMap step_motor_map[] = {
     {8, 1, motors_center2},
     {8, 2, motors_battery1},   // Battery_1
     {8, 3, motors_battery4},   // Battery_2
-    {8, 4, motors_battery2},   // Battery_3
-    {8, 5, motors_battery2},   // Battery_18
-    {8, 6, motors_battery2},   // Battery_19
-    {8, 7, motors_battery2},   // Battery_18
-    {8, 8, motors_battery2},   // Battery_20
-    {8, 9, motors_battery4},   // Battery_6
-    {8,10, motors_battery1},   // Battery_7
-    {8,11, motors_battery4},   // Battery_21
-    {8,12, motors_leave},      // LeaveCenter
+    {8, 4, motors_door},       // open door
+    {8, 5, motors_battery2},   // motor 2 near
+    {8, 6, motors_battery2},   // motor 2 far
+    {8, 7, motors_battery2},   // motor 2 near
+    {8, 8, motors_battery2},   // motor 2 far
+    {8, 9, motors_battery2},   // motor 2 home
+    {8,10, motors_none},       // wait for UAV power on
+    {8,11, motors_center2},    // center return
+    {8,12, motors_battery1},   // motor 1 home
+    {8,13, motors_battery4},   // plane transfer out
 
     // ========== 序列9：飞机关机 (CLOSEFLY) ==========
     {9, 0, motors_center1},
     {9, 1, motors_center2},
     {9, 2, motors_battery1},   // Battery_1
     {9, 3, motors_battery4},   // Battery_2
-    {9, 4, motors_battery2},   // Battery_3
-    {9, 5, motors_battery2},   // Battery_18
-    {9, 6, motors_battery2},   // Battery_19
-    {9, 7, motors_battery2},   // Battery_18
-    {9, 8, motors_battery2},   // Battery_20
-    {9, 9, motors_battery4},   // Battery_6
-    {9,10, motors_battery1},   // Battery_7
-    {9,11, motors_battery4},   // Battery_21
-    {9,12, motors_leave},      // LeaveCenter
+    {9, 4, motors_door},       // open door
+    {9, 5, motors_battery2},   // motor 2 near
+    {9, 6, motors_battery2},   // motor 2 far
+    {9, 7, motors_battery2},   // motor 2 near
+    {9, 8, motors_battery2},   // motor 2 far
+    {9, 9, motors_battery2},   // motor 2 home
+    {9,10, motors_none},       // wait for UAV power on
+    {9,11, motors_center2},    // center return
+    {9,12, motors_battery1},   // motor 1 home
+    {9,13, motors_battery4},   // plane transfer out
 
     // ========== 序列10：打开舱门 (OPENDR) ==========
     {10, 0, motors_door},      // OpenDr

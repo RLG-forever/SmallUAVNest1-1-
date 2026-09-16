@@ -57,10 +57,10 @@ static const char *Sequence_GetTraceStepName(SeqId id, uint8_t step_index)
 {
     static const char *const takeoff_step_names[] = {
         "center-1", "center-2", "motor1-fly-lift",
-        "plane-transfer-in", "motor2-near-1", "motor2-far-1",
+        "plane-transfer-in", "open-door", "motor2-near-1", "motor2-far-1",
         "motor2-near-2", "motor2-far-2", "motor2-home",
         "wait-uav-power-on", "center-2-return", "motor1-home",
-        "plane-transfer-out", "open-door", "leave-center", "close-ac",
+        "plane-transfer-out", "leave-center", "close-ac",
         "wait-uav-away-close-door"
     };
     uint8_t full_index = step_index;
@@ -266,7 +266,7 @@ SequenceStartResult Sequence_Start(SeqId id)
     }
     switch (id) {
 				case SEQ_ID_OPENDR1:
-						seq_runner.steps = opendr1_steps;
+						seq_runner.steps = opendr_steps;
 						seq_runner.step_count = OPENDR1_STEP_COUNT;
 						LOG_INFO("SEQUENCE", "open-door sequence selected\r\n");
 				break;

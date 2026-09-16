@@ -72,6 +72,12 @@ typedef struct {
 #define MOTOR4_CMD_OPEN                  0x0002  // 开舱
 #define MOTOR4_CMD_CLOSE                 0x0001  // 关舱
 #define MOTOR4_CMD_STOP                  0x0005  // 停止
+#define MOTOR4_HOME_CTRL_REG             0x0047U // 十进制71，回零指令
+#define MOTOR4_HOME_TO_POSITIVE_LIMIT    0x0001U
+#define MOTOR4_HOME_TO_NEGATIVE_LIMIT    0x0002U
+#define MOTOR4_STATUS_REG                0x004BU // 十进制75，驱动器状态
+#define MOTOR4_HOME_COMPLETE_MASK        0x0004U // bit2，回零完成
+#define MOTOR4_MOVE_COMPLETE_MASK        0x0080U // bit7，运动完成
 
 //电机5-12
 #define MOTOR5_CTRL_REG1      0x00d0  // 电机5-12绝对位置控制寄存器（D0低字，D1高字）
@@ -361,7 +367,7 @@ extern const StepDef recovery_without_battery_steps[];
 extern const uint8_t OPENDR1_STEP_COUNT;
 extern const uint8_t OPENDR_STEP_COUNT;
 extern const uint8_t CLOSEDR_STEP_COUNT;
-#define TAKEOFF_UAV_POWER_CHECK_STEP_INDEX 9U
+#define TAKEOFF_UAV_POWER_CHECK_STEP_INDEX 10U
 #define OPENFLY_STEP_OFFSET             0U
 #define OPENFLY_TRAILING_EXCLUDED_STEPS 3U
 #define OPENFLY_STEP_COUNT                                              \
