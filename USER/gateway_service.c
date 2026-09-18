@@ -46,6 +46,7 @@ typedef enum {
     GATEWAY_CMD_UAV_POWER_MODE2 = 0x0053U,
     GATEWAY_CMD_COOLING_STOP_TEMP = 0x0054U,
     GATEWAY_CMD_HEATING_STOP_TEMP = 0x0055U,
+    GATEWAY_CMD_TAKEOFF_NO_CLOSE = 0x0056U,
     GATEWAY_CMD_UAV_STATUS = 0x0060U
 } GatewayCommandRegister;
 
@@ -237,15 +238,18 @@ static uint8_t GatewayService_StartSequence(SeqId id)
     return MODBUS_RESULT_PARAM;
 }
 
-static uint8_t GatewayService_StartTakeoffAttempt(void)
+static uint8_t GatewayService_StartTakeoffAttempt(uint16_t register_address)
 {
-    uint8_t result = GatewayService_StartSequence(SEQ_ID_TAKEOFF);
+    SeqId sequence_id = register_address == GATEWAY_CMD_TAKEOFF_NO_CLOSE
+                            ? SEQ_ID_TAKEOFF_NO_CLOSE : SEQ_ID_TAKEOFF;
+    uint8_t result = GatewayService_StartSequence(sequence_id);
 
     if (result == MODBUS_RESULT_OK) {
         takeoff_sequence_attempt_count++;
         takeoff_state = GATEWAY_TAKEOFF_STATE_SEQUENCE;
         StatusRegs_Update(REG_COMMAND_STEP, Sequence_GetCurrentStep());
-        LOG_WARN("GW_TRACE", "takeoff attempt started: %u/%u\r\n",
+        LOG_WARN("GW_TRACE", "takeoff 0x%02X attempt started: %u/%u\r\n",
+                 (unsigned int)register_address,
                  (unsigned int)takeoff_sequence_attempt_count,
                  (unsigned int)GATEWAY_TAKEOFF_MAX_ATTEMPTS);
     }
@@ -282,6 +286,18 @@ static uint8_t GatewayService_IsSameActive(uint16_t register_address,
     return active_command.active &&
            active_command.register_address == register_address &&
            active_command.value == value;
+}
+
+/* 起飞或降落序列执行期间，0x44 只确认收到，不启动另一套机械动作。 */
+static uint8_t GatewayService_AckOpenUpDuringFlightSequence(
+    uint16_t register_address)
+{
+    return register_address == GATEWAY_CMD_OPEN_UP &&
+           Sequence_IsBusy() && !Sequence_IsPaused() &&
+           !Sequence_IsRecovering() &&
+           (Sequence_GetCurrentId() == SEQ_ID_TAKEOFF ||
+            Sequence_GetCurrentId() == SEQ_ID_TAKEOFF_NO_CLOSE ||
+            Sequence_GetCurrentId() == SEQ_ID_LANDING);
 }
 
 /**
@@ -453,11 +469,13 @@ static uint8_t GatewayService_ExecuteWrite(uint16_t register_address,
             break;
 
         case GATEWAY_CMD_TAKEOFF:
+        case GATEWAY_CMD_TAKEOFF_NO_CLOSE:
         {
             uint16_t uav_status = StatusRegs_GetLive(REG_RESERVED4);
 
             LOG_INFO("GW_TRACE",
-                     "0x38 takeoff processing: uav_status=%u, sequence_busy=%u\r\n",
+                     "0x%02X takeoff processing: uav_status=%u, sequence_busy=%u\r\n",
+                     (unsigned int)register_address,
                      (unsigned int)uav_status,
                      (unsigned int)Sequence_IsBusy());
 
@@ -469,9 +487,10 @@ static uint8_t GatewayService_ExecuteWrite(uint16_t register_address,
                                            GATEWAY_ACTIVE_TAKEOFF_POWER);
                 result = MODBUS_RESULT_OK;
                 LOG_INFO("GW_TRACE",
-                         "0x38: UAV status is 0; remote power-on started\r\n");
+                         "0x%02X: UAV status is 0; remote power-on started\r\n",
+                         (unsigned int)register_address);
             } else if (uav_status == 1U) {
-                result = GatewayService_StartTakeoffAttempt();
+                result = GatewayService_StartTakeoffAttempt(register_address);
                 if (result == MODBUS_RESULT_OK) {
                     GatewayService_BeginActive(
                         register_address, value,
@@ -480,7 +499,8 @@ static uint8_t GatewayService_ExecuteWrite(uint16_t register_address,
             } else if (uav_status == 2U || uav_status == 3U) {
                 result = MODBUS_RESULT_OK;
                 LOG_INFO("GW_TRACE",
-                         "0x38 completed immediately: uav_status=%u\r\n",
+                         "0x%02X completed immediately: uav_status=%u\r\n",
+                         (unsigned int)register_address,
                          (unsigned int)uav_status);
             } else {
                 result = MODBUS_RESULT_PARAM;
@@ -612,7 +632,7 @@ static void GatewayService_ProcessActiveCommand(void)
     if (active_command.type == GATEWAY_ACTIVE_TAKEOFF_POWER) {
         uav_status = StatusRegs_GetLive(REG_RESERVED4);
 
-        /* 状态3只结束0x38命令，已经启动的机械序列继续执行。 */
+        /* 状态3只结束起飞命令，已经启动的机械序列继续执行。 */
         if (uav_status == 3U) {
             if ((takeoff_state == GATEWAY_TAKEOFF_STATE_START_REMOTE ||
                  takeoff_state == GATEWAY_TAKEOFF_STATE_WAIT_REMOTE) &&
@@ -631,7 +651,8 @@ static void GatewayService_ProcessActiveCommand(void)
                 if (ModbusMaster_IsBusy()) {
                     ModbusMaster_Cancel();
                 }
-                result = GatewayService_StartTakeoffAttempt();
+                result = GatewayService_StartTakeoffAttempt(
+                    active_command.register_address);
                 if (result == MODBUS_RESULT_BUSY) {
                     return;
                 }
@@ -688,7 +709,8 @@ static void GatewayService_ProcessActiveCommand(void)
 
         if (takeoff_state == GATEWAY_TAKEOFF_STATE_WAIT_REMOTE) {
             if (uav_status == 1U) {
-                result = GatewayService_StartTakeoffAttempt();
+                result = GatewayService_StartTakeoffAttempt(
+                    active_command.register_address);
                 if (result == MODBUS_RESULT_BUSY) {
                     return;
                 }
@@ -822,7 +844,8 @@ static void GatewayService_ProcessActiveCommand(void)
             }
 
             GatewayService_SetControlEnabled(1U);
-            result = GatewayService_StartTakeoffAttempt();
+            result = GatewayService_StartTakeoffAttempt(
+                active_command.register_address);
             if (result == MODBUS_RESULT_BUSY ||
                 result == MODBUS_RESULT_PENDING) {
                 return;
@@ -1065,6 +1088,13 @@ static uint8_t GatewayService_Handle06(const ModbusSlaveRequest *request)
         return GatewayService_HandleUavStatusWrite(request);
     }
 
+    if (GatewayService_AckOpenUpDuringFlightSequence(
+            request->start_register)) {
+        LOG_INFO("GW_TRACE",
+                 "0x44 acknowledged during takeoff/landing sequence; no new sequence started\r\n");
+        return ModbusSlave_SendWriteAck(request) != 0U;
+    }
+
     if (GatewayService_IsSameActive(request->start_register,
                                     request->value)) {
         LOG_DEBUG("GATEWAY", "active duplicate acknowledged: reg=0x%04X, value=0x%04X\r\n",
@@ -1130,11 +1160,21 @@ static uint8_t GatewayService_Handle10(const ModbusSlaveRequest *request)
     }
 
     if ((register_address == GATEWAY_CMD_HOME_ALL ||
-         register_address == GATEWAY_CMD_TAKEOFF) &&
+         register_address == GATEWAY_CMD_TAKEOFF ||
+         register_address == GATEWAY_CMD_TAKEOFF_NO_CLOSE) &&
         request->register_count != 1U) {
         active = 0U;
         index = 0U;
         return ModbusSlave_SendException(request, 0x03U) != 0U;
+    }
+
+    if (request->register_count == 1U &&
+        GatewayService_AckOpenUpDuringFlightSequence(register_address)) {
+        active = 0U;
+        index = 0U;
+        LOG_INFO("GW_TRACE",
+                 "0x44 acknowledged during takeoff/landing sequence; no new sequence started\r\n");
+        return ModbusSlave_SendWriteAck(request) != 0U;
     }
 
     if (active_command.active) {

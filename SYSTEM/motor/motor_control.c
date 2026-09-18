@@ -19,6 +19,7 @@ typedef enum {
     MOTOR_BATCH_PHASE_SCAN_ALARMS,
     MOTOR_BATCH_PHASE_VERIFY_POSITION,
     MOTOR_BATCH_PHASE_VERIFY_ALARM,
+    MOTOR_BATCH_PHASE_VERIFY_STATUS,
     MOTOR_BATCH_PHASE_STOP_PAIRED_MOTOR
 } MotorBatchPhase;
 
@@ -44,13 +45,16 @@ typedef struct {
     uint16_t position_words[MOTOR_CONTROL_POSITION_REG_COUNT];
     uint16_t checkpoint_words[MOTOR_CONTROL_POSITION_REG_COUNT];
     uint16_t alarm_status_word;
+    uint16_t run_status_words[MOTOR_HOME_STATUS_REG_COUNT];
     uint32_t next_poll_tick;
-    uint32_t verify_deadline;
     uint32_t next_checkpoint_tick;
+    uint32_t last_progress_ticks[MODBUS_BATCH_MAX_MOTORS];
     int32_t current_position;
     int32_t target_positions[MODBUS_BATCH_MAX_MOTORS];
     int32_t reached_positions[MODBUS_BATCH_MAX_MOTORS];
     int32_t checkpoint_positions[2];
+    int64_t progress_reference_errors[MODBUS_BATCH_MAX_MOTORS];
+    uint8_t progress_initialized_mask;
     uint8_t results[MODBUS_BATCH_MAX_MOTORS];
     MotorControlParams motors[MODBUS_BATCH_MAX_MOTORS];
 } MotorBatchContext;
@@ -1117,7 +1121,6 @@ static uint8_t MotorControl_ReadCurrentPosition(int32_t *position)
         motor_batch.position_words);
     if (result == MODBUS_RESULT_OK) {
         if (position_register == MOTOR_CONTROL_DRIVER_POSITION_REG) {
-            /* This driver returns 0x0004 high word, then 0x0005 low word. */
             *position = MotorControl_CombinePosition(
                 motor_batch.position_words[1],
                 motor_batch.position_words[0]);
@@ -2600,7 +2603,9 @@ static uint8_t MotorControl_BatchMoveInternal(
     uint8_t alarm_status;
     uint8_t index;
     uint8_t checkpoint_mask = 0U;
+    uint8_t motor_bit;
     uint32_t now;
+    int64_t current_error;
 
     if (MotorControl_HomeIsBusy() || MotorControl_PreHomeIsBusy()) {
         return MODBUS_RESULT_BUSY;
@@ -2722,21 +2727,11 @@ static uint8_t MotorControl_BatchMoveInternal(
             motor_batch.index = 0U;
             motor_batch.next_poll_tick =
                 now + MOTOR_CONTROL_POSITION_POLL_INTERVAL_MS;
-            motor_batch.verify_deadline = now + MOTOR_CONTROL_MOVE_TIMEOUT_MS;
             motor_batch.phase = MOTOR_BATCH_PHASE_WAIT_POLL;
             return MODBUS_RESULT_PENDING;
 
         case MOTOR_BATCH_PHASE_WAIT_POLL:
             now = GetTick();
-            if (MotorControl_IsTimeReached(now, motor_batch.verify_deadline)) {
-                motor_batch.results[motor_batch.index] = MODBUS_RESULT_TIMEOUT;
-                LOG_ERROR("MOTOR",
-                    "position timeout: slave=0x%02X, target=%ld\r\n",
-                    (unsigned int)motor_batch.motors[motor_batch.index].slave_addr,
-                    (long)motor_batch.target_positions[motor_batch.index]);
-                return MotorControl_FinishBatch(MODBUS_RESULT_TIMEOUT, results,
-                                                positions);
-            }
             if (!MotorControl_IsTimeReached(now, motor_batch.next_poll_tick)) {
                 return MODBUS_RESULT_PENDING;
             }
@@ -2793,6 +2788,16 @@ static uint8_t MotorControl_BatchMoveInternal(
             if (motor_batch.alarm_index < motor_batch.count) {
                 return MODBUS_RESULT_PENDING;
             }
+            motor_batch.index = 0U;
+            while (motor_batch.index < motor_batch.count &&
+                   (motor_batch.reached_mask &
+                    (uint8_t)(1U << motor_batch.index)) != 0U) {
+                motor_batch.index++;
+            }
+            if (motor_batch.index >= motor_batch.count) {
+                return MotorControl_FinishBatch(MODBUS_RESULT_OK, results,
+                                                positions);
+            }
             motor_batch.phase = MOTOR_BATCH_PHASE_VERIFY_POSITION;
             return MODBUS_RESULT_PENDING;
 
@@ -2813,7 +2818,7 @@ static uint8_t MotorControl_BatchMoveInternal(
                 return MotorControl_FinishBatch(result, results, positions);
             }
 
-            /* 每次读取位置后都必须检查当前告警，再判断本次移动是否完成。 */
+            /* 每次读取位置后都必须检查当前告警和运行状态。 */
             motor_batch.phase = MOTOR_BATCH_PHASE_VERIFY_ALARM;
             return MODBUS_RESULT_PENDING;
 
@@ -2856,44 +2861,111 @@ static uint8_t MotorControl_BatchMoveInternal(
                 return MotorControl_FinishBatch(result, results, positions);
             }
 
-            if (MotorControl_PositionReached(
+            motor_batch.phase = MOTOR_BATCH_PHASE_VERIFY_STATUS;
+            return MODBUS_RESULT_PENDING;
+
+        case MOTOR_BATCH_PHASE_VERIFY_STATUS:
+            result = ModbusMaster_03_ReadHoldReg(
+                MODBUS_MASTER_CLIENT_MOTOR_CONTROL,
+                motor_batch.motors[motor_batch.index].slave_addr,
+                MOTOR_HOME_STATUS_REG,
+                MOTOR_HOME_STATUS_REG_COUNT,
+                motor_batch.run_status_words);
+            if (result == MODBUS_RESULT_PENDING || result == MODBUS_RESULT_BUSY) {
+                return result;
+            }
+            if (result != MODBUS_RESULT_OK) {
+                motor_batch.results[motor_batch.index] = result;
+                LOG_ERROR("MOTOR",
+                    "run status read failed: slave=0x%02X, result=%u\r\n",
+                    (unsigned int)motor_batch.motors[motor_batch.index].slave_addr,
+                    (unsigned int)result);
+                return MotorControl_FinishBatch(result, results, positions);
+            }
+
+            now = GetTick();
+            motor_bit = (uint8_t)(1U << motor_batch.index);
+            current_error = MotorControl_AbsI64(
+                (int64_t)motor_batch.current_position -
+                (int64_t)motor_batch.target_positions[motor_batch.index]);
+
+            if ((motor_batch.run_status_words[0] &
+                 MOTOR_MOVE_COMPLETE_MASK) != 0U ||
+                MotorControl_PositionReached(
                     motor_batch.current_position,
                     motor_batch.target_positions[motor_batch.index])) {
                 motor_batch.results[motor_batch.index] = MODBUS_RESULT_OK;
                 motor_batch.reached_positions[motor_batch.index] =
                     motor_batch.current_position;
-                motor_batch.reached_mask |=
-                    (uint8_t)(1U << motor_batch.index);
+                motor_batch.reached_mask |= motor_bit;
                 LOG_INFO("MOTOR",
-                    "position reached: slave=0x%02X, current=%ld, target=%ld\r\n",
+                    "position reached: slave=0x%02X, current=%ld, target=%ld, status=0x%04X\r\n",
                     (unsigned int)motor_batch.motors[motor_batch.index].slave_addr,
                     (long)motor_batch.current_position,
-                    (long)motor_batch.target_positions[motor_batch.index]);
+                    (long)motor_batch.target_positions[motor_batch.index],
+                    (unsigned int)motor_batch.run_status_words[0]);
+            } else if ((motor_batch.progress_initialized_mask & motor_bit) ==
+                       0U) {
+                motor_batch.progress_reference_errors[motor_batch.index] =
+                    current_error;
+                motor_batch.last_progress_ticks[motor_batch.index] = now;
+                motor_batch.progress_initialized_mask |= motor_bit;
+                LOG_DEBUG("MOTOR",
+                    "position progress baseline: slave=0x%02X, current=%ld, target=%ld, error=%ld\r\n",
+                    (unsigned int)motor_batch.motors[motor_batch.index].slave_addr,
+                    (long)motor_batch.current_position,
+                    (long)motor_batch.target_positions[motor_batch.index],
+                    (long)current_error);
+            } else if ((motor_batch.progress_reference_errors[
+                            motor_batch.index] - current_error) >=
+                       MOTOR_CONTROL_PROGRESS_MIN_DELTA) {
+                motor_batch.progress_reference_errors[motor_batch.index] =
+                    current_error;
+                motor_batch.last_progress_ticks[motor_batch.index] = now;
+                LOG_DEBUG("MOTOR",
+                    "position progressed: slave=0x%02X, current=%ld, target=%ld, error=%ld\r\n",
+                    (unsigned int)motor_batch.motors[motor_batch.index].slave_addr,
+                    (long)motor_batch.current_position,
+                    (long)motor_batch.target_positions[motor_batch.index],
+                    (long)current_error);
+            } else if ((uint32_t)(now -
+                       motor_batch.last_progress_ticks[motor_batch.index]) >=
+                       MOTOR_CONTROL_NO_PROGRESS_TIMEOUT_MS) {
+                motor_batch.results[motor_batch.index] =
+                    MOTOR_CONTROL_RESULT_POSITION_STALL;
+                LOG_ERROR("MOTOR",
+                    "position stalled: slave=0x%02X, current=%ld, target=%ld, error=%ld, no_progress=%lu ms\r\n",
+                    (unsigned int)motor_batch.motors[motor_batch.index].slave_addr,
+                    (long)motor_batch.current_position,
+                    (long)motor_batch.target_positions[motor_batch.index],
+                    (long)current_error,
+                    (unsigned long)(now - motor_batch.last_progress_ticks[
+                        motor_batch.index]));
+                return MotorControl_FinishBatch(
+                    MOTOR_CONTROL_RESULT_POSITION_STALL, results, positions);
+            } else {
+                LOG_DEBUG("MOTOR",
+                    "position pending: slave=0x%02X, current=%ld, target=%ld, error=%ld, status=0x%04X\r\n",
+                    (unsigned int)motor_batch.motors[motor_batch.index].slave_addr,
+                    (long)motor_batch.current_position,
+                    (long)motor_batch.target_positions[motor_batch.index],
+                    (long)current_error,
+                    (unsigned int)motor_batch.run_status_words[0]);
+            }
+
+            motor_batch.index++;
+            while (motor_batch.index < motor_batch.count &&
+                   (motor_batch.reached_mask &
+                    (uint8_t)(1U << motor_batch.index)) != 0U) {
                 motor_batch.index++;
-                if (motor_batch.index >= motor_batch.count) {
-                    return MotorControl_FinishBatch(MODBUS_RESULT_OK, results,
-                                                    positions);
-                }
-                /* 其他电机同时运动，直接检查批次中的下一台。 */
+            }
+            if (motor_batch.index < motor_batch.count) {
                 motor_batch.phase = MOTOR_BATCH_PHASE_VERIFY_POSITION;
                 return MODBUS_RESULT_PENDING;
             }
-
-            LOG_DEBUG("MOTOR",
-                "position pending: slave=0x%02X, current=%ld, target=%ld\r\n",
-                (unsigned int)motor_batch.motors[motor_batch.index].slave_addr,
-                (long)motor_batch.current_position,
-                (long)motor_batch.target_positions[motor_batch.index]);
-
-            now = GetTick();
-            if (MotorControl_IsTimeReached(now, motor_batch.verify_deadline)) {
-                motor_batch.results[motor_batch.index] = MODBUS_RESULT_TIMEOUT;
-                LOG_ERROR("MOTOR",
-                    "position timeout: slave=0x%02X, current=%ld, target=%ld\r\n",
-                    (unsigned int)motor_batch.motors[motor_batch.index].slave_addr,
-                    (long)motor_batch.current_position,
-                    (long)motor_batch.target_positions[motor_batch.index]);
-                return MotorControl_FinishBatch(MODBUS_RESULT_TIMEOUT, results,
+            if (motor_batch.reached_mask ==
+                (uint8_t)((1UL << motor_batch.count) - 1UL)) {
+                return MotorControl_FinishBatch(MODBUS_RESULT_OK, results,
                                                 positions);
             }
             motor_batch.next_poll_tick =

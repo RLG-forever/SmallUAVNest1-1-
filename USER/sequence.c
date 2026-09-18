@@ -11,6 +11,7 @@
 
 #define SEQUENCE_STEP_RETRY_LIMIT 2U
 #define SEQUENCE_ALARM_RECOVERY_LIMIT 3U
+#define LANDING_ALARM_RECOVERY_LIMIT 1U
 #define SEQUENCE_CLAMP_RELEASE_WAIT_MS 1000U
 
 // 外部主站写函数
@@ -50,6 +51,7 @@ struct {
     uint8_t recovery_failed_slave;
     uint8_t recovery_alarm_result;
     uint8_t recovery_finish_after_release;
+    uint8_t recovery_restart_after_home;
     uint32_t recovery_deadline;
 } seq_runner;
 
@@ -67,7 +69,7 @@ static const char *Sequence_GetTraceStepName(SeqId id, uint8_t step_index)
 
     if (id == SEQ_ID_OPENFLY || id == SEQ_ID_CLOSEFLY) {
         full_index = (uint8_t)(step_index + OPENFLY_STEP_OFFSET);
-    } else if (id != SEQ_ID_TAKEOFF) {
+    } else if (id != SEQ_ID_TAKEOFF && id != SEQ_ID_TAKEOFF_NO_CLOSE) {
         return "generic-action";
     }
 
@@ -116,6 +118,7 @@ static void Sequence_Finish(SequenceResult result)
     seq_runner.recovery_failed_slave = 0U;
     seq_runner.recovery_alarm_result = 0U;
     seq_runner.recovery_finish_after_release = 0U;
+    seq_runner.recovery_restart_after_home = 0U;
     seq_runner.recovery_deadline = 0U;
     StatusRegs_ReleaseSnapshot();
 }
@@ -308,6 +311,12 @@ SequenceStartResult Sequence_Start(SeqId id)
                         LOG_INFO("SEQUENCE", "takeoff sequence selected: bay=%u\r\n",
                                  (unsigned int)empty_bay);
                 break;
+                case SEQ_ID_TAKEOFF_NO_CLOSE:
+                    seq_runner.steps = takeoff_steps;
+                    seq_runner.step_count = TAKEOFF_NO_CLOSE_STEP_COUNT;
+                    LOG_INFO("SEQUENCE", "takeoff without door close selected: bay=%u\r\n",
+                             (unsigned int)empty_bay);
+                break;
                 case SEQ_ID_LANDING:
                     seq_runner.steps = landing_steps;
                     seq_runner.step_count = LANDING_STEP_COUNT;
@@ -372,6 +381,7 @@ SequenceStartResult Sequence_Start(SeqId id)
     seq_runner.recovery_failed_slave = 0U;
     seq_runner.recovery_alarm_result = 0U;
     seq_runner.recovery_finish_after_release = 0U;
+    seq_runner.recovery_restart_after_home = 0U;
     seq_runner.recovery_deadline = 0U;
     LOG_INFO("SEQUENCE", "started: id=%u, bay=%u, target_bay=%u, steps=%u\r\n",
              (unsigned int)id, (unsigned int)empty_bay,
@@ -387,6 +397,13 @@ static uint16_t Sequence_ComposeFaultCode(uint8_t slave_addr,
     return ((uint16_t)slave_addr << 8) | error_code;
 }
 
+static uint8_t Sequence_GetAlarmRecoveryLimit(void)
+{
+    return seq_runner.id == SEQ_ID_LANDING
+               ? LANDING_ALARM_RECOVERY_LIMIT
+               : SEQUENCE_ALARM_RECOVERY_LIMIT;
+}
+
 static void Sequence_ResetForAlarmRestart(void)
 {
     seq_runner.current_index = 0U;
@@ -397,6 +414,7 @@ static void Sequence_ResetForAlarmRestart(void)
     seq_runner.step_start_tick = 0U;
     seq_runner.last_error = 0U;
     seq_runner.recovery_finish_after_release = 0U;
+    seq_runner.recovery_restart_after_home = 0U;
     seq_runner.recovery_deadline = 0U;
     if (seq_runner.pause_requested) {
         seq_runner.state = SEQUENCE_STATE_PAUSED;
@@ -411,18 +429,21 @@ static void Sequence_ResetForAlarmRestart(void)
              "alarm recovery restart: id=%u, attempt=%u/%u, restarting from step 0, bay=%u\r\n",
              (unsigned int)seq_runner.id,
              (unsigned int)seq_runner.alarm_recovery_count,
-             (unsigned int)SEQUENCE_ALARM_RECOVERY_LIMIT,
+             (unsigned int)Sequence_GetAlarmRecoveryLimit(),
              (unsigned int)seq_runner.selected_bay);
 }
 
 static void Sequence_BeginAlarmRecovery(uint8_t alarm_result)
 {
+    uint8_t recovery_limit = Sequence_GetAlarmRecoveryLimit();
+
     seq_runner.recovery_failed_step = seq_runner.current_index;
     seq_runner.recovery_failed_slave = MotorControl_GetLastFailedSlave();
     seq_runner.recovery_alarm_result = alarm_result;
     seq_runner.recovery_finish_after_release = 0U;
+    seq_runner.recovery_restart_after_home = 1U;
 
-    if (seq_runner.alarm_recovery_count >= SEQUENCE_ALARM_RECOVERY_LIMIT) {
+    if (seq_runner.alarm_recovery_count >= recovery_limit) {
         /* 恢复次数耗尽时也先松开夹紧机构，再结束本次序列。 */
         seq_runner.recovery_finish_after_release = 1U;
         LOG_ERROR("SEQ_TRACE",
@@ -440,10 +461,27 @@ static void Sequence_BeginAlarmRecovery(uint8_t alarm_result)
                  (unsigned int)seq_runner.recovery_failed_slave,
                  (unsigned int)seq_runner.recovery_alarm_result,
                  (unsigned int)seq_runner.alarm_recovery_count,
-                 (unsigned int)SEQUENCE_ALARM_RECOVERY_LIMIT);
+                 (unsigned int)recovery_limit);
     }
 
     seq_runner.state = SEQUENCE_STATE_RECOVERY_RELEASE_CLAMP;
+}
+
+/* 到位停滞属于不可重跑故障：回零完成后结束原任务并进入待机。 */
+static void Sequence_BeginPositionStallRecovery(uint8_t stall_result)
+{
+    seq_runner.recovery_failed_step = seq_runner.current_index;
+    seq_runner.recovery_failed_slave = MotorControl_GetLastFailedSlave();
+    seq_runner.recovery_alarm_result = stall_result;
+    seq_runner.recovery_finish_after_release = 0U;
+    seq_runner.recovery_restart_after_home = 0U;
+    seq_runner.state = SEQUENCE_STATE_RECOVERY_RELEASE_CLAMP;
+
+    LOG_ERROR("SEQ_TRACE",
+              "position stall caught: id=%u, step=%u, slave=0x%02X; full homing will run without restarting task\r\n",
+              (unsigned int)seq_runner.id,
+              (unsigned int)seq_runner.recovery_failed_step,
+              (unsigned int)seq_runner.recovery_failed_slave);
 }
 
 // 执行当前步骤（发送指令）
@@ -564,6 +602,11 @@ static void Sequence_ExecuteCurrentStep(void)
         return;
     }
 
+    if (ret == MOTOR_CONTROL_RESULT_POSITION_STALL) {
+        Sequence_BeginPositionStallRecovery(ret);
+        return;
+    }
+
     LOG_ERROR("SEQ_TRACE",
               "step failed: id=%u, step=%u/%u, name=%s, result=%u, elapsed=%lu ms\r\n",
               (unsigned int)seq_runner.id,
@@ -613,7 +656,7 @@ void Sequence_Process(void)
             seq_runner.last_error = Sequence_ComposeFaultCode(
                 MOTOR_CLAMP_SLAVE_ADDR, result);
             LOG_ERROR("SEQ_TRACE",
-                      "alarm recovery clamp release failed: result=%u\r\n",
+                      "recovery clamp release failed: result=%u\r\n",
                       (unsigned int)result);
             Sequence_Finish(SEQUENCE_RESULT_ACTION_FAILED);
             return;
@@ -622,7 +665,7 @@ void Sequence_Process(void)
             SEQUENCE_CLAMP_RELEASE_WAIT_MS;
         seq_runner.state = SEQUENCE_STATE_RECOVERY_WAIT_CLAMP;
         LOG_INFO("SEQ_TRACE",
-                 "alarm recovery clamp release accepted; waiting %u ms\r\n",
+                 "recovery clamp release accepted; waiting %u ms\r\n",
                  (unsigned int)SEQUENCE_CLAMP_RELEASE_WAIT_MS);
         return;
 
@@ -656,14 +699,14 @@ void Sequence_Process(void)
         if (result != MODBUS_RESULT_OK) {
             seq_runner.last_error = result;
             LOG_ERROR("SEQ_TRACE",
-                      "alarm recovery failed to start full home: result=%u\r\n",
+                      "recovery failed to start full home: result=%u\r\n",
                       (unsigned int)result);
             Sequence_Finish(SEQUENCE_RESULT_ACTION_FAILED);
             return;
         }
         seq_runner.state = SEQUENCE_STATE_RECOVERY_HOMING;
         LOG_WARN("SEQ_TRACE",
-                 "alarm recovery full home started: id=%u, failed_step=%u\r\n",
+                 "recovery full home started: id=%u, failed_step=%u\r\n",
                  (unsigned int)seq_runner.id,
                  (unsigned int)seq_runner.recovery_failed_step);
         return;
@@ -673,7 +716,21 @@ void Sequence_Process(void)
             return;
         }
         if (MotorControl_FullHomeGetState() == MOTOR_FULL_HOME_STATE_SUCCESS) {
-            Sequence_ResetForAlarmRestart();
+            if (seq_runner.recovery_restart_after_home) {
+                Sequence_ResetForAlarmRestart();
+                return;
+            }
+            fault_code = Sequence_ComposeFaultCode(
+                seq_runner.recovery_failed_slave,
+                seq_runner.recovery_alarm_result);
+            seq_runner.last_error = fault_code != 0U ? fault_code : 0x00FFU;
+            seq_runner.current_index = seq_runner.recovery_failed_step;
+            LOG_WARN("SEQ_TRACE",
+                     "position stall recovery homing completed; original task stopped: id=%u, step=%u, slave=0x%02X\r\n",
+                     (unsigned int)seq_runner.id,
+                     (unsigned int)seq_runner.recovery_failed_step,
+                     (unsigned int)seq_runner.recovery_failed_slave);
+            Sequence_Finish(SEQUENCE_RESULT_ACTION_FAILED);
             return;
         }
         fault_code = Sequence_ComposeFaultCode(
@@ -746,6 +803,7 @@ SequenceStartResult Sequence_StartRecovery(void)
     seq_runner.recovery_failed_slave = 0U;
     seq_runner.recovery_alarm_result = 0U;
     seq_runner.recovery_finish_after_release = 0U;
+    seq_runner.recovery_restart_after_home = 0U;
     seq_runner.recovery_deadline = 0U;
     return SEQ_START_OK;
 }

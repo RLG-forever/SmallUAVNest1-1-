@@ -25,6 +25,7 @@ typedef enum {
 	  SEQ_ID_CLOSEDR,       // 关闭舱门
     SEQ_ID_RECOVERY,       /* explicit recovery sequence */
 		SEQ_ID_OPENDR1,         // 打开舱门
+    SEQ_ID_TAKEOFF_NO_CLOSE, // 一键起飞，不执行最后的关舱门步骤
     SEQ_ID_INVALID = 0xFF
 } SeqId;
 
@@ -55,7 +56,7 @@ SequenceStartResult Sequence_Start(SeqId id);
 uint8_t Sequence_IsBusy(void);
 /* 已完成当前步骤并停在下一步骤之前时返回 1。 */
 uint8_t Sequence_IsPaused(void);
-/* 自动告警恢复（松开夹紧、回原点或重启序列）进行中时返回 1。 */
+/* 自动恢复（松开夹紧、回原点，以及告警恢复时重启序列）进行中时返回 1。 */
 uint8_t Sequence_IsRecovering(void);
 
 // 序列处理函数（需在主循环中周期性调用）

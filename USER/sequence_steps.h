@@ -373,6 +373,7 @@ extern const uint8_t CLOSEDR_STEP_COUNT;
 #define OPENFLY_STEP_COUNT                                              \
     ((uint8_t)(TAKEOFF_STEP_COUNT - OPENFLY_TRAILING_EXCLUDED_STEPS))
 extern const uint8_t TAKEOFF_STEP_COUNT;
+#define TAKEOFF_NO_CLOSE_STEP_COUNT ((uint8_t)(TAKEOFF_STEP_COUNT - 1U))
 extern const uint8_t LANDING_STEP_COUNT;
 extern const uint8_t CLOSECENTER_STEP_COUNT;
 extern const uint8_t LEAVECENTER_STEP_COUNT;

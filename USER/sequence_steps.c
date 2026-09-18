@@ -14,7 +14,7 @@
 #include <stddef.h>
 
 #define UAV_DEPARTURE_WAIT_TIMEOUT_MS (120UL * 1000UL)
-#define UAV_POWER_ON_WAIT_TIMEOUT_MS   (60UL * 1000UL)
+#define UAV_POWER_ON_WAIT_TIMEOUT_MS  (120UL * 1000UL)
 
 /* 需要同步运动的电机组；单电机步骤直接在 EXEC_MOVE_ABS_STEP 中写参数。 */
 static const MotorMoveAbsPosParams plane_transfer_in_motors[] = {
@@ -270,7 +270,8 @@ uint8_t WaitForUavPowerOn(void)
 {
     uint16_t uav_status = StatusRegs_GetLive(REG_RESERVED4);
 
-    if (Sequence_GetCurrentId() != SEQ_ID_TAKEOFF) {
+    if (Sequence_GetCurrentId() != SEQ_ID_TAKEOFF &&
+        Sequence_GetCurrentId() != SEQ_ID_TAKEOFF_NO_CLOSE) {
         return MODBUS_RESULT_OK;
     }
     if (uav_status == 2U || uav_status == 3U) {
@@ -461,14 +462,15 @@ const StepDef landing_steps[] =
     {Motor3Lossen, 1000, STATUS_REG_NONE, 0},
 
     //横移电机推进去电池位置
-    EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, CALIB_MOTOR2_AIRCRAFT_CLEAR_POS, 0, STATUS_REG_NONE, 0),
+    EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, CALIB_MOTOR2_AIRCRAFT_CLEAR_POS, 2000, STATUS_REG_NONE, 0),
 
     EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, MOTOR_HOME_POS, 0, STATUS_REG_NONE, 0),
     {Center_2, 0, STATUS_REG_NONE, 0},
     EXEC_MOVE_ABS_STEP(MOTOR1_SLAVE_ADDR, MOTOR_HOME_POS, 0, STATUS_REG_NONE, 0),
     EXEC_MOVE_ABS_ARRAY_STEP(plane_transfer_out_motors, 0, REG_SWAP_MECH_STATE, 4),
     
-    {LeaveCenter, 0, REG_CENTER_ROD_STATE, 2},
+    //{LeaveCenter, 0, REG_CENTER_ROD_STATE, 2},
+
     {CloseDr, 16250, REG_DOOR_STATE, 4},
 
     {OpenAC, 500, STATUS_REG_NONE, 0},
@@ -733,6 +735,10 @@ const uint8_t *SequenceSteps_GetMotorList(uint8_t sequence_id,
                                           uint8_t step_index)
 {
     uint16_t index;
+
+    if (sequence_id == (uint8_t)SEQ_ID_TAKEOFF_NO_CLOSE) {
+        sequence_id = (uint8_t)SEQ_ID_TAKEOFF;
+    }
 
     for (index = 0U; index < (uint16_t)MAP_SIZE; index++) {
         if (step_motor_map[index].seq_id == sequence_id &&

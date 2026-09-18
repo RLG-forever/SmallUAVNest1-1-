@@ -28,17 +28,22 @@
 #define MOTOR_CONTROL_IS_ALARM_RESULT(result) \
     ((((uint8_t)(result) & 0xF0U) == MOTOR_CONTROL_RESULT_ALARM_BASE) ? 1U : 0U)
 
+/* 位置能够读取但连续一段时间没有向目标取得有效进展。 */
+#define MOTOR_CONTROL_RESULT_POSITION_STALL        0xB0U
+
 /* 到位检测参数；位置和容差的单位均为电机脉冲数。 */
 #define MOTOR_CONTROL_POSITION_TOLERANCE          2000L
+#define MOTOR_CONTROL_PROGRESS_MIN_DELTA           200L
 #define MOTOR_CONTROL_POSITION_POLL_INTERVAL_MS   1000U
 #define MOTOR_POSITION_CHECKPOINT_INTERVAL_MS     1000U
-#define MOTOR_CONTROL_MOVE_TIMEOUT_MS             30000U
+#define MOTOR_CONTROL_NO_PROGRESS_TIMEOUT_MS      30000U
 
 /* 回原点协议：向 0x00C9 写速度命令，读取 0x0006~0x0007 的运行状态。 */
 #define MOTOR_HOME_COMMAND_REG                    0x00C9U
 #define MOTOR_HOME_STATUS_REG                     0x0006U
 #define MOTOR_HOME_STATUS_REG_COUNT               2U
 #define MOTOR_HOME_COMPLETE_MASK                  0x8000U
+#define MOTOR_MOVE_COMPLETE_MASK                  0x1000U
 
 /* 回零前配对电机调平参数，位置单位均为脉冲。 */
 //是否允许调平
