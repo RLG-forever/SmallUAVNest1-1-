@@ -48,6 +48,8 @@ typedef struct {
 #define MOTOR14_SLAVE_ADDR 0x14   // 电机14从站地址(控制遥控器的舵机)
 #define MOTOR15_SLAVE_ADDR 0x13   // 电机15从站地址(电池充电空开)
 
+#define MOTOR2_GET_BATTERY_RETURN_POS 100000L  
+
 /* Device calibration values selected by the build target. */
 #include "config/device_profile.h"
 

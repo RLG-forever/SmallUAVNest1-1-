@@ -442,7 +442,7 @@ const StepDef landing_steps[] =
     //横移电机移动到电池仓推进电池位置
     EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, CALIB_MOTOR2_BAY_RELEASE_POS, 0, STATUS_REG_NONE, 0),
     
-    EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, MOTOR_HOME_POS, 0, STATUS_REG_NONE, 0),
+    EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, MOTOR2_GET_BATTERY_RETURN_POS, 0, STATUS_REG_NONE, 0),
 
     /* 根据同一个空仓号选择新电池取出位置。 */
     {NULL, 0, STATUS_REG_NONE, 0, MoveMotor1GetBayPos,  &battery_bay_next},

@@ -27,6 +27,12 @@
 
 // 横移电机 取飞机电池位置
 #define CALIB_MOTOR2_AIRCRAFT_WORK_POS             304000L
+
+// 横移电机 装飞机电池释放位置
+#define CALIB_MOTOR2_AIRCRAFT_RELEASE_POS          288000L
+// 横移电机 装飞机电池时推电池位置
+#define CALIB_MOTOR2_AIRCRAFT_CLEAR_POS            314000L
+
 // 横移电机 电池仓装电池位置
 #define CALIB_MOTOR2_BAY_WORK_POS                  355000L
 // 横移电机 电池仓推进电池位置
