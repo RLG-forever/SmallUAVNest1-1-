@@ -20,7 +20,7 @@ static const PollBlock poll_blocks[] =
 {
     {0x0e, 0x00, 1, REG_RAINFALL},          //  降雨量    
     {0x0f, 0x00, 1, REG_WIND_SPEED},        //  风速 
-	{0x16, 0x00, 1, REG_CABIN_TEMP},        //  舱		
+	{0x16, 0x00, 1, REG_CABIN_TEMP},        //  机舱温度		
 };
 #define POLL_BLOCK_COUNT (sizeof(poll_blocks) / sizeof(poll_blocks[0]))
 

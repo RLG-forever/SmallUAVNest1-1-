@@ -76,6 +76,8 @@ SequenceStartResult Sequence_StartRecovery(void);
 
 SeqId Sequence_GetCurrentId(void);
 uint8_t Sequence_GetCurrentStep(void);
+/* 首次执行为0，等待无人机开机超时并重跑步骤后为1。 */
+uint8_t Sequence_GetUavPowerRetryCount(void);
 uint8_t Sequence_GetSelectedBay(void);
 /* 获取本次落地流程启动时锁定的目标空机位；非落地流程返回 0。 */
 uint8_t Sequence_GetTargetEmptyBay(void);

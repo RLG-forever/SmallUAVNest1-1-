@@ -523,7 +523,14 @@ int main(void)
 			GatewayService_Process();
 			/* 自动告警恢复中的序列需要在全回原点失败后完成收尾。 */
 			Sequence_Process(); 
-			if (normal_operations_enabled) {
+			/*
+			 * GatewayService_Process() 可能在本轮启动全回原点，执行后台
+			 * Modbus 任务前必须重新检查实时状态。否则轮询可能在回原点启动后
+			 * 提交事务，随后因正常业务被禁用而无法取走完成结果，造成 Modbus
+			 * 主站被该轮询事务持续占用。
+			 */
+			if (normal_operations_enabled &&
+				!MotorControl_FullHomeIsBusy()) {
 				SwapState_TrySave();   // 延迟保存（Flash 写入过程仍为同步执行）
 				StallRecovery_Task();
 				/* 后台轮询优先级最低，避免抢在控制命令之前占用主站总线。 */

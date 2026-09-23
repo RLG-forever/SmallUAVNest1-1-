@@ -14,7 +14,7 @@
 #include <stddef.h>
 
 #define UAV_DEPARTURE_WAIT_TIMEOUT_MS (120UL * 1000UL)
-#define UAV_POWER_ON_WAIT_TIMEOUT_MS  (120UL * 1000UL)
+#define UAV_POWER_ON_WAIT_TIMEOUT_MS  (30UL * 1000UL)
 
 /* 需要同步运动的电机组；单电机步骤直接在 EXEC_MOVE_ABS_STEP 中写参数。 */
 static const MotorMoveAbsPosParams plane_transfer_in_motors[] = {
@@ -79,6 +79,30 @@ static uint8_t MoveOneToAbsPos(uint8_t slave_addr, int32_t position)
         EXEC_ABS_POS(slave_addr, position);
 
     return MotorControl_MoveToAbsPos(&motor, 1U, NULL);
+}
+
+/* 第二轮开机尝试时整体前移，近端和远端仍保持原有相对距离。 */
+static int32_t GetTakeoffMotor2NearPosition(void)
+{
+    int32_t position = CALIB_MOTOR2_FLY_NEAR_POS;
+
+    if (Sequence_GetUavPowerRetryCount() > 0U) {
+        position += TAKEOFF_UAV_POWER_RETRY_POSITION_OFFSET;
+    }
+    return position;
+}
+
+static uint8_t MoveTakeoffMotor2Near(void)
+{
+    return MoveOneToAbsPos(MOTOR2_SLAVE_ADDR,
+                           GetTakeoffMotor2NearPosition());
+}
+
+static uint8_t MoveTakeoffMotor2Far(void)
+{
+    return MoveOneToAbsPos(
+        MOTOR2_SLAVE_ADDR,
+        GetTakeoffMotor2NearPosition() + MOTOR2_FLY_FAR_RELA_POS);
 }
 
 static uint8_t MoveArrayToAbsPos(const MotorMoveAbsPosParams *motors,
@@ -347,6 +371,28 @@ uint8_t CloseAC(void)
     return ctrl_ret3;
 }
 
+/* 起飞收尾时关闭空调失败只记录告警，不阻止后续关舱门步骤。 */
+uint8_t CloseACForTakeoff(void)
+{
+    uint8_t result = ModbusMaster_06_WriteSingleReg(
+        MODBUS_MASTER_CLIENT_GATEWAY, AIR_CONDITIONER_SLAVE,
+        AIR_POWER_CTRL_REG, AIR_POWER_OFF_VALUE);
+
+    if (result == MODBUS_RESULT_PENDING ||
+        result == MODBUS_RESULT_BUSY) {
+        return result;
+    }
+    if (result != MODBUS_RESULT_OK) {
+        LOG_WARN("STEP",
+                 "close air conditioner failed during takeoff: result=%u; continuing sequence\r\n",
+                 (unsigned int)result);
+        return MODBUS_RESULT_OK;
+    }
+
+    LOG_INFO("STEP", "air conditioner closed during takeoff\r\n");
+    return MODBUS_RESULT_OK;
+}
+
 /* Sequence step tables. */
 const StepDef opendr1_steps[] =
 {
@@ -373,7 +419,7 @@ const StepDef closedr_steps[] =
 {
     {CloseDr, 16250, REG_DOOR_STATE, 4},      //1.关闭舱门
 //			{StopDr, 1000, REG_DOOR_STATE, 4},       //2.停止
-	{OpenAC, 0, STATUS_REG_NONE, 0},   // 打开空调
+	{CloseACForTakeoff, 0, STATUS_REG_NONE, 0},   // 打开空调
 
 };
 const uint8_t CLOSEDR_STEP_COUNT = (uint8_t)(sizeof(closedr_steps) / sizeof(closedr_steps[0]));
@@ -390,28 +436,28 @@ const StepDef takeoff_steps[] =
 
         {OpenDr, 20250, REG_DOOR_STATE, 2},      // 飞机前进完成后打开舱门
 
-        // 电机2移动到无人机电池靠近标定位置
-        EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, CALIB_MOTOR2_FLY_NEAR_POS, 0, STATUS_REG_NONE, 0),      //5.电机2前进
-        // 电机2移动到无人机电池远端标定位置
-        EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, CALIB_MOTOR2_FLY_NEAR_POS + MOTOR2_FLY_FAR_RELA_POS, 0, STATUS_REG_NONE, 0),      //27.电机2前进
-        // 电机2移动到无人机电池靠近标定位置
-        EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, CALIB_MOTOR2_FLY_NEAR_POS, 0, STATUS_REG_NONE, 0),      //28.电机2后退
-        // 电机2移动到无人机电池远端标定位置
-        EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, CALIB_MOTOR2_FLY_NEAR_POS + MOTOR2_FLY_FAR_RELA_POS, 0, STATUS_REG_NONE, 0),      //29.电机2前进
+        // 电机2按当前开机尝试次数移动到靠近位置
+        {MoveTakeoffMotor2Near, 0, STATUS_REG_NONE, 0},      //5.电机2前进
+        // 电机2按当前开机尝试次数移动到远端位置
+        {MoveTakeoffMotor2Far, 0, STATUS_REG_NONE, 0},       //27.电机2前进
+        // 电机2返回本轮对应的靠近位置
+        {MoveTakeoffMotor2Near, 0, STATUS_REG_NONE, 0},      //28.电机2后退
+        // 电机2再次移动到本轮对应的远端位置
+        {MoveTakeoffMotor2Far, 0, STATUS_REG_NONE, 0},       //29.电机2前进
         //移动至原点位置0
-        EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, MOTOR_HOME_POS, 0, STATUS_REG_NONE, 0),     //30.电机2后退
+        EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, MOTOR2_RETURN_POS, 0, STATUS_REG_NONE, 0),     //30.电机2后退
         
         {WaitForUavPowerOn, 0, STATUS_REG_NONE, 0, NULL, NULL,  UAV_POWER_ON_WAIT_TIMEOUT_MS},   //等待无人机开机
         //待修改
         {Center_2, 0, STATUS_REG_NONE, 0},       //31.飞机后退
         //电机回零位
-        EXEC_MOVE_ABS_STEP(MOTOR1_SLAVE_ADDR, MOTOR_HOME_POS, 0, STATUS_REG_NONE, 0),      //32.电机1下降
+        EXEC_MOVE_ABS_STEP(MOTOR1_SLAVE_ADDR, MOTOR1_RETURN_POS, 0, STATUS_REG_NONE, 0),      //32.电机1下降
         //飞机前进
         EXEC_MOVE_ABS_ARRAY_STEP(plane_transfer_out_motors, 0, STATUS_REG_NONE, 0),     //33.飞机前进
 
         {LeaveCenter, 0, REG_CENTER_ROD_STATE, 2},   	  //34.居中杆释放
 
-        {CloseAC, 500, STATUS_REG_NONE, 0},            // 关闭空调
+        {CloseACForTakeoff, 500, STATUS_REG_NONE, 0}, // 关闭空调，失败后继续关舱门
 
         {CheckAndCloseDoor, 16250, STATUS_REG_NONE, 0, NULL, NULL, UAV_DEPARTURE_WAIT_TIMEOUT_MS},                  // 等待无人机离巢后关闭舱门
 };
@@ -442,7 +488,7 @@ const StepDef landing_steps[] =
     //横移电机移动到电池仓推进电池位置
     EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, CALIB_MOTOR2_BAY_RELEASE_POS, 0, STATUS_REG_NONE, 0),
     
-    EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, MOTOR2_GET_BATTERY_RETURN_POS, 0, STATUS_REG_NONE, 0),
+    EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, MOTOR2_RETURN_POS, 0, STATUS_REG_NONE, 0),
 
     /* 根据同一个空仓号选择新电池取出位置。 */
     {NULL, 0, STATUS_REG_NONE, 0, MoveMotor1GetBayPos,  &battery_bay_next},
@@ -464,9 +510,9 @@ const StepDef landing_steps[] =
     //横移电机推进去电池位置
     EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, CALIB_MOTOR2_AIRCRAFT_CLEAR_POS, 2000, STATUS_REG_NONE, 0),
 
-    EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, MOTOR_HOME_POS, 0, STATUS_REG_NONE, 0),
+    EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, MOTOR2_RETURN_POS, 0, STATUS_REG_NONE, 0),
     {Center_2, 0, STATUS_REG_NONE, 0},
-    EXEC_MOVE_ABS_STEP(MOTOR1_SLAVE_ADDR, MOTOR_HOME_POS, 0, STATUS_REG_NONE, 0),
+    EXEC_MOVE_ABS_STEP(MOTOR1_SLAVE_ADDR, MOTOR1_RETURN_POS, 0, STATUS_REG_NONE, 0),
     EXEC_MOVE_ABS_ARRAY_STEP(plane_transfer_out_motors, 0, REG_SWAP_MECH_STATE, 4),
     
     //{LeaveCenter, 0, REG_CENTER_ROD_STATE, 2},
@@ -481,15 +527,15 @@ const uint8_t LANDING_STEP_COUNT =
 // 居中步骤
 const StepDef closecenter_steps[] =
 {
-		{Center_1, 0, STATUS_REG_NONE, 0},
-        {Center_2, 0, REG_CENTER_ROD_STATE, 4},
+	{Center_1, 0, STATUS_REG_NONE, 0},
+    {Center_2, 0, REG_CENTER_ROD_STATE, 4},
 };
 const uint8_t CLOSECENTER_STEP_COUNT = (uint8_t)(sizeof(closecenter_steps) / sizeof(closecenter_steps[0]));
 
 // 释放步骤
 const StepDef leavecenter_steps[] =
 {
-		{LeaveCenter, 0, REG_CENTER_ROD_STATE, 2},    // 到位后完成
+	{LeaveCenter, 0, REG_CENTER_ROD_STATE, 2},    // 到位后完成
 
 };
 const uint8_t LEAVECENTER_STEP_COUNT = (uint8_t)(sizeof(leavecenter_steps) / sizeof(leavecenter_steps[0]));
@@ -501,8 +547,7 @@ const StepDef loadbattery_steps[] =
     {Center_2, 0, REG_CENTER_ROD_STATE, 4},
 
     /* 根据序列启动时锁定的空仓号选择电池仓位置。 */
-    {NULL, 0, STATUS_REG_NONE, 0, MoveMotor1GetBayPos,
-     &battery_bay_current},
+    {NULL, 0, STATUS_REG_NONE, 0, MoveMotor1GetBayPos, &battery_bay_current},
     //横移电机移动到电池仓取/装电池
     EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, CALIB_MOTOR2_BAY_LOAD_POS, 0, STATUS_REG_NONE, 0),
     

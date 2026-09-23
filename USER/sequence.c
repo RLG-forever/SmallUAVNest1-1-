@@ -46,6 +46,7 @@ struct {
     uint8_t step_trace_started;
     uint8_t step_pending_logged;
     uint32_t step_start_tick;
+    uint8_t uav_power_retry_count;
     uint8_t alarm_recovery_count;
     uint8_t recovery_failed_step;
     uint8_t recovery_failed_slave;
@@ -113,6 +114,7 @@ static void Sequence_Finish(SequenceResult result)
     seq_runner.step_trace_started = 0U;
     seq_runner.step_pending_logged = 0U;
     seq_runner.step_start_tick = 0U;
+    seq_runner.uav_power_retry_count = 0U;
     seq_runner.alarm_recovery_count = 0U;
     seq_runner.recovery_failed_step = SEQUENCE_STEP_INVALID;
     seq_runner.recovery_failed_slave = 0U;
@@ -376,6 +378,7 @@ SequenceStartResult Sequence_Start(SeqId id)
     seq_runner.step_trace_started = 0U;
     seq_runner.step_pending_logged = 0U;
     seq_runner.step_start_tick = 0U;
+    seq_runner.uav_power_retry_count = 0U;
     seq_runner.alarm_recovery_count = 0U;
     seq_runner.recovery_failed_step = SEQUENCE_STEP_INVALID;
     seq_runner.recovery_failed_slave = 0U;
@@ -521,6 +524,40 @@ static void Sequence_ExecuteCurrentStep(void)
         if (step->wait_timeout_ms > 0U &&
             (uint32_t)(GetTick() - seq_runner.step_start_tick) >=
                 step->wait_timeout_ms) {
+            if ((seq_runner.id == SEQ_ID_TAKEOFF ||
+                 seq_runner.id == SEQ_ID_TAKEOFF_NO_CLOSE) &&
+                seq_runner.current_index ==
+                    TAKEOFF_UAV_POWER_CHECK_STEP_INDEX &&
+                seq_runner.uav_power_retry_count <
+                    TAKEOFF_UAV_POWER_MAX_RETRIES) {
+                seq_runner.uav_power_retry_count++;
+                seq_runner.current_index =
+                    TAKEOFF_UAV_POWER_RETRY_START_STEP_INDEX;
+                seq_runner.current_step_retry_count = 0U;
+                seq_runner.delay_deadline = 0U;
+                seq_runner.step_trace_started = 0U;
+                seq_runner.step_pending_logged = 0U;
+                seq_runner.step_start_tick = 0U;
+                seq_runner.last_error = 0U;
+                seq_runner.state = seq_runner.pause_requested
+                                       ? SEQUENCE_STATE_PAUSED
+                                       : SEQUENCE_STATE_RUNNING;
+                StatusRegs_Update(REG_FAULT_CODE, 0U);
+                LOG_WARN(
+                    "SEQ_TRACE",
+                    "UAV power wait timed out; retrying steps %u-%u: retry=%u/%u, motor2_offset=%ld, near=%ld, far=%ld\r\n",
+                    (unsigned int)TAKEOFF_UAV_POWER_RETRY_START_STEP_INDEX,
+                    (unsigned int)TAKEOFF_UAV_POWER_CHECK_STEP_INDEX,
+                    (unsigned int)seq_runner.uav_power_retry_count,
+                    (unsigned int)TAKEOFF_UAV_POWER_MAX_RETRIES,
+                    (long)TAKEOFF_UAV_POWER_RETRY_POSITION_OFFSET,
+                    (long)(CALIB_MOTOR2_FLY_NEAR_POS +
+                           TAKEOFF_UAV_POWER_RETRY_POSITION_OFFSET),
+                    (long)(CALIB_MOTOR2_FLY_NEAR_POS +
+                           TAKEOFF_UAV_POWER_RETRY_POSITION_OFFSET +
+                           MOTOR2_FLY_FAR_RELA_POS));
+                return;
+            }
             StatusRegs_Update(REG_FAULT_CODE, MODBUS_RESULT_TIMEOUT);
             seq_runner.last_error = MODBUS_RESULT_TIMEOUT;
             LOG_ERROR("SEQ_TRACE",
@@ -818,6 +855,11 @@ uint8_t Sequence_GetCurrentStep(void)
 {
     if (!Sequence_IsBusy()) return SEQUENCE_STEP_INVALID;
     return seq_runner.current_index;
+}
+
+uint8_t Sequence_GetUavPowerRetryCount(void)
+{
+    return seq_runner.uav_power_retry_count;
 }
 
 uint8_t Sequence_GetSelectedBay(void)
