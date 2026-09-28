@@ -46,7 +46,7 @@ typedef struct {
 #define MOTOR14_SLAVE_ADDR 0x14   // 电机14从站地址(控制遥控器的舵机)
 
 
-#define MOTOR1_RETURN_POS 70000L    //升降电机1的停住位置
+#define MOTOR1_RETURN_POS 10000L    //升降电机1的停住位置
 #define MOTOR2_RETURN_POS 100000L   //升降电机2的停住位置
 
 /* 根据编译目标选择设备标定参数。 */
@@ -71,53 +71,6 @@ typedef struct {
 #define MOTOR4_STATUS_REG                0x004BU // 十进制75，驱动器状态
 #define MOTOR4_HOME_COMPLETE_MASK        0x0004U // bit2，回零完成
 #define MOTOR4_MOVE_COMPLETE_MASK        0x0080U // bit7，运动完成
-
-/* 电池模块仍在使用的电机1兼容脉冲参数。 */
-#define MOTOR1_MOVE_POS_330000_LOW_WORD  0x0910  //远离电机，正脉冲330000低位
-#define MOTOR1_MOVE_POS_330000_HIGH_WORD 0x0005  //远离电机，正脉冲330000高位
-#define MOTOR1_MOVE_POS_136000_LOW_WORD  0x1340  //远离电机，正脉冲136000低位
-#define MOTOR1_MOVE_POS_136000_HIGH_WORD 0x0002  //远离电机，正脉冲136000高位
-
-#define MOTOR_PRESET_PULSE_07            MOTOR1_MOVE_POS_330000_LOW_WORD  //兼容原宏名
-#define MOTOR_PRESET_PULSE_08            MOTOR1_MOVE_POS_330000_HIGH_WORD //兼容原宏名
-#define MOTOR_PRESET_PULSE_09            0x10e0        //程低位，靠近电机332000
-#define MOTOR_PRESET_PULSE_10           0x0005        //行程高位   5
-#define MOTOR_PRESET_PULSE_11           MOTOR1_MOVE_POS_136000_LOW_WORD  //兼容原宏名
-#define MOTOR_PRESET_PULSE_12           MOTOR1_MOVE_POS_136000_HIGH_WORD //兼容原宏名
-
-#define MOTOR_PRESET_PULSE_13           0x1340        //程低位，靠近电机136000
-#define MOTOR_PRESET_PULSE_14           0x0002        //行程高位
-
-
-
-
-
-
-
-
-/* 电池模块仍在使用的电机2兼容脉冲参数。 */
-#define  MOTOR2_SPEED_VALUE                 0x01f4        //速度（两字节）
-
-#define MOTOR2_MOVE_POS_315000_LOW_WORD  0xCE78  //远离电机，正脉冲315000低位
-#define MOTOR2_MOVE_POS_315000_HIGH_WORD 0x0004  //远离电机，正脉冲315000高位
-#define MOTOR2_MOVE_POS_9000_LOW_WORD    0x2328  //远离电机，正脉冲9000低位
-#define MOTOR2_MOVE_POS_9000_HIGH_WORD   0x0000  //远离电机，正脉冲9000高位
-
-
-
-
-
-
-#define MOTOR_PRESET_PULSE_01             MOTOR2_MOVE_POS_315000_LOW_WORD  //兼容原宏名
-#define MOTOR_PRESET_PULSE_02             MOTOR2_MOVE_POS_315000_HIGH_WORD //兼容原宏名
-#define MOTOR_PRESET_PULSE_03             0xa168        //电机2端低位脉冲数369000
-#define MOTOR_PRESET_PULSE_04             0x0005        //电机2端高位脉冲数	  5
-#define MOTOR_PRESET_PULSE_05             MOTOR2_MOVE_POS_9000_LOW_WORD  //兼容原宏名
-#define MOTOR_PRESET_PULSE_06             MOTOR2_MOVE_POS_9000_HIGH_WORD //兼容原宏名
-
-
-
-
 
 /* 夹紧电机命令。 */
 #define MOTOR_CLAMP_CMD_RELEASE            0x0001         //松开
@@ -199,7 +152,5 @@ extern const uint8_t LOADBATTERY_STEP_COUNT;
 extern const uint8_t DOWNBATTERY_STEP_COUNT;
 extern const uint8_t RECOVERY_WITH_BATTERY_COUNT;
 extern const uint8_t RECOVERY_WITHOUT_BATTERY_COUNT;
-const uint8_t *SequenceSteps_GetMotorList(uint8_t sequence_id,
-                                          uint8_t step_index);
 
 #endif

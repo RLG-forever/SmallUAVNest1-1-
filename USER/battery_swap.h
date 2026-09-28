@@ -50,7 +50,6 @@ void SwapState_SetEmptyBay(uint8_t bay); // 设置空仓号并保存
 void BatterySwap_Perform(void);         // 执行一次换电操作（由外部触发）
 /* 按当前落地序列锁定的目标机位提交状态，并立即保存到 Flash。 */
 uint8_t UpdateEmptyBay(void);
-void SwapState_TrySave(void);
 void MotorPositionStore_Init(void);
 uint8_t MotorPositionStore_Save(int32_t motor7_position,
                                 int32_t motor8_position);

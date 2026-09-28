@@ -58,7 +58,6 @@ extern  ADCGEN       adc1;
 //extern  DOORLGEN     drl; 
 //extern  ERRORGEN     err;
 extern  LinterMotor         lim;
-extern int testI,testJ;
 /*==================================================================================
      declare definition
 ===================================================================================*/

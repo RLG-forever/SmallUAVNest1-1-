@@ -33,6 +33,9 @@
 
 /* 到位检测参数；位置和容差的单位均为电机脉冲数。 */
 #define MOTOR_CONTROL_POSITION_TOLERANCE          2000L
+/* 连续轮询的位置读数均须在容差内，且最近几次读数的跨度不得超过此值。 */
+#define MOTOR_CONTROL_STABLE_POSITION_DELTA        100L
+#define MOTOR_CONTROL_STABLE_SAMPLE_COUNT          3U
 #define MOTOR_CONTROL_PROGRESS_MIN_DELTA           200L
 #define MOTOR_CONTROL_POSITION_POLL_INTERVAL_MS   1000U
 #define MOTOR_POSITION_CHECKPOINT_INTERVAL_MS     1000U
@@ -43,7 +46,6 @@
 #define MOTOR_HOME_STATUS_REG                     0x0006U
 #define MOTOR_HOME_STATUS_REG_COUNT               2U
 #define MOTOR_HOME_COMPLETE_MASK                  0x8000U
-#define MOTOR_MOVE_COMPLETE_MASK                  0x1000U
 
 /* 回零前配对电机调平参数，位置单位均为脉冲。 */
 //是否允许调平
@@ -127,6 +129,19 @@ typedef enum {
     MOTOR_FULL_HOME_STATE_FAILED
 } MotorFullHomeState;
 
+/*
+ * 上电回零调试阶段。
+ * ALL 保持原有完整流程；其余取值只执行指定阶段后结束。
+ */
+typedef enum {
+    MOTOR_FULL_HOME_STAGE_ALL = 0,
+    MOTOR_FULL_HOME_STAGE_INITIAL_GROUP,
+    MOTOR_FULL_HOME_STAGE_PREMOVE_78,
+    MOTOR_FULL_HOME_STAGE_MOTOR2,
+    MOTOR_FULL_HOME_STAGE_MOTOR1,
+    MOTOR_FULL_HOME_STAGE_FINAL_78
+} MotorFullHomeStage;
+
 typedef struct {
     uint8_t slave_addr;
     uint16_t register_address;
@@ -150,8 +165,10 @@ uint8_t Motor_Batch_Control(uint8_t slave_addr, uint16_t start_reg,
 
 uint8_t MotorControl_IsBusy(void);
 void MotorControl_Cancel(void);
-/* 最近一次批量动作失败的从站地址；成功或尚无失败时返回 0。 */
+/* 最近一次电机动作失败的从站地址；成功或尚无失败时返回 0。 */
 uint8_t MotorControl_GetLastFailedSlave(void);
+/* 开始新命令或新步骤前清除上一次电机故障归属。 */
+void MotorControl_ClearLastFailedSlave(void);
 
 /*
  * 非阻塞回原点服务；Start 只创建任务，Process 在主循环中持续推进。
@@ -181,9 +198,15 @@ uint8_t MotorControl_FullHomeStart(uint8_t saved_position_valid,
                                    int32_t motor7_saved_position,
                                    int32_t motor8_saved_position,
                                    uint16_t speed_command);
+uint8_t MotorControl_FullHomeStageStart(MotorFullHomeStage stage,
+                                        uint8_t saved_position_valid,
+                                        int32_t motor7_saved_position,
+                                        int32_t motor8_saved_position,
+                                        uint16_t speed_command);
 void MotorControl_FullHomeProcess(void);
 uint8_t MotorControl_FullHomeIsBusy(void);
 MotorFullHomeState MotorControl_FullHomeGetState(void);
+MotorFullHomeStage MotorControl_FullHomeGetStage(void);
 uint8_t MotorControl_FullHomeGetCurrentSlave(void);
 uint8_t MotorControl_FullHomeGetFailedSlave(void);
 uint8_t MotorControl_FullHomeGetLastError(void);
@@ -217,8 +240,5 @@ uint8_t MotorControl_BatchMoveNoPositionCheck(
     const MotorControlParams *motors, uint8_t count, uint8_t *results);
 uint8_t ModbusBatch_IsBusy(void);
 void ModbusBatch_Cancel(void);
-
-uint8_t MotorMonitor_StallTriggered(void);
-void MotorMonitor_ClearStallTrigger(void);
 
 #endif

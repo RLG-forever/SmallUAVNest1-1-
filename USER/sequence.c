@@ -56,6 +56,8 @@ struct {
     uint32_t recovery_deadline;
 } seq_runner;
 
+static uint8_t landing_same_bay_debug_enabled;
+
 static const char *Sequence_GetTraceStepName(SeqId id, uint8_t step_index)
 {
     static const char *const takeoff_step_names[] = {
@@ -220,6 +222,7 @@ void Sequence_Resume(void)
 void Sequence_Init(void)
 {
     memset(&seq_runner, 0, sizeof(seq_runner));
+    landing_same_bay_debug_enabled = 0U;
     seq_runner.id = SEQ_ID_INVALID;
     seq_runner.state = SEQUENCE_STATE_IDLE;
     seq_runner.last_result = SEQUENCE_RESULT_NONE;
@@ -246,7 +249,8 @@ uint8_t Sequence_IsRecovering(void)
             seq_runner.state == SEQUENCE_STATE_RECOVERY_START_HOME ||
             seq_runner.state == SEQUENCE_STATE_RECOVERY_HOMING) ? 1U : 0U;
 }
-SequenceStartResult Sequence_Start(SeqId id)
+static SequenceStartResult Sequence_StartInternal(SeqId id,
+                                                  uint8_t same_bay_debug)
 {
     uint8_t target_empty_bay = 0U;
 
@@ -326,9 +330,12 @@ SequenceStartResult Sequence_Start(SeqId id)
                      * 在流程启动时锁定换电完成后的空机位。
                      * 告警恢复会从第 0 步重跑，但该目标值不会随当前状态再次递增。
                      */
-                    target_empty_bay = (uint8_t)((empty_bay % BAY_COUNT) + 1U);
-                    LOG_INFO("SEQUENCE", "landing sequence selected: bay=%u\r\n",
-                              (unsigned int)empty_bay);
+                    target_empty_bay = same_bay_debug
+                        ? empty_bay
+                        : (uint8_t)((empty_bay % BAY_COUNT) + 1U);
+                    LOG_INFO("SEQUENCE", "landing sequence selected: put_bay=%u, take_bay=%u\r\n",
+                             (unsigned int)empty_bay,
+                             (unsigned int)target_empty_bay);
                 break;
 				case SEQ_ID_OPENFLY:
                     seq_runner.steps = &takeoff_steps[OPENFLY_STEP_OFFSET];
@@ -393,6 +400,17 @@ SequenceStartResult Sequence_Start(SeqId id)
     return SEQ_START_OK;
 }
 
+void Sequence_SetLandingSameBayDebugEnabled(uint8_t enabled)
+{
+    landing_same_bay_debug_enabled = enabled != 0U ? 1U : 0U;
+    LOG_INFO("SEQUENCE", "landing same-bay debug=%u\r\n",
+             (unsigned int)landing_same_bay_debug_enabled);
+}
+
+SequenceStartResult Sequence_Start(SeqId id)
+{
+    return Sequence_StartInternal(id, landing_same_bay_debug_enabled);
+}
 
 static uint16_t Sequence_ComposeFaultCode(uint8_t slave_addr,
                                           uint8_t error_code)
@@ -497,8 +515,10 @@ static void Sequence_ExecuteCurrentStep(void)
 {
     const StepDef *step = &seq_runner.steps[seq_runner.current_index];
     uint8_t ret;
+    uint8_t failed_slave;
 
     if (!seq_runner.step_trace_started) {
+        MotorControl_ClearLastFailedSlave();
         seq_runner.step_trace_started = 1U;
         seq_runner.step_pending_logged = 0U;
         seq_runner.step_start_tick = GetTick();
@@ -644,16 +664,21 @@ static void Sequence_ExecuteCurrentStep(void)
         return;
     }
 
+    failed_slave = MotorControl_GetLastFailedSlave();
+    seq_runner.last_error = failed_slave != 0U
+        ? Sequence_ComposeFaultCode(failed_slave, ret)
+        : (uint16_t)ret;
     LOG_ERROR("SEQ_TRACE",
-              "step failed: id=%u, step=%u/%u, name=%s, result=%u, elapsed=%lu ms\r\n",
+              "step failed: id=%u, step=%u/%u, name=%s, slave=0x%02X, result=%u, fault=0x%04X, elapsed=%lu ms\r\n",
               (unsigned int)seq_runner.id,
               (unsigned int)seq_runner.current_index,
               (unsigned int)seq_runner.step_count,
               Sequence_GetTraceStepName(seq_runner.id,
                                         seq_runner.current_index),
+              (unsigned int)failed_slave,
               (unsigned int)ret,
+              (unsigned int)seq_runner.last_error,
               (unsigned long)(GetTick() - seq_runner.step_start_tick));
-    seq_runner.last_error = ret;
     Sequence_Finish(SEQUENCE_RESULT_ACTION_FAILED);
 }
 void Sequence_Process(void)
@@ -870,12 +895,6 @@ uint8_t Sequence_GetSelectedBay(void)
 uint8_t Sequence_GetTargetEmptyBay(void)
 {
     return seq_runner.target_empty_bay;
-}
-
-const uint8_t *Sequence_GetCurrentStepMotors(void)
-{
-    return SequenceSteps_GetMotorList((uint8_t)Sequence_GetCurrentId(),
-                                      Sequence_GetCurrentStep());
 }
 
 /**

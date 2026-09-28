@@ -289,6 +289,10 @@ static uint8_t ModbusMaster_IsNoReplyWriteTarget(void)
 
 static void ModbusMaster_RetryOrFinish(uint8_t result)
 {
+    /* 后台传感器轮询失败后直接交还总线，其他客户端仍最多尝试三次。 */
+    uint8_t max_attempts = master_transaction.client == MODBUS_MASTER_CLIENT_POLLING
+                               ? 1U : MODBUS_MASTER_MAX_RETRIES;
+
     if (result == MODBUS_RESULT_TIMEOUT &&
         master_transaction.phase == MASTER_TXN_WAITING &&
         ModbusMaster_IsNoReplyWriteTarget()) {
@@ -302,12 +306,12 @@ static void ModbusMaster_RetryOrFinish(uint8_t result)
         return;
     }
 
-    if (master_transaction.attempts < MODBUS_MASTER_MAX_RETRIES) {
+    if (master_transaction.attempts < max_attempts) {
         LOG_WARN("MODBUS", "retry scheduled: slave=0x%02X, fn=0x%02X, attempt=%u/%u, result=%u\r\n",
                  (unsigned int)master_transaction.slave,
                  (unsigned int)master_transaction.function,
                  (unsigned int)master_transaction.attempts,
-                 (unsigned int)MODBUS_MASTER_MAX_RETRIES,
+                 (unsigned int)max_attempts,
                  (unsigned int)result);
         master_transaction.phase = MASTER_TXN_RETRY_WAIT;
         master_transaction.deadline = GetTick() + MODBUS_MASTER_RETRY_GAP_MS;

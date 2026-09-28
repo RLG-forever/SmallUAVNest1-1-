@@ -51,6 +51,8 @@ void Sequence_Init(void);
 
 // 启动指定序列（由从站回调调用）
 SequenceStartResult Sequence_Start(SeqId id);
+/* Applies to subsequent landing sequences, including gateway commands. */
+void Sequence_SetLandingSameBayDebugEnabled(uint8_t enabled);
 
 // 查询是否有序列正在执行
 uint8_t Sequence_IsBusy(void);
@@ -81,7 +83,6 @@ uint8_t Sequence_GetUavPowerRetryCount(void);
 uint8_t Sequence_GetSelectedBay(void);
 /* 获取本次落地流程启动时锁定的目标空机位；非落地流程返回 0。 */
 uint8_t Sequence_GetTargetEmptyBay(void);
-const uint8_t *Sequence_GetCurrentStepMotors(void);
 SequenceResult Sequence_GetLastResult(void);
 uint8_t Sequence_GetLastStep(void);
 uint16_t Sequence_GetLastError(void);

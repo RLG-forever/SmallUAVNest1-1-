@@ -134,7 +134,7 @@
             <RunIndependent>0</RunIndependent>
             <UpdateFlashBeforeDebugging>1</UpdateFlashBeforeDebugging>
             <Capability>1</Capability>
-            <DriverSelection>4103</DriverSelection>
+            <DriverSelection>4096</DriverSelection>
           </Flash1>
           <bUseTDR>1</bUseTDR>
           <Flash2>BIN\UL2CM3.DLL</Flash2>
@@ -388,6 +388,16 @@
               <FileName>main.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\PROJECT\main.c</FilePath>
+            </File>
+            <File>
+              <FileName>startup_door.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\PROJECT\startup_door.c</FilePath>
+            </File>
+            <File>
+              <FileName>full_home_service.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\PROJECT\full_home_service.c</FilePath>
             </File>
             <File>
               <FileName>stm32f4xx_it.c</FileName>
@@ -1117,6 +1127,16 @@
               <FilePath>..\PROJECT\main.c</FilePath>
             </File>
             <File>
+              <FileName>startup_door.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\PROJECT\startup_door.c</FilePath>
+            </File>
+            <File>
+              <FileName>full_home_service.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\PROJECT\full_home_service.c</FilePath>
+            </File>
+            <File>
               <FileName>stm32f4xx_it.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\PROJECT\stm32f4xx_it.c</FilePath>
@@ -1842,6 +1862,16 @@
               <FileName>main.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\PROJECT\main.c</FilePath>
+            </File>
+            <File>
+              <FileName>startup_door.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\PROJECT\startup_door.c</FilePath>
+            </File>
+            <File>
+              <FileName>full_home_service.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\PROJECT\full_home_service.c</FilePath>
             </File>
             <File>
               <FileName>stm32f4xx_it.c</FileName>

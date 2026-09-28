@@ -11,7 +11,6 @@
 #endif
 /* 当前状态缓存 */
 static Swapstate g_swap_state;
-static uint8_t need_save = 0;   // 保存标志
 static MotorPositionState g_motor_position_state;
 static uint8_t motor_position_state_valid;
 
@@ -603,8 +602,8 @@ void BatterySwap_Perform(void)
 }
 
 /*
- * 用于落地序列步骤表：新电池从下一仓取出且电机2退回原点后，
- * 将该仓提交为本次序列启动时锁定的空仓，并立即保存到 Flash。
+ * 用于落地序列步骤表：从本次锁定的目标仓取出电池且电机2退回原点后，
+ * 将目标仓提交为空仓；调试同仓模式下目标仓与原空仓相同。
  */
 uint8_t UpdateEmptyBay(void)
 {
@@ -620,7 +619,6 @@ uint8_t UpdateEmptyBay(void)
     /* 自动恢复重跑到本步骤时，目标值不变，因此不会再次循环增加机位。 */
     if (g_swap_state.empty_bay == target) {
         StatusRegs_Update(REG_RESERVED2, target);
-        need_save = 0U;
         LOG_INFO("SWAP", "empty bay already committed: value=%u\r\n",
                  (unsigned int)target);
         return MODBUS_RESULT_OK;
@@ -629,25 +627,7 @@ uint8_t UpdateEmptyBay(void)
     g_swap_state.empty_bay = target;
     StatusRegs_Update(REG_RESERVED2, target);
     SwapState_Save();
-    need_save = 0U;
     LOG_INFO("SWAP", "empty bay committed and saved: value=%u\r\n",
              (unsigned int)target);
     return MODBUS_RESULT_OK;
-}
-
-// 主循环中调用，尝试保存
-void SwapState_TrySave(void)
-{
-		static uint32_t last_print = 0;
-    if (GetTick() - last_print > 5000) {
-        last_print = GetTick();
-//        printf("TrySave: need_save=%d, master_state=%d, seq_busy=%d\r\n", 
-//               need_save, master_state, Sequence_IsBusy());
-    }
-    if (need_save && !ModbusMaster_IsBusy() && !Sequence_IsBusy()) {
-        LOG_INFO("SWAP", "deferred flash save started\r\n");
-        SwapState_Save();
-        need_save = 0;
-        LOG_INFO("SWAP", "deferred flash save completed\r\n");
-    }
 }
