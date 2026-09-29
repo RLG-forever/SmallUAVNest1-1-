@@ -34,6 +34,9 @@ void StatusRegs_Init(void)
     memset(status_regs, 0, sizeof(status_regs));
     memset(status_cache, 0, sizeof(status_cache));
     memset(status_snapshot, 0, sizeof(status_snapshot));
+    /* 上电默认按舱门关到位处理，使起飞清理流程能尝试开门。 */
+    status_regs[REG_DOOR_STATE] = 4U;
+    status_cache[REG_DOOR_STATE] = 4U;
     snapshot_active = 0U;
     StatusRegs_ExitCritical(primask);
 }

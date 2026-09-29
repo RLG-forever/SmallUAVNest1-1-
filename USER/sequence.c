@@ -68,7 +68,29 @@ static const char *Sequence_GetTraceStepName(SeqId id, uint8_t step_index)
         "plane-transfer-out", "leave-center", "close-ac",
         "wait-uav-away-close-door"
     };
+    static const char *const landing_step_names[] = {
+        "center-1", "center-2", "motor1-transfer-lift",
+        "plane-transfer-in", "motor2-aircraft-work", "clamp-old-battery",
+        "motor2-home-after-pickup", "center-2-after-pickup",
+        "motor1-old-bay", "motor2-bay-work", "release-old-battery",
+        "motor2-bay-release", "motor2-return-after-storage",
+        "motor1-new-bay", "motor2-bay-load", "clamp-new-battery",
+        "motor2-home-after-loading", "update-empty-bay",
+        "motor1-battery-install", "plane-transfer-in-for-install",
+        "motor2-aircraft-release", "release-new-battery",
+        "motor2-aircraft-clear", "motor2-return-after-install",
+        "center-2-after-install", "motor1-home", "plane-transfer-out",
+        "close-door", "open-ac"
+    };
     uint8_t full_index = step_index;
+
+    if (id == SEQ_ID_LANDING) {
+        if (step_index >= (uint8_t)(sizeof(landing_step_names) /
+                                   sizeof(landing_step_names[0]))) {
+            return "invalid-step";
+        }
+        return landing_step_names[step_index];
+    }
 
     if (id == SEQ_ID_OPENFLY || id == SEQ_ID_CLOSEFLY) {
         full_index = (uint8_t)(step_index + OPENFLY_STEP_OFFSET);
@@ -276,7 +298,7 @@ static SequenceStartResult Sequence_StartInternal(SeqId id,
     switch (id) {
 				case SEQ_ID_OPENDR1:
 						seq_runner.steps = opendr_steps;
-						seq_runner.step_count = OPENDR1_STEP_COUNT;
+						seq_runner.step_count = OPENDR_STEP_COUNT;
 						LOG_INFO("SEQUENCE", "open-door sequence selected\r\n");
 				break;
 				case SEQ_ID_OPENDR:

@@ -341,7 +341,12 @@ uint8_t OpenDr(void)
 
 uint8_t CloseDr(void)
 {
-    return Motor_Control(MOTOR_ID_4, 1U, MOTOR4_CMD_CLOSE);
+    uint8_t result = Motor_Control(MOTOR_ID_4, 1U, MOTOR4_CMD_CLOSE);
+
+    if (result == MODBUS_RESULT_OK) {
+        StatusRegs_Update(REG_DOOR_STATE, 3U);
+    }
+    return result;
 }
 
 uint8_t OpenAC(void)
@@ -399,21 +404,13 @@ uint8_t CloseACForTakeoff(void)
 }
 
 /* Sequence step tables. */
-const StepDef opendr1_steps[] =
-{
-        {OpenDr, 16250, STATUS_REG_NONE, 0},      //1.打开舱门
-			//{StopDr, 1000, REG_DOOR_STATE, 2},       //2.停止
-			{CloseAC, 0, STATUS_REG_NONE, 0},   // 关闭空调
-
-};
-const uint8_t OPENDR1_STEP_COUNT = (uint8_t)(sizeof(opendr1_steps) / sizeof(opendr1_steps[0]));
 // 打开舱门步骤表
 const StepDef opendr_steps[] =
 {
-      {OpenDr, 16250, REG_DOOR_STATE, 2},      //1.打开舱门
-      //{OpenDr, 500, REG_DOOR_STATE, 2},      //1.打开舱门
-//			{StopDr, 1000, REG_DOOR_STATE, 2},       //2.停止
-			{CloseAC, 0, STATUS_REG_NONE, 0},   // 关闭空调
+    {OpenDr, 16250, REG_DOOR_STATE, 2},      //1.打开舱门
+    //{OpenDr, 500, REG_DOOR_STATE, 2},      //1.打开舱门
+    //{StopDr, 1000, REG_DOOR_STATE, 2},       //2.停止
+    {CloseAC, 0, STATUS_REG_NONE, 0},   // 关闭空调
 
 };
 const uint8_t OPENDR_STEP_COUNT = (uint8_t)(sizeof(opendr_steps) / sizeof(opendr_steps[0]));
@@ -423,7 +420,6 @@ const uint8_t OPENDR_STEP_COUNT = (uint8_t)(sizeof(opendr_steps) / sizeof(opendr
 const StepDef closedr_steps[] =
 {
     {CloseDr, 16250, REG_DOOR_STATE, 4},      //1.关闭舱门
-//			{StopDr, 1000, REG_DOOR_STATE, 4},       //2.停止
 	{CloseACForTakeoff, 0, STATUS_REG_NONE, 0},   // 打开空调
 
 };
@@ -432,39 +428,39 @@ const uint8_t CLOSEDR_STEP_COUNT = (uint8_t)(sizeof(closedr_steps) / sizeof(clos
 // 一键起飞完整步骤表；中间步骤同时供飞机开机、关机流程复用
 const StepDef takeoff_steps[] =
 {
-        {Center_1, 0, STATUS_REG_NONE, 0},        //1.左右居中
-        {Center_2, 0, REG_CENTER_ROD_STATE, 4},     	  //2.前后居中
-        /* 电机1移动到起降抬升标定位置。 */
-        EXEC_MOVE_ABS_STEP(MOTOR1_SLAVE_ADDR, CALIB_MOTOR1_FLY_LIFT_POS, 0, STATUS_REG_NONE, 0),      //3.电机1上升
-        //飞机前进
-        {MovePlaneTransferIn, 0, STATUS_REG_NONE, 0},       //4.飞机前进
+    {Center_1, 0, STATUS_REG_NONE, 0},        //1.左右居中
+    {Center_2, 0, REG_CENTER_ROD_STATE, 4},     	  //2.前后居中
+    /* 电机1移动到起降抬升标定位置。 */
+    EXEC_MOVE_ABS_STEP(MOTOR1_SLAVE_ADDR, CALIB_MOTOR1_FLY_LIFT_POS, 0, STATUS_REG_NONE, 0),      //3.电机1上升
+    //飞机前进
+    {MovePlaneTransferIn, 0, STATUS_REG_NONE, 0},       //4.飞机前进
 
-        {OpenDr, 20250, REG_DOOR_STATE, 2},      // 飞机前进完成后打开舱门
+    {OpenDr, 20250, REG_DOOR_STATE, 2},      // 飞机前进完成后打开舱门
 
-        // 电机2按当前开机尝试次数移动到靠近位置
-        {MoveTakeoffMotor2Near, 0, STATUS_REG_NONE, 0},      //5.电机2前进
-        // 电机2按当前开机尝试次数移动到远端位置
-        {MoveTakeoffMotor2Far, 0, STATUS_REG_NONE, 0},       //27.电机2前进
-        // 电机2返回本轮对应的靠近位置
-        {MoveTakeoffMotor2Near, 0, STATUS_REG_NONE, 0},      //28.电机2后退
-        // 电机2再次移动到本轮对应的远端位置
-        {MoveTakeoffMotor2Far, 0, STATUS_REG_NONE, 0},       //29.电机2前进
-        //移动至原点位置0
-        EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, MOTOR2_RETURN_POS, 0, STATUS_REG_NONE, 0),     //30.电机2后退
-        
-        {WaitForUavPowerOn, 0, STATUS_REG_NONE, 0, NULL, NULL,  UAV_POWER_ON_WAIT_TIMEOUT_MS},   //等待无人机开机
-        //待修改
-        {Center_2, 0, STATUS_REG_NONE, 0},       //31.飞机后退
-        //电机回零位
-        EXEC_MOVE_ABS_STEP(MOTOR1_SLAVE_ADDR, MOTOR1_RETURN_POS, 0, STATUS_REG_NONE, 0),      //32.电机1下降
-        //飞机前进
-        EXEC_MOVE_ABS_ARRAY_STEP(plane_transfer_out_motors, 0, STATUS_REG_NONE, 0),     //33.飞机前进
+    // 电机2按当前开机尝试次数移动到靠近位置
+    {MoveTakeoffMotor2Near, 0, STATUS_REG_NONE, 0},      //5.电机2前进
+    // 电机2按当前开机尝试次数移动到远端位置
+    {MoveTakeoffMotor2Far, 0, STATUS_REG_NONE, 0},       //27.电机2前进
+    // 电机2返回本轮对应的靠近位置
+    {MoveTakeoffMotor2Near, 0, STATUS_REG_NONE, 0},      //28.电机2后退
+    // 电机2再次移动到本轮对应的远端位置
+    {MoveTakeoffMotor2Far, 0, STATUS_REG_NONE, 0},       //29.电机2前进
+    //移动至原点位置0
+    EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, MOTOR2_RETURN_POS, 0, STATUS_REG_NONE, 0),     //30.电机2后退
 
-        {LeaveCenter, 0, REG_CENTER_ROD_STATE, 2},   	  //34.居中杆释放
+    {WaitForUavPowerOn, 0, STATUS_REG_NONE, 0, NULL, NULL,  UAV_POWER_ON_WAIT_TIMEOUT_MS},   //等待无人机开机
+    //待修改
+    {Center_2, 0, STATUS_REG_NONE, 0},       //31.飞机后退
+    //电机回零位
+    EXEC_MOVE_ABS_STEP(MOTOR1_SLAVE_ADDR, MOTOR1_RETURN_POS, 0, STATUS_REG_NONE, 0),      //32.电机1下降
+    //飞机前进
+    EXEC_MOVE_ABS_ARRAY_STEP(plane_transfer_out_motors, 0, STATUS_REG_NONE, 0),     //33.飞机前进
 
-        {CloseACForTakeoff, 500, STATUS_REG_NONE, 0}, // 关闭空调，失败后继续关舱门
+    {LeaveCenter, 0, REG_CENTER_ROD_STATE, 2},   	  //34.居中杆释放
 
-        {CheckAndCloseDoor, 16250, STATUS_REG_NONE, 0, NULL, NULL, UAV_DEPARTURE_WAIT_TIMEOUT_MS},                  // 等待无人机离巢后关闭舱门
+    {CloseACForTakeoff, 500, STATUS_REG_NONE, 0}, // 关闭空调，失败后继续关舱门
+
+    {CheckAndCloseDoor, 16250, REG_DOOR_STATE, 4, NULL, NULL, UAV_DEPARTURE_WAIT_TIMEOUT_MS},                  // 等待无人机离巢后关闭舱门
 };
 const uint8_t TAKEOFF_STEP_COUNT = (uint8_t)(sizeof(takeoff_steps) / sizeof(takeoff_steps[0]));
 

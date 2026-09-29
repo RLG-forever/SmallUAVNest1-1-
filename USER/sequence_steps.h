@@ -120,7 +120,6 @@ uint8_t CloseAC(void);
 uint8_t CloseACForTakeoff(void);
 
 /* 只读序列步骤表。 */
-extern const StepDef opendr1_steps[];
 extern const StepDef opendr_steps[];
 extern const StepDef closedr_steps[];
 extern const StepDef takeoff_steps[];
@@ -132,7 +131,6 @@ extern const StepDef downbattery_steps[];
 extern const StepDef recovery_with_battery_steps[];
 extern const StepDef recovery_without_battery_steps[];
 
-extern const uint8_t OPENDR1_STEP_COUNT;
 extern const uint8_t OPENDR_STEP_COUNT;
 extern const uint8_t CLOSEDR_STEP_COUNT;
 #define TAKEOFF_UAV_POWER_RETRY_START_STEP_INDEX 5U

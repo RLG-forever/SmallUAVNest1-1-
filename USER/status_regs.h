@@ -31,17 +31,13 @@ typedef enum {
     REG_SWAP_MECH_STATE,      // 换电机构状态（预留）
     REG_CENTER_ROD_STATE,     // 居中杆状态（1收紧2释放）
     REG_AIRCRAFT_PRESENT,     // 飞机是否在机巢（1是2否）
-    REG_FAULT_CODE,           // 故障码 0x16
-    REG_RESERVED1,            // 备用   0x17
-    REG_RESERVED2,            // 备用   0x18
-	REG_RESERVED3,			  // 备用   0x19
-	REG_RESERVED4,			  // 备用  存储0x60的值 0x1A
-    REG_COMMAND_STEP,         // 当前步骤或最后失败步骤 0x1B
+    REG_FAULT_CODE,           // 故障码 0x17
+    REG_COMMAND_STATE,        // 命令状态 0x18
+    REG_COMMAND_STEP = 0x19, // 当前步骤或最后执行步骤 0x19
+    REG_COMMAND_CODE = 0x1A, // 当前或最后执行的命令码 0x1A
+    REG_RESERVED4 = 0x1B,    // 存储0x60写入的无人机状态 0x1B
+    REG_RESERVED2 = 0x1C     // 当前空仓号 0x1C
 } StatusRegAddr;
-
-/* 复用现有备用寄存器，保持原有寄存器地址不变。 */
-#define REG_COMMAND_STATE REG_RESERVED1  //0x17 24
-#define REG_COMMAND_CODE  REG_RESERVED3  //0x19 
 
 typedef enum {
     COMMAND_STATE_IDLE = 0U,
