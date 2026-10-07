@@ -593,9 +593,9 @@ static void Sequence_ExecuteCurrentStep(void)
                     (unsigned int)seq_runner.uav_power_retry_count,
                     (unsigned int)TAKEOFF_UAV_POWER_MAX_RETRIES,
                     (long)TAKEOFF_UAV_POWER_RETRY_POSITION_OFFSET,
-                    (long)(CALIB_MOTOR2_FLY_NEAR_POS +
+                    (long)(MOTOR2_FLY_NEAR_POS +
                            TAKEOFF_UAV_POWER_RETRY_POSITION_OFFSET),
-                    (long)(CALIB_MOTOR2_FLY_NEAR_POS +
+                    (long)(MOTOR2_FLY_NEAR_POS +
                            TAKEOFF_UAV_POWER_RETRY_POSITION_OFFSET +
                            MOTOR2_FLY_FAR_RELA_POS));
                 return;

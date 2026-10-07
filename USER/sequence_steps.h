@@ -100,7 +100,6 @@ uint8_t Motor3Clamp(void);
 uint8_t Motor2Back(void);
 uint8_t Motor1Down1(void);
 uint8_t Motor3Lossen(void);
-uint8_t Motor1Up2(void);
 uint8_t Motor1Up3(void);
 uint8_t FlyForward(void);
 uint8_t FlyBack(void);
