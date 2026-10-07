@@ -35,6 +35,10 @@
 
 // 横移电机 电池仓装电池位置
 #define CALIB_MOTOR2_BAY_WORK_POS                  355000L
+// 电池装入1号仓时，电机2的独立位置
+#define CALIB_MOTOR2_BAY1_WORK_POS                 355000L
+// 电池装入2号仓时，电机2的独立位置
+#define CALIB_MOTOR2_BAY2_WORK_POS                 355000L
 // 横移电机 电池仓推进电池位置
 #define CALIB_MOTOR2_BAY_RELEASE_POS               371000L
 // 横移电机 电池仓取电池位置

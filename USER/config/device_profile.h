@@ -58,6 +58,12 @@
 #ifndef CALIB_MOTOR2_BAY_LOAD_POS
 #error "Missing CALIB_MOTOR2_BAY_LOAD_POS"
 #endif
+#ifndef CALIB_MOTOR2_BAY1_WORK_POS
+#error "Missing CALIB_MOTOR2_BAY1_WORK_POS"
+#endif
+#ifndef CALIB_MOTOR2_BAY2_WORK_POS
+#error "Missing CALIB_MOTOR2_BAY2_WORK_POS"
+#endif
 #ifndef CALIB_BATTERY_BAY1_POS
 #error "Missing CALIB_BATTERY_BAY1_POS"
 #endif

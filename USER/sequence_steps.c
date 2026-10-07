@@ -137,6 +137,12 @@ static const int32_t battery_bay_positions[3] = {
     CALIB_BATTERY_BAY3_POS
 };
 
+static const int32_t motor2_bay_work_positions[3] = {
+    CALIB_MOTOR2_BAY1_WORK_POS,
+    CALIB_MOTOR2_BAY2_WORK_POS,
+    CALIB_MOTOR2_BAY_WORK_POS
+};
+
 
 static const int32_t battery_get_bay_positions[3] = {
     CALIB_BATTERY_GET_BAY1_POS,
@@ -182,6 +188,23 @@ static uint8_t MoveMotor1GetBayPos(const void *context)
     position_index = (uint8_t)(bay - 1U);
     return MoveOneToAbsPos(MOTOR1_SLAVE_ADDR,
                            battery_get_bay_positions[position_index]);
+}
+
+/* 把电池装入电池仓：按仓号选择电机2的标定位置。 */
+static uint8_t MoveMotor2ToBayWorkPos(const void *context)
+{
+    const uint8_t *bay_offset = (const uint8_t *)context;
+    const uint8_t bay = Sequence_GetSelectedBay();
+
+    if (bay_offset == NULL || *bay_offset != BATTERY_BAY_CURRENT) {
+        return MODBUS_RESULT_PARAM;
+    }
+    if (bay < 1U || bay > 3U) {
+        return MODBUS_RESULT_PARAM;
+    }
+
+    return MoveOneToAbsPos(MOTOR2_SLAVE_ADDR,
+                           motor2_bay_work_positions[bay - 1U]);
 }
 
 // 电机1移动到回收流程标定位置
@@ -311,43 +334,43 @@ uint8_t WaitForUavPowerOn(void)
     return STEP_RESULT_WAIT;
 }
 
-// uint8_t StopDr(void)
-// {
-//     //return Motor_Control(MOTOR_ID_4, 1U, MOTOR4_CMD_STOP);
-//     return 0;
-// }
-
-// uint8_t OpenDr(void)
-// {
-//     //return Motor_Control(MOTOR_ID_4, 1U, MOTOR4_CMD_OPEN);
-//     return 0;
-// }
-
-// uint8_t CloseDr(void)
-// {
-//     //return Motor_Control(MOTOR_ID_4, 1U, MOTOR4_CMD_CLOSE);
-//     return 0;
-// }
-
 uint8_t StopDr(void)
 {
-    return Motor_Control(MOTOR_ID_4, 1U, MOTOR4_CMD_STOP);
+    //return Motor_Control(MOTOR_ID_4, 1U, MOTOR4_CMD_STOP);
+    return 0;
 }
 
 uint8_t OpenDr(void)
 {
-    return Motor_Control(MOTOR_ID_4, 1U, MOTOR4_CMD_OPEN);
+    //return Motor_Control(MOTOR_ID_4, 1U, MOTOR4_CMD_OPEN);
+    return 0;
 }
 
 uint8_t CloseDr(void)
 {
-    uint8_t result = Motor_Control(MOTOR_ID_4, 1U, MOTOR4_CMD_CLOSE);
-
-    if (result == MODBUS_RESULT_OK) {
-        StatusRegs_Update(REG_DOOR_STATE, 3U);
-    }
-    return result;
+    //return Motor_Control(MOTOR_ID_4, 1U, MOTOR4_CMD_CLOSE);
+    return 0;
 }
+
+// uint8_t StopDr(void)
+// {
+//     return Motor_Control(MOTOR_ID_4, 1U, MOTOR4_CMD_STOP);
+// }
+
+// uint8_t OpenDr(void)
+// {
+//     return Motor_Control(MOTOR_ID_4, 1U, MOTOR4_CMD_OPEN);
+// }
+
+// uint8_t CloseDr(void)
+// {
+//     uint8_t result = Motor_Control(MOTOR_ID_4, 1U, MOTOR4_CMD_CLOSE);
+
+//     if (result == MODBUS_RESULT_OK) {
+//         StatusRegs_Update(REG_DOOR_STATE, 3U);
+//     }
+//     return result;
+// }
 
 uint8_t OpenAC(void)
 {
@@ -484,7 +507,8 @@ const StepDef landing_steps[] =
     /* 根据序列启动时锁定的空仓号选择旧电池存放位置。 */
     {NULL, 0, STATUS_REG_NONE, 0, MoveMotor1ToSelectedBay,   &battery_bay_current},
     //横移电机移动到电池仓装电池位置
-    EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, CALIB_MOTOR2_BAY_WORK_POS, 0, STATUS_REG_NONE, 0),
+    {NULL, 0, STATUS_REG_NONE, 0, MoveMotor2ToBayWorkPos,
+     &battery_bay_current},
     //松开夹爪
     {Motor3Lossen, 1000, STATUS_REG_NONE, 0},
     //横移电机移动到电池仓推进电池位置
@@ -592,7 +616,8 @@ const StepDef downbattery_steps[] =
     /* 根据序列启动时锁定的空仓号选择旧电池存放位置。 */
     {NULL, 0, STATUS_REG_NONE, 0, MoveMotor1ToSelectedBay,
      &battery_bay_current},
-    EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, CALIB_MOTOR2_BAY_WORK_POS, 0, STATUS_REG_NONE, 0),
+    {NULL, 0, STATUS_REG_NONE, 0, MoveMotor2ToBayWorkPos,
+     &battery_bay_current},
     {Motor3Lossen, 1000, STATUS_REG_NONE, 0},
     EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, CALIB_MOTOR2_BAY_RELEASE_POS, 0, STATUS_REG_NONE, 0),
     EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, MOTOR_HOME_POS, 0, STATUS_REG_NONE, 0),
