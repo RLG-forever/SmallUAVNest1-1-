@@ -1,4 +1,5 @@
 #include "sequence_steps.h"
+#include "slave_ctrl.h"
 #include "exec_steps.h"
 #include "sequence.h"
 

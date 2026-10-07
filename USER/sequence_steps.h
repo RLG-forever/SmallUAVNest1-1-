@@ -45,23 +45,22 @@ typedef struct {
 
 #define MOTOR14_SLAVE_ADDR 0x14   // 电机14从站地址(控制遥控器的舵机)
 
-
 #define MOTOR1_RETURN_POS 10000L    //升降电机1的停住位置
 #define MOTOR2_RETURN_POS 100000L   //升降电机2的停住位置
 
 /* 根据编译目标选择设备标定参数。 */
 #include "config/device_profile.h"
 
-/* 步进电机控制寄存器。 */
+/* 步进电机控制寄存器*/
 #define MOTOR1_CTRL_REG1      0x00d0  // 电机1绝对位置控制寄存器（D0低字，D1高字）
 #define MOTOR2_CTRL_REG1      0x00d0  // 电机2绝对位置控制寄存器（D0低字，D1高字）
 
-/* 夹紧电机控制寄存器。 */
+/* 夹紧电机控制寄存器*/
 #define MOTOR_CLAMP_CTRL_REG1 0x0036  // 夹紧电机控制寄存器地址（松开）
 #define MOTOR_CLAMP_CTRL_REG2 0x0037  // 夹紧电机控制寄存器地址（夹紧）
 #define MOTOR_CLAMP_CTRL_REG3 0x0047  // 夹紧电机控制寄存器地址（保存）
 
-/* 舱门控制参数。 */
+/* 舱门控制参数 */
 #define MOTOR4_CTRL_REG1       0x0046  // 电机4控制寄存器地址
 #define MOTOR4_CMD_OPEN                  0x0002  // 开舱
 #define MOTOR4_CMD_CLOSE                 0x0001  // 关舱
@@ -72,27 +71,9 @@ typedef struct {
 #define MOTOR4_HOME_COMPLETE_MASK        0x0004U // bit2，回零完成
 #define MOTOR4_MOVE_COMPLETE_MASK        0x0080U // bit7，运动完成
 
-/* 夹紧电机命令。 */
-#define MOTOR_CLAMP_CMD_RELEASE            0x0001         //松开
-#define MOTOR_CLAMP_CMD_CLAMP              0x0001         //夹紧
-
-/* 非电机设备的 Modbus 地址和控制参数。 */
-#define UAV_CONTROLLER_SLAVE          0x14U
-#define UAV_POWER_CTRL_REG            0x0001U
-#define UAV_POWER_ON_VALUE            0x0001U
-#define UAV_POWER_MODE2_VALUE         0x0002U
-
-#define CHARGER_SLAVE                 0x13U
-#define CHARGER_POWER_CTRL_REG        0x0000U
-#define CHARGER_POWER_ON_VALUE        0x0001U
-#define CHARGER_POWER_OFF_VALUE       0x0000U
-
-#define AIR_CONDITIONER_SLAVE         0x0DU
-#define AIR_POWER_CTRL_REG            0x002FU
-#define AIR_POWER_ON_VALUE            0x0001U
-#define AIR_POWER_OFF_VALUE           0x0000U
-#define AIR_COOLING_STOP_TEMP_REG     0x0000U
-#define AIR_HEATING_STOP_TEMP_REG     0x0002U
+/* 夹紧电机命令*/
+#define MOTOR_CLAMP_CMD_RELEASE      0x0001         //松开
+#define MOTOR_CLAMP_CMD_CLAMP        0x0001         //夹紧
 
 uint8_t Motor1Up1(void);
 uint8_t Motor2Forward(void);

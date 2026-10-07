@@ -3,6 +3,7 @@
 #include "modbus_common.h"
 #include "modbus_master.h"
 #include "sequence.h"
+#include "slave_ctrl.h"
 #include "status_regs.h"
 #include "tick.h"
 #include "debug_log.h"
@@ -18,14 +19,13 @@ typedef struct {
 // 轮询块数组（根据实际硬件修改从站地址和寄存器对应关系）
 static const PollBlock poll_blocks[] = 
 {
-    {0x0e, 0x00, 1, REG_RAINFALL},          //  降雨量    
-    {0x0f, 0x00, 1, REG_WIND_SPEED},        //  风速 
-	{0x16, 0x00, 1, REG_CABIN_TEMP},        //  机舱温度		
+    {RAINFALL_SLAVE, RAINFALL_VALUE_REG, 1, REG_RAINFALL},    // 降雨量
+    {WIND_SPEED_SLAVE, WIND_SPEED_VALUE_REG, 1, REG_WIND_SPEED}, // 风速
+    {CABIN_TEMP_SLAVE, CABIN_TEMP_VALUE_REG, 1, REG_CABIN_TEMP}, // 机舱温度
 };
 #define POLL_BLOCK_COUNT (sizeof(poll_blocks) / sizeof(poll_blocks[0]))
 
 /* 雨量传感器累计值维护：每十分钟清除一次传感器的历史数据。 */
-#define RAIN_HISTORY_SLAVE_ADDR              0x0EU
 #define RAIN_HISTORY_CLEAR_REG               0x0006U
 #define RAIN_HISTORY_CLEAR_VALUE             0x0000U
 #define RAIN_HISTORY_CLEAR_INTERVAL_MS       (10UL * 60UL * 1000UL)
@@ -68,7 +68,7 @@ void MasterPolling_Task(void)
         rain_history_clear_pending = 1U;
         LOG_INFO("POLL",
                  "rain history clear due: slave=0x%02X, reg=0x%04X\r\n",
-                 (unsigned int)RAIN_HISTORY_SLAVE_ADDR,
+                 (unsigned int)RAINFALL_SLAVE,
                  (unsigned int)RAIN_HISTORY_CLEAR_REG);
     }
 
@@ -79,7 +79,7 @@ void MasterPolling_Task(void)
     if (rain_history_clear_pending && !polling_active) {
         ret = ModbusMaster_06_WriteSingleReg(
             MODBUS_MASTER_CLIENT_POLLING,
-            RAIN_HISTORY_SLAVE_ADDR,
+            RAINFALL_SLAVE,
             RAIN_HISTORY_CLEAR_REG,
             RAIN_HISTORY_CLEAR_VALUE);
         if (ret == MODBUS_RESULT_PENDING || ret == MODBUS_RESULT_BUSY) {

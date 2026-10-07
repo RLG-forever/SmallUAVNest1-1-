@@ -7,6 +7,7 @@
 #include "battery_swap.h"
 #include "sequence.h"
 #include "sequence_steps.h"
+#include "slave_ctrl.h"
 #include "status_regs.h"
 #include "tick.h"
 #include "debug_log.h"

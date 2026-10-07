@@ -605,6 +605,11 @@
               <FilePath>.\sequence_steps.h</FilePath>
             </File>
             <File>
+              <FileName>slave_ctrl.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\slave_ctrl.h</FilePath>
+            </File>
+            <File>
               <FileName>device_profile.h</FileName>
               <FileType>5</FileType>
               <FilePath>.\config\device_profile.h</FilePath>
@@ -1342,6 +1347,11 @@
               <FilePath>.\sequence_steps.h</FilePath>
             </File>
             <File>
+              <FileName>slave_ctrl.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\slave_ctrl.h</FilePath>
+            </File>
+            <File>
               <FileName>device_profile.h</FileName>
               <FileType>5</FileType>
               <FilePath>.\config\device_profile.h</FilePath>
@@ -2077,6 +2087,11 @@
               <FileName>sequence_steps.h</FileName>
               <FileType>5</FileType>
               <FilePath>.\sequence_steps.h</FilePath>
+            </File>
+            <File>
+              <FileName>slave_ctrl.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\slave_ctrl.h</FilePath>
             </File>
             <File>
               <FileName>device_profile.h</FileName>

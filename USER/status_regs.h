@@ -36,7 +36,8 @@ typedef enum {
     REG_COMMAND_STEP = 0x19, // 当前步骤或最后执行步骤 0x19
     REG_COMMAND_CODE = 0x1A, // 当前或最后执行的命令码 0x1A
     REG_RESERVED2 = 0x1B,    // 存储0x60写入的无人机状态 0x1B
-    REG_RESERVED4 = 0x1C     // 当前空仓号 0x1C
+    REG_RESERVED4 = 0x1C,     // 当前空仓号 0x1C
+    REG_CHARGING_CURRENT = 0x1D //当前充电电流大小
 } StatusRegAddr;
 
 typedef enum {
