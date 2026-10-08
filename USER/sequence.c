@@ -36,6 +36,7 @@ struct {
     uint8_t current_index;
     uint8_t selected_bay;
     uint8_t target_empty_bay;
+    uint8_t landing_door_closed;
     SequenceState state;
     uint8_t pause_requested;
     SequenceResult last_result;
@@ -64,25 +65,24 @@ static const char *Sequence_GetTraceStepName(SeqId id, uint8_t step_index)
 {
     static const char *const takeoff_step_names[] = {
         "center-1", "center-2", "motor1-fly-lift",
-        "plane-transfer-in", "open-door", "motor2-near-1", "motor2-far-1",
+        "plane-transfer-in", "open-door", "close-ac", "motor2-near-1", "motor2-far-1",
         "motor2-near-2", "motor2-far-2", "motor2-home",
         "wait-uav-power-on", "center-2-return", "motor1-home",
-        "plane-transfer-out", "leave-center", "close-ac",
-        "wait-uav-away-close-door"
+        "plane-transfer-out", "leave-center",
+        "wait-uav-away-close-door", "open-ac"
     };
     static const char *const landing_step_names[] = {
-        "center-1", "center-2", "motor1-transfer-lift",
-        "plane-transfer-in", "motor2-aircraft-work", "clamp-old-battery",
-        "motor2-home-after-pickup", "center-2-after-pickup",
-        "motor1-old-bay", "motor2-bay-work", "release-old-battery",
-        "motor2-bay-push-current-check", "motor2-return-after-storage",
-        "motor1-new-bay", "motor2-bay-load", "clamp-new-battery",
-        "motor2-home-after-loading", "update-empty-bay",
+        "center-1", "plane-transfer-in-before-close", "close-door", "open-ac", "center-2",
+        "motor1-transfer-lift", "plane-transfer-in", "motor2-aircraft-work",
+        "clamp-old-battery", "motor2-home-after-pickup",
+        "center-2-after-pickup", "motor1-old-bay", "motor2-bay-work",
+        "release-old-battery", "motor2-bay-push-current-check",
+        "motor2-return-after-storage", "motor1-new-bay", "motor2-bay-load",
+        "clamp-new-battery", "motor2-home-after-loading", "update-empty-bay",
         "motor1-battery-install", "plane-transfer-in-for-install",
         "motor2-aircraft-release", "release-new-battery",
         "motor2-aircraft-clear", "motor2-return-after-install",
-        "center-2-after-install", "motor1-home", "plane-transfer-out",
-        "close-door", "open-ac"
+        "center-2-after-install", "motor1-home", "plane-transfer-out"
     };
     uint8_t full_index = step_index;
 
@@ -146,6 +146,7 @@ static void Sequence_Finish(SequenceResult result)
     seq_runner.current_index = 0U;
     seq_runner.selected_bay = 0U;
     seq_runner.target_empty_bay = 0U;
+    seq_runner.landing_door_closed = 0U;
     seq_runner.state = SEQUENCE_STATE_IDLE;
     seq_runner.pause_requested = 0U;
     seq_runner.last_result = result;
@@ -186,6 +187,11 @@ static void Sequence_CompleteCurrentStep(void)
 
     if (step->completion_reg != STATUS_REG_NONE) {
         StatusRegs_Update(step->completion_reg, step->completion_value);
+        if (seq_runner.id == SEQ_ID_LANDING &&
+            step->completion_reg == REG_DOOR_STATE &&
+            step->completion_value == 4U) {
+            seq_runner.landing_door_closed = 1U;
+        }
     }
 
     if (seq_runner.id == SEQ_ID_LANDING &&
@@ -428,6 +434,7 @@ static SequenceStartResult Sequence_StartInternal(SeqId id,
     seq_runner.id = id;
     seq_runner.selected_bay = empty_bay;
     seq_runner.target_empty_bay = target_empty_bay;
+    seq_runner.landing_door_closed = 0U;
     seq_runner.current_index = 0U;
     seq_runner.state = SEQUENCE_STATE_RUNNING;
     seq_runner.pause_requested = 0U;
@@ -592,6 +599,18 @@ static void Sequence_ExecuteCurrentStep(void)
                  Sequence_GetTraceStepName(seq_runner.id,
                                            seq_runner.current_index),
                  (unsigned long)step->post_delay_ms);
+    }
+
+    /* 只跳过本次降落已完成的关门步骤，避免使用上电默认状态跳过首次关门。 */
+    if (seq_runner.id == SEQ_ID_LANDING &&
+        seq_runner.alarm_recovery_count > 0U &&
+        seq_runner.landing_door_closed &&
+        step->completion_reg == REG_DOOR_STATE &&
+        step->completion_value == 4U &&
+        StatusRegs_GetLive(REG_DOOR_STATE) == 4U) {
+        LOG_INFO("SEQ_TRACE", "landing door already closed; skipping repeated close and delay\r\n");
+        Sequence_CompleteCurrentStep();
+        return;
     }
 
     if (step->run_with_context != NULL) {
@@ -915,6 +934,7 @@ SequenceStartResult Sequence_StartRecovery(void)
     seq_runner.id = SEQ_ID_RECOVERY;
     seq_runner.selected_bay = 0U;
     seq_runner.target_empty_bay = 0U;
+    seq_runner.landing_door_closed = 0U;
     seq_runner.current_index = 0U;
     seq_runner.state = SEQUENCE_STATE_RUNNING;
     seq_runner.pause_requested = 0U;

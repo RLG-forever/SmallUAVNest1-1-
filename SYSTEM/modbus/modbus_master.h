@@ -14,6 +14,12 @@ typedef enum {
     MODBUS_MASTER_CLIENT_POLLING
 } ModbusMasterClient;
 
+/* 02：读取最多125个离散输入，每个输入在read_buff中展开为一个0/1值。 */
+uint8_t ModbusMaster_02_ReadDiscreteInputs(ModbusMasterClient client,
+                                            uint8_t slave_addr,
+                                            uint16_t start_input,
+                                            uint16_t input_num,
+                                            uint16_t *read_buff);
 uint8_t ModbusMaster_03_ReadHoldReg(ModbusMasterClient client,
                                     uint8_t slave_addr, uint16_t start_reg,
                                     uint16_t reg_num, uint16_t *read_buff);

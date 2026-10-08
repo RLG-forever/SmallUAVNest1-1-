@@ -134,16 +134,18 @@ extern const StepDef recovery_without_battery_steps[];
 
 extern const uint8_t OPENDR_STEP_COUNT;
 extern const uint8_t CLOSEDR_STEP_COUNT;
-#define TAKEOFF_UAV_POWER_RETRY_START_STEP_INDEX 5U
-#define TAKEOFF_UAV_POWER_CHECK_STEP_INDEX      10U
+#define TAKEOFF_UAV_POWER_RETRY_START_STEP_INDEX 6U
+#define TAKEOFF_UAV_POWER_CHECK_STEP_INDEX      11U
 #define TAKEOFF_UAV_POWER_MAX_RETRIES            1U
 #define TAKEOFF_UAV_POWER_RETRY_POSITION_OFFSET 2000L
 #define OPENFLY_STEP_OFFSET             0U
+/* 飞机开关机不执行末尾的居中释放、关舱门和开空调。 */
 #define OPENFLY_TRAILING_EXCLUDED_STEPS 3U
 #define OPENFLY_STEP_COUNT                                              \
     ((uint8_t)(TAKEOFF_STEP_COUNT - OPENFLY_TRAILING_EXCLUDED_STEPS))
 extern const uint8_t TAKEOFF_STEP_COUNT;
-#define TAKEOFF_NO_CLOSE_STEP_COUNT ((uint8_t)(TAKEOFF_STEP_COUNT - 1U))
+/* 不关舱门时，同时排除关门后的开空调步骤。 */
+#define TAKEOFF_NO_CLOSE_STEP_COUNT ((uint8_t)(TAKEOFF_STEP_COUNT - 2U))
 extern const uint8_t LANDING_STEP_COUNT;
 extern const uint8_t CLOSECENTER_STEP_COUNT;
 extern const uint8_t LEAVECENTER_STEP_COUNT;

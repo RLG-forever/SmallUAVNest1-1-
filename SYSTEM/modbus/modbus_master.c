@@ -34,7 +34,7 @@ typedef enum {
 
 #define MASTER_RETRY_WAIT MASTER_WAIT_RESP
 
-/* 一个RTU主站同一时刻只能有一笔在途事务。03/06/10接口返回PENDING后，
+/* 一个RTU主站同一时刻只能有一笔在途事务。02/03/06/10接口返回PENDING后，
  * 调用方必须以相同参数重复调用，直到取得最终结果。 */
 typedef enum {
     MASTER_TXN_FREE = 0,
@@ -179,7 +179,7 @@ static void ModbusMaster_BuildFrame(void)
         Modbus_PutU16BE(&master_transaction.frame[4], master_transaction.write_data[0]);
         master_transaction.frame_len = 8U;
     } else {
-        /* 03/10：数据区先放寄存器数量。 */
+        /* 02/03/10：数据区先放离散输入或寄存器数量。 */
         Modbus_PutU16BE(&master_transaction.frame[4], master_transaction.reg_num);
         if (master_transaction.function == 0x10U) {
             /* 10：追加字节数和待写入的寄存器数据。 */
@@ -322,7 +322,7 @@ static void ModbusMaster_RetryOrFinish(uint8_t result)
     }
 }
 
-/* 校验当前接收缓冲区中的 Modbus RTU 响应，并解析读寄存器数据。 */
+/* 校验当前接收缓冲区中的 Modbus RTU 响应，并解析读取的数据。 */
 static uint8_t ModbusMaster_ValidateResponse(void)
 {
     uint16_t len = Master_RX_CNT;
@@ -342,6 +342,21 @@ static uint8_t ModbusMaster_ValidateResponse(void)
     /* 校验响应是否来自目标从站，并且对应当前请求的功能码。 */
     if (Master_RX_BUFF[0] != master_transaction.slave ||
         Master_RX_BUFF[1] != master_transaction.function) return MODBUS_RESULT_HEADER;
+
+    if (master_transaction.function == 0x02U) {
+        uint16_t byte_count = (uint16_t)((master_transaction.reg_num + 7U) / 8U);
+
+        if (len != (uint16_t)(5U + byte_count) ||
+            Master_RX_BUFF[2] != (uint8_t)byte_count) {
+            return MODBUS_RESULT_LENGTH;
+        }
+        /* 每字节从低位开始，展开为与寄存器读取接口一致的0/1数组。 */
+        for (uint16_t i = 0U; i < master_transaction.reg_num; i++) {
+            master_transaction.read_data[i] =
+                (uint16_t)((Master_RX_BUFF[3U + i / 8U] >> (i % 8U)) & 1U);
+        }
+        return MODBUS_RESULT_OK;
+    }
 
     if (master_transaction.function == 0x03U) {
         /* 03：校验数据字节数和总长度后，解析大端序寄存器数据。 */
@@ -485,7 +500,8 @@ static uint8_t ModbusMaster_Submit(ModbusMasterClient client,
             return MODBUS_RESULT_PENDING;
         }
         result = master_transaction.result;
-        if (result == MODBUS_RESULT_OK && function == 0x03U) {
+        if (result == MODBUS_RESULT_OK &&
+            (function == 0x02U || function == 0x03U)) {
             memcpy(read_data, master_transaction.read_data, reg_num * sizeof(uint16_t));
         }
         memset(&master_transaction, 0, sizeof(master_transaction));
@@ -510,6 +526,24 @@ static uint8_t ModbusMaster_Submit(ModbusMasterClient client,
     ModbusMaster_BuildFrame();
     ModbusMaster_StartAttempt();
     return MODBUS_RESULT_PENDING;
+}
+
+uint8_t ModbusMaster_02_ReadDiscreteInputs(ModbusMasterClient client,
+                                          uint8_t slave_addr,
+                                          uint16_t start_input,
+                                          uint16_t input_num,
+                                          uint16_t *read_buff)
+{
+    if (read_buff == NULL || slave_addr == 0U || slave_addr > 247U ||
+        input_num == 0U || input_num > 125U ||
+        (uint32_t)start_input + input_num > 0x10000UL) {
+        LOG_ERROR("MODBUS", "invalid 02 request: slave=0x%02X, input=0x%04X, count=%u\r\n",
+                  (unsigned int)slave_addr, (unsigned int)start_input,
+                  (unsigned int)input_num);
+        return MODBUS_RESULT_PARAM;
+    }
+    return ModbusMaster_Submit(client, slave_addr, 0x02U,
+                              start_input, input_num, NULL, read_buff);
 }
 
 uint8_t ModbusMaster_03_ReadHoldReg(ModbusMasterClient client,

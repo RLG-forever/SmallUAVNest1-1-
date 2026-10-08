@@ -20,6 +20,12 @@
 #define AIR_POWER_OFF_VALUE           0x0000U
 #define AIR_COOLING_STOP_TEMP_REG     0x0000U
 #define AIR_HEATING_STOP_TEMP_REG     0x0002U
+/* 空调只读 BOOL 状态地址：0=停止，1=运行。 */
+#define AIR_COOLING_STATE_REG              0x0002U  // 制冷状态
+#define AIR_HEATING_STATE_REG              0x0003U  // 加热状态
+#define AIR_COOLING_DEHUMIDIFY_STATE_REG    0x0004U  // 制冷除湿状态
+#define AIR_HEATING_DEHUMIDIFY_STATE_REG    0x0005U  // 加热除湿状态
+
 /* 降雨量从站 */
 #define RAINFALL_SLAVE                0x0EU
 #define RAINFALL_VALUE_REG            0x0000U

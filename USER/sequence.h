@@ -25,7 +25,7 @@ typedef enum {
 	  SEQ_ID_CLOSEDR,       // 关闭舱门
     SEQ_ID_RECOVERY,       /* explicit recovery sequence */
 		SEQ_ID_OPENDR1,         // 打开舱门
-    SEQ_ID_TAKEOFF_NO_CLOSE, // 一键起飞，不执行最后的关舱门步骤
+    SEQ_ID_TAKEOFF_NO_CLOSE, // 一键起飞，不执行末尾的关舱门和开空调步骤
     SEQ_ID_INVALID = 0xFF
 } SeqId;
 

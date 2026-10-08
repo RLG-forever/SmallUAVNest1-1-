@@ -559,6 +559,27 @@ uint8_t OpenAC(void)
     return ctrl_ret3;
 }
 
+/* 起飞收尾或降落时开空调失败只记录告警，不阻止序列继续执行。 */
+static uint8_t OpenACForSequence(void)
+{
+    uint8_t result = ModbusMaster_06_WriteSingleReg(
+        MODBUS_MASTER_CLIENT_SEQUENCE, AIR_CONDITIONER_SLAVE,
+        AIR_POWER_CTRL_REG, AIR_POWER_ON_VALUE);
+
+    if (result == MODBUS_RESULT_PENDING || result == MODBUS_RESULT_BUSY) {
+        return MODBUS_RESULT_PENDING;
+    }
+    if (result != MODBUS_RESULT_OK) {
+        LOG_WARN("STEP",
+                 "open air conditioner failed: result=%u; continuing sequence\r\n",
+                 (unsigned int)result);
+        return MODBUS_RESULT_OK;
+    }
+
+    LOG_INFO("STEP", "air conditioner opened during sequence\r\n");
+    return MODBUS_RESULT_OK;
+}
+
 uint8_t CloseAC(void)
 {
 	//关闭空调
@@ -575,7 +596,7 @@ uint8_t CloseAC(void)
     return ctrl_ret3;
 }
 
-/* 起飞收尾时关闭空调失败只记录告警，不阻止后续关舱门步骤。 */
+/* 起飞准备时关闭空调失败只记录告警，不阻止后续开机步骤。 */
 uint8_t CloseACForTakeoff(void)
 {
     uint8_t result = ModbusMaster_06_WriteSingleReg(
@@ -584,7 +605,7 @@ uint8_t CloseACForTakeoff(void)
 
     if (result == MODBUS_RESULT_PENDING ||
         result == MODBUS_RESULT_BUSY) {
-        return result;
+        return MODBUS_RESULT_PENDING;
     }
     if (result != MODBUS_RESULT_OK) {
         LOG_WARN("STEP",
@@ -614,7 +635,7 @@ const uint8_t OPENDR_STEP_COUNT = (uint8_t)(sizeof(opendr_steps) / sizeof(opendr
 const StepDef closedr_steps[] =
 {
     {CloseDr, 16250, REG_DOOR_STATE, 4},      //1.关闭舱门
-	{CloseACForTakeoff, 0, STATUS_REG_NONE, 0},   // 打开空调
+	{OpenAC, 0, STATUS_REG_NONE, 0},   // 打开空调
 
 };
 const uint8_t CLOSEDR_STEP_COUNT = (uint8_t)(sizeof(closedr_steps) / sizeof(closedr_steps[0]));
@@ -630,6 +651,7 @@ const StepDef takeoff_steps[] =
     {MovePlaneTransferIn, 0, STATUS_REG_NONE, 0},       //4.飞机前进
 
     {OpenDr, 20250, REG_DOOR_STATE, 2},      // 飞机前进完成后打开舱门
+    {CloseACForTakeoff, 500, STATUS_REG_NONE, 0}, // 关闭空调，失败后继续开机
 
     // 电机2按当前开机尝试次数移动到靠近位置
     {MoveTakeoffMotor2Near, 0, STATUS_REG_NONE, 0},      //5.电机2前进
@@ -652,9 +674,9 @@ const StepDef takeoff_steps[] =
 
     {LeaveCenter, 0, REG_CENTER_ROD_STATE, 2},   	  //34.居中杆释放
 
-    {CloseACForTakeoff, 500, STATUS_REG_NONE, 0}, // 关闭空调，失败后继续关舱门
-
     {CheckAndCloseDoor, 16250, REG_DOOR_STATE, 4, NULL, NULL, UAV_DEPARTURE_WAIT_TIMEOUT_MS},                  // 等待无人机离巢后关闭舱门
+
+    {OpenACForSequence, 500, STATUS_REG_NONE, 0}
 };
 const uint8_t TAKEOFF_STEP_COUNT = (uint8_t)(sizeof(takeoff_steps) / sizeof(takeoff_steps[0]));
 
@@ -662,6 +684,10 @@ const uint8_t TAKEOFF_STEP_COUNT = (uint8_t)(sizeof(takeoff_steps) / sizeof(take
 const StepDef landing_steps[] =
 {
     {Center_1, 0, STATUS_REG_NONE, 0},
+    //飞机前进
+    {MovePlaneTransferIn, 0, STATUS_REG_NONE, 0},
+    {CloseDr, 16250, REG_DOOR_STATE, 4},
+    {OpenACForSequence, 500, STATUS_REG_NONE, 0},
     {Center_2, 0, REG_CENTER_ROD_STATE, 4},
     //上升到取电池高度
     EXEC_MOVE_ABS_STEP(MOTOR1_SLAVE_ADDR, MOTOR1_TRANSFER_LIFT_POS, 0, STATUS_REG_NONE, 0),
@@ -669,7 +695,7 @@ const StepDef landing_steps[] =
     {MovePlaneTransferIn, 0, STATUS_REG_NONE, 0},
     //横移电机移动到取飞机电机位置
     EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, MOTOR2_AIRCRAFT_WORK_POS, 0, STATUS_REG_NONE, 0),
-    
+
     {Motor3Clamp, 1000, STATUS_REG_NONE, 0},
 
     EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, MOTOR_HOME_POS, 0, STATUS_REG_NONE, 0),
@@ -683,7 +709,7 @@ const StepDef landing_steps[] =
     {Motor3Lossen, 1000, STATUS_REG_NONE, 0},
     //横移电机移动到电池仓推进电池位置
     {BatteryPushCheckAndRetry, 0, STATUS_REG_NONE, 0},
-    
+
     EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, MOTOR2_RETURN_POS, 0, STATUS_REG_NONE, 0),
 
     /* 根据本次序列锁定的目标仓号选择取电池位置。 */
@@ -709,13 +735,9 @@ const StepDef landing_steps[] =
     EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, MOTOR2_RETURN_POS, 0, STATUS_REG_NONE, 0),
     {Center_2, 0, STATUS_REG_NONE, 0},
     EXEC_MOVE_ABS_STEP(MOTOR1_SLAVE_ADDR, MOTOR1_RETURN_POS, 0, STATUS_REG_NONE, 0),
-    EXEC_MOVE_ABS_ARRAY_STEP(plane_transfer_out_motors, 0, REG_SWAP_MECH_STATE, 4),
-    
+    EXEC_MOVE_ABS_ARRAY_STEP(plane_transfer_out_motors, 0, REG_SWAP_MECH_STATE, 4)
+
     //{LeaveCenter, 0, REG_CENTER_ROD_STATE, 2},
-
-    {CloseDr, 16250, REG_DOOR_STATE, 4},
-
-    {OpenAC, 500, STATUS_REG_NONE, 0},
 };
 const uint8_t LANDING_STEP_COUNT =
     (uint8_t)(sizeof(landing_steps) / sizeof(landing_steps[0]));
