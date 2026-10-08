@@ -9,12 +9,12 @@ const uint8_t g_project_debug_enabled = PROJECT_DEBUG;
 
 /* 0=关闭；0x38=上电回零后执行一次起飞步骤；0x40=执行一次降落步骤。 */
 #ifndef STARTUP_DEBUG_COMMAND
-#define STARTUP_DEBUG_COMMAND             0x40U
+#define STARTUP_DEBUG_COMMAND             0U
 #endif
 
 /* 0 表示使用已保存的空仓号；1～3 表示调试降落流程时指定空仓号。 */
 #ifndef STARTUP_DEBUG_EMPTY_BAY
-#define STARTUP_DEBUG_EMPTY_BAY        3U
+#define STARTUP_DEBUG_EMPTY_BAY        0U
 #endif
 
 #if STARTUP_DEBUG_EMPTY_BAY > 3U
@@ -23,7 +23,7 @@ const uint8_t g_project_debug_enabled = PROJECT_DEBUG;
 
 /* 调试模式下执行 0x40 命令（上电自动或网关触发）时，在指定仓号存取电池。 */
 #ifndef STARTUP_DEBUG_SAME_BAY
-#define STARTUP_DEBUG_SAME_BAY          1U
+#define STARTUP_DEBUG_SAME_BAY          0U
 #endif
 
 #if STARTUP_DEBUG_SAME_BAY > 1U
@@ -80,7 +80,7 @@ int main(void)
 #endif
     Sequence_SetLandingSameBayDebugEnabled(
         (uint8_t)(PROJECT_DEBUG != 0U && STARTUP_DEBUG_SAME_BAY != 0U));
-    StatusRegs_Update(REG_RESERVED2, SwapState_GetEmptyBay());
+    StatusRegs_Update(REG_EMPTY_BAY, SwapState_GetEmptyBay());
     LOG_INFO("MAIN", "startup empty bay=%u, debug override=%u\r\n",
              (unsigned int)SwapState_GetEmptyBay(),
              (unsigned int)STARTUP_DEBUG_EMPTY_BAY);

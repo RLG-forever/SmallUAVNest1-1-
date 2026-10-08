@@ -48,8 +48,27 @@ typedef struct {
 #define MOTOR1_RETURN_POS 10000L    //升降电机1的停住位置
 #define MOTOR2_RETURN_POS 100000L   //升降电机2的停住位置
 
+/* 降落流程：检查旧电池是否成功推入电池仓。 */
+#ifndef LANDING_BAY_PUSH_RETRY_BACK_POS
+#define LANDING_BAY_PUSH_RETRY_BACK_POS       320000L
+#endif
+#define LANDING_BAY_PUSH_CURRENT_DELTA_LIMIT 10L
+#define LANDING_BAY_PUSH_CURRENT_WAIT_MS     10000UL
+#define LANDING_BAY_PUSH_MAX_REPUSHES        2U
+/* 电机2推电池后电流增长不足，使用独立的业务故障码。 */
+#define LANDING_BAY_PUSH_CURRENT_FAULT_CODE  0x02F1U
+
 /* 根据编译目标选择设备标定参数。 */
 #include "config/device_profile.h"
+
+/* 控制电流后台轮询和降落时电池仓推进前后的电流检查，默认关闭。 */
+#ifndef LANDING_BAY_PUSH_CURRENT_CHECK_ENABLE
+#define LANDING_BAY_PUSH_CURRENT_CHECK_ENABLE 0U
+#endif
+#if LANDING_BAY_PUSH_CURRENT_CHECK_ENABLE != 0U && \
+    LANDING_BAY_PUSH_CURRENT_CHECK_ENABLE != 1U
+#error "LANDING_BAY_PUSH_CURRENT_CHECK_ENABLE must be 0 or 1"
+#endif
 
 /* 步进电机控制寄存器*/
 #define MOTOR1_CTRL_REG1      0x00d0  // 电机1绝对位置控制寄存器（D0低字，D1高字）
@@ -98,6 +117,8 @@ uint8_t WaitForUavPowerOn(void);
 uint8_t OpenAC(void);
 uint8_t CloseAC(void);
 uint8_t CloseACForTakeoff(void);
+void LandingBayPush_Reset(void);
+uint8_t LandingBayPush_HasCurrentFault(void);
 
 /* 只读序列步骤表。 */
 extern const StepDef opendr_steps[];

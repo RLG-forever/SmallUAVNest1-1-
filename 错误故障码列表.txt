@@ -165,8 +165,8 @@ error_code = fault_code & 0xFF
 REG_COMMAND_CODE     0x001A    当前或最近执行的命令编号
 REG_COMMAND_STATE    0x0018    命令执行状态
 REG_COMMAND_STEP     0x0019    当前步骤或最后执行步骤
-REG_RESERVED4        0x001B    0x60写入的无人机状态
-REG_RESERVED2        0x001C    当前空仓号
+REG_RC_UAV_STATE      0x001C    0x60写入的遥控器和无人机状态
+REG_EMPTY_BAY         0x001B    当前空仓号
 REG_FAULT_CODE       0x0017    16位故障码
 
 命令状态：

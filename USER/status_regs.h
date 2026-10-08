@@ -3,9 +3,6 @@
 
 #include <stdint.h>
 
-// 寄存器总数（0x00 ~ 0x1C 共29个）
-#define STATUS_REG_COUNT  29U
-
 // 寄存器地址枚举
 typedef enum {
     REG_RAINFALL = 0x00,      // 降雨量（mm）
@@ -35,10 +32,14 @@ typedef enum {
     REG_COMMAND_STATE,        // 命令状态 0x18
     REG_COMMAND_STEP = 0x19, // 当前步骤或最后执行步骤 0x19
     REG_COMMAND_CODE = 0x1A, // 当前或最后执行的命令码 0x1A
-    REG_RESERVED2 = 0x1B,    // 存储0x60写入的无人机状态 0x1B
-    REG_RESERVED4 = 0x1C,     // 当前空仓号 0x1C
-    REG_CHARGING_CURRENT = 0x1D //当前充电电流大小
+    REG_EMPTY_BAY = 0x1B,       // 当前空仓号 0x1B
+    REG_RC_UAV_STATE = 0x1C,    // 存储0x60写入的遥控器和无人机状态
+    REG_CHARGING_CURRENT = 0x1D, //当前充电电流大小
+    REG_ADDR_COUNT             // 必须保持在枚举末尾，自动取最后一个寄存器地址加1
 } StatusRegAddr;
+
+// 寄存器总数，随地址枚举自动计算
+#define STATUS_REG_COUNT (REG_ADDR_COUNT + 0U)
 
 typedef enum {
     COMMAND_STATE_IDLE = 0U,

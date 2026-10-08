@@ -511,7 +511,7 @@ static void GatewayService_FinishActive(CommandState state,
                   (unsigned int)register_address, (unsigned int)value,
                   (unsigned int)state,
                   (unsigned int)fault_code, (unsigned int)step,
-                  (unsigned int)StatusRegs_GetLive(REG_RESERVED4),
+                  (unsigned int)StatusRegs_GetLive(REG_RC_UAV_STATE),
                   (unsigned int)Sequence_GetLastResult(),
                   (unsigned int)Sequence_GetLastError());
     }
@@ -605,7 +605,7 @@ static uint8_t GatewayService_ExecuteWrite(uint16_t register_address,
         case GATEWAY_CMD_TAKEOFF:
         case GATEWAY_CMD_TAKEOFF_NO_CLOSE:
         {
-            uint16_t uav_status = StatusRegs_GetLive(REG_RESERVED4);
+            uint16_t uav_status = StatusRegs_GetLive(REG_RC_UAV_STATE);
             uint16_t center_rod_state = 0U;
             uint16_t door_state = 0U;
 
@@ -700,9 +700,9 @@ static uint8_t GatewayService_ExecuteWrite(uint16_t register_address,
         case GATEWAY_CMD_UAV_STATUS:
             LOG_INFO("GW_TRACE",
                      "0x60 UAV status received: old=%u, new=%u\r\n",
-                     (unsigned int)StatusRegs_GetLive(REG_RESERVED4),
+                     (unsigned int)StatusRegs_GetLive(REG_RC_UAV_STATE),
                      (unsigned int)value);
-            StatusRegs_Update(REG_RESERVED4, value);
+            StatusRegs_Update(REG_RC_UAV_STATE, value);
             result = MODBUS_RESULT_OK;
             break;
 
@@ -775,7 +775,7 @@ static void GatewayService_ProcessActiveCommand(void)
     }
 
     if (active_command.type == GATEWAY_ACTIVE_TAKEOFF_POWER) {
-        uav_status = StatusRegs_GetLive(REG_RESERVED4);
+        uav_status = StatusRegs_GetLive(REG_RC_UAV_STATE);
 
         /* 状态3只结束起飞命令，已经启动的机械序列继续执行。 */
         if (uav_status == 3U) {

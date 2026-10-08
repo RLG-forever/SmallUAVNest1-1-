@@ -29,8 +29,6 @@
 //横移电机装 飞机电池 时推电池位置
 #define MOTOR2_AIRCRAFT_CLEAR_POS          302000L
 
-//横移电机移动到 电池仓  推进去电池位置
-#define MOTOR2_BAY_RELEASE_POS             362000L
 //横移电机移动到 电池仓  取电池位置
 #define MOTOR2_BAY_LOAD_POS                358000L
 
@@ -39,7 +37,7 @@
 #define BATTERY_BAY2_REALEASE_POS          350000L
 #define BATTERY_BAY3_REALEASE_POS          350000L
 
-//电池仓 推电池 横向位置
+//电池仓 推进去电池 横向位置
 #define BATTERY_BAY1_PUSH_POS              362000L
 #define BATTERY_BAY2_PUSH_POS              362000L
 #define BATTERY_BAY3_PUSH_POS              362000L
@@ -53,6 +51,9 @@
 #define BATTERY_GET_BAY1_HEIGHT            142000L
 #define BATTERY_GET_BAY2_HEIGHT             75000L
 #define BATTERY_GET_BAY3_HEIGHT              6000L
+
+//横移电机移动到 电池仓  推进去电池位置
+#define MOTOR2_BAY_RELEASE_POS             362000L
 
 //让飞机前进时电机5和6移动到的位置
 #define UAV_FORWARD_MOTOR56_POS            180000L

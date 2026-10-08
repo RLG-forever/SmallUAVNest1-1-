@@ -13,6 +13,7 @@
 #include "debug_log.h"
 
 #include <stddef.h>
+#include <string.h>
 
 #define UAV_DEPARTURE_WAIT_TIMEOUT_MS (120UL * 1000UL)
 #define UAV_POWER_ON_WAIT_TIMEOUT_MS  (30UL * 1000UL)
@@ -229,6 +230,160 @@ static uint8_t MoveMotor2ToBayReleasePos(const void *context)
                            motor2_bay_release_positions[bay - 1U]);
 }
 
+typedef enum {
+    LANDING_BAY_PUSH_READ_BEFORE = 0,
+    LANDING_BAY_PUSH_MOVE,
+    LANDING_BAY_PUSH_WAIT_CURRENT,
+    LANDING_BAY_PUSH_READ_AFTER,
+    LANDING_BAY_PUSH_MOVE_BACK
+} LandingBayPushPhase;
+
+static struct {
+    LandingBayPushPhase phase;
+    uint8_t repush_count;
+    uint8_t monitor_enabled;
+    uint16_t read_value;
+    uint16_t before_value;
+    uint32_t current_deadline;
+} landing_bay_push;
+static uint8_t landing_bay_push_current_fault;
+
+void LandingBayPush_Reset(void)
+{
+    memset(&landing_bay_push, 0, sizeof(landing_bay_push));
+    landing_bay_push_current_fault = 0U;
+}
+
+uint8_t LandingBayPush_HasCurrentFault(void)
+{
+    return landing_bay_push_current_fault;
+}
+
+static void LandingBayPush_ResetAction(void)
+{
+    memset(&landing_bay_push, 0, sizeof(landing_bay_push));
+}
+
+/* 在同一步骤中非阻塞地完成电流读取、推进及重推。 */
+static uint8_t BatteryPushCheckAndRetry(void)
+{
+    uint8_t result;
+    int32_t increase;
+
+    if (LANDING_BAY_PUSH_CURRENT_CHECK_ENABLE == 0U) {
+        return MoveMotor2ToBayReleasePos(&battery_bay_current);
+    }
+
+    switch (landing_bay_push.phase) {
+    case LANDING_BAY_PUSH_READ_BEFORE:
+        result = ModbusMaster_03_ReadHoldReg(
+            MODBUS_MASTER_CLIENT_SEQUENCE, CHARGING_CURRENT_SLAVE,
+            CHARGING_CURRENT_VALUE_REG, 1U, &landing_bay_push.read_value);
+        if (result == MODBUS_RESULT_PENDING || result == MODBUS_RESULT_BUSY) {
+            return MODBUS_RESULT_PENDING;
+        }
+        landing_bay_push.monitor_enabled = result == MODBUS_RESULT_OK;
+        if (landing_bay_push.monitor_enabled) {
+            StatusRegs_Update(REG_CHARGING_CURRENT,
+                              landing_bay_push.read_value);
+            landing_bay_push.before_value = landing_bay_push.read_value;
+            LOG_INFO("STEP", "bay push current before: bay=%u, retry=%u, value=%u\r\n",
+                     (unsigned int)Sequence_GetSelectedBay(),
+                     (unsigned int)landing_bay_push.repush_count,
+                     (unsigned int)landing_bay_push.before_value);
+        } else {
+            LOG_WARN("STEP", "bay push current pre-read failed: result=%u; continuing without current check\r\n",
+                     (unsigned int)result);
+        }
+        landing_bay_push.phase = LANDING_BAY_PUSH_MOVE;
+        return MODBUS_RESULT_PENDING;
+
+    case LANDING_BAY_PUSH_MOVE:
+        result = MoveMotor2ToBayReleasePos(&battery_bay_current);
+        if (result == MODBUS_RESULT_PENDING || result == MODBUS_RESULT_BUSY) {
+            return MODBUS_RESULT_PENDING;
+        }
+        if (result != MODBUS_RESULT_OK) {
+            return result;
+        }
+        if (!landing_bay_push.monitor_enabled) {
+            LandingBayPush_ResetAction();
+            return MODBUS_RESULT_OK;
+        }
+        landing_bay_push.current_deadline =
+            GetTick() + LANDING_BAY_PUSH_CURRENT_WAIT_MS;
+        landing_bay_push.phase = LANDING_BAY_PUSH_WAIT_CURRENT;
+        return MODBUS_RESULT_PENDING;
+
+    case LANDING_BAY_PUSH_WAIT_CURRENT:
+        if ((int32_t)(GetTick() - landing_bay_push.current_deadline) < 0) {
+            return MODBUS_RESULT_PENDING;
+        }
+        landing_bay_push.phase = LANDING_BAY_PUSH_READ_AFTER;
+        return MODBUS_RESULT_PENDING;
+
+    case LANDING_BAY_PUSH_READ_AFTER:
+        result = ModbusMaster_03_ReadHoldReg(
+            MODBUS_MASTER_CLIENT_SEQUENCE, CHARGING_CURRENT_SLAVE,
+            CHARGING_CURRENT_VALUE_REG, 1U, &landing_bay_push.read_value);
+        if (result == MODBUS_RESULT_PENDING || result == MODBUS_RESULT_BUSY) {
+            return MODBUS_RESULT_PENDING;
+        }
+        if (result != MODBUS_RESULT_OK) {
+            LOG_WARN("STEP", "bay push current post-read failed: result=%u; continuing without current check\r\n",
+                     (unsigned int)result);
+            LandingBayPush_ResetAction();
+            return MODBUS_RESULT_OK;
+        }
+        StatusRegs_Update(REG_CHARGING_CURRENT,
+                          landing_bay_push.read_value);
+        increase = (int32_t)landing_bay_push.read_value -
+                   (int32_t)landing_bay_push.before_value;
+        LOG_INFO("STEP", "bay push current after: bay=%u, retry=%u, before=%u, after=%u, increase=%ld\r\n",
+                 (unsigned int)Sequence_GetSelectedBay(),
+                 (unsigned int)landing_bay_push.repush_count,
+                 (unsigned int)landing_bay_push.before_value,
+                 (unsigned int)landing_bay_push.read_value,
+                 (long)increase);
+        if (increase > LANDING_BAY_PUSH_CURRENT_DELTA_LIMIT) {
+            LandingBayPush_ResetAction();
+            return MODBUS_RESULT_OK;
+        }
+        if (landing_bay_push.repush_count < LANDING_BAY_PUSH_MAX_REPUSHES) {
+            landing_bay_push.repush_count++;
+            landing_bay_push.phase = LANDING_BAY_PUSH_MOVE_BACK;
+            LOG_WARN("STEP", "bay push current increase too small; retry=%u/%u, back_pos=%ld\r\n",
+                     (unsigned int)landing_bay_push.repush_count,
+                     (unsigned int)LANDING_BAY_PUSH_MAX_REPUSHES,
+                     (long)LANDING_BAY_PUSH_RETRY_BACK_POS);
+            return MODBUS_RESULT_PENDING;
+        }
+        landing_bay_push_current_fault = 1U;
+        LOG_ERROR("STEP", "bay push current increase failed after %u repushes: bay=%u, increase=%ld, fault=0x%04X; continuing landing\r\n",
+                  (unsigned int)landing_bay_push.repush_count,
+                  (unsigned int)Sequence_GetSelectedBay(),
+                  (long)increase,
+                  (unsigned int)LANDING_BAY_PUSH_CURRENT_FAULT_CODE);
+        LandingBayPush_ResetAction();
+        return MODBUS_RESULT_OK;
+
+    case LANDING_BAY_PUSH_MOVE_BACK:
+        result = MoveOneToAbsPos(MOTOR2_SLAVE_ADDR,
+                                 LANDING_BAY_PUSH_RETRY_BACK_POS);
+        if (result == MODBUS_RESULT_PENDING || result == MODBUS_RESULT_BUSY) {
+            return MODBUS_RESULT_PENDING;
+        }
+        if (result != MODBUS_RESULT_OK) {
+            return result;
+        }
+        landing_bay_push.phase = LANDING_BAY_PUSH_READ_BEFORE;
+        return MODBUS_RESULT_PENDING;
+
+    default:
+        return MODBUS_RESULT_PARAM;
+    }
+}
+
 // 电机1移动到回收流程标定位置
 uint8_t Motor1Up1(void)
 {
@@ -266,7 +421,6 @@ uint8_t Motor1Up3(void)
 {
     return MoveOneToAbsPos(MOTOR1_SLAVE_ADDR, MOTOR1_TRANSFER_LIFT_POS);
 }
-
 
 uint8_t FlyForward(void)
 {
@@ -319,7 +473,7 @@ uint8_t LeaveCenter(void)
 
 uint8_t CheckAndCloseDoor(void)
 {
-    uint16_t uav_status = StatusRegs_GetLive(REG_RESERVED4);
+    uint16_t uav_status = StatusRegs_GetLive(REG_RC_UAV_STATE);
     uint8_t ret;
     if (uav_status != 3U) {
         return STEP_RESULT_WAIT;
@@ -337,7 +491,7 @@ uint8_t CheckAndCloseDoor(void)
 
 uint8_t WaitForUavPowerOn(void)
 {
-    uint16_t uav_status = StatusRegs_GetLive(REG_RESERVED4);
+    uint16_t uav_status = StatusRegs_GetLive(REG_RC_UAV_STATE);
 
     if (Sequence_GetCurrentId() != SEQ_ID_TAKEOFF &&
         Sequence_GetCurrentId() != SEQ_ID_TAKEOFF_NO_CLOSE) {
@@ -524,13 +678,11 @@ const StepDef landing_steps[] =
     /* 根据序列启动时锁定的空仓号选择旧电池存放位置。 */
     {NULL, 0, STATUS_REG_NONE, 0, MoveMotor1ToSelectedBay,   &battery_bay_current},
     //横移电机移动到电池仓装电池位置
-    {NULL, 0, STATUS_REG_NONE, 0, MoveMotor2ToBayWorkPos,
-     &battery_bay_current},
+    {NULL, 0, STATUS_REG_NONE, 0, MoveMotor2ToBayWorkPos,  &battery_bay_current},
     //松开夹爪
     {Motor3Lossen, 1000, STATUS_REG_NONE, 0},
     //横移电机移动到电池仓推进电池位置
-    {NULL, 0, STATUS_REG_NONE, 0, MoveMotor2ToBayReleasePos,
-     &battery_bay_current},
+    {BatteryPushCheckAndRetry, 0, STATUS_REG_NONE, 0},
     
     EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, MOTOR2_RETURN_POS, 0, STATUS_REG_NONE, 0),
 

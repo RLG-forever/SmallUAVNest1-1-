@@ -43,6 +43,8 @@ struct {
     uint8_t current_step_retry_count;
     uint8_t last_step;
     uint16_t last_error;
+    uint16_t deferred_fault_code;
+    uint8_t deferred_fault_step;
     uint8_t step_trace_started;
     uint8_t step_pending_logged;
     uint32_t step_start_tick;
@@ -73,7 +75,7 @@ static const char *Sequence_GetTraceStepName(SeqId id, uint8_t step_index)
         "plane-transfer-in", "motor2-aircraft-work", "clamp-old-battery",
         "motor2-home-after-pickup", "center-2-after-pickup",
         "motor1-old-bay", "motor2-bay-work", "release-old-battery",
-        "motor2-bay-release", "motor2-return-after-storage",
+        "motor2-bay-push-current-check", "motor2-return-after-storage",
         "motor1-new-bay", "motor2-bay-load", "clamp-new-battery",
         "motor2-home-after-loading", "update-empty-bay",
         "motor1-battery-install", "plane-transfer-in-for-install",
@@ -112,6 +114,18 @@ static uint8_t Sequence_IsTimeReached(uint32_t now, uint32_t deadline)
 
 static void Sequence_Finish(SequenceResult result)
 {
+    const uint8_t deferred_fault_applied =
+        result == SEQUENCE_RESULT_SUCCESS &&
+        seq_runner.deferred_fault_code != 0U;
+
+    if (deferred_fault_applied) {
+        result = SEQUENCE_RESULT_ACTION_FAILED;
+        seq_runner.last_error = seq_runner.deferred_fault_code;
+        StatusRegs_Update(REG_FAULT_CODE, seq_runner.last_error);
+    } else if (seq_runner.deferred_fault_code != 0U) {
+        /* 后续动作失败或取消时，优先上报对应结果。 */
+        StatusRegs_Update(REG_FAULT_CODE, seq_runner.last_error);
+    }
     LOG_INFO("SEQ_TRACE",
              "sequence finished: id=%u, step=%u/%u, name=%s, result=%u, error=0x%04X, elapsed=%lu ms\r\n",
              (unsigned int)seq_runner.id,
@@ -123,7 +137,9 @@ static void Sequence_Finish(SequenceResult result)
              (unsigned int)seq_runner.last_error,
              (unsigned long)(seq_runner.step_trace_started
                  ? (GetTick() - seq_runner.step_start_tick) : 0U));
-    seq_runner.last_step = seq_runner.current_index;
+    seq_runner.last_step = deferred_fault_applied
+                               ? seq_runner.deferred_fault_step
+                               : seq_runner.current_index;
     seq_runner.id = SEQ_ID_INVALID;
     seq_runner.steps = NULL;
     seq_runner.step_count = 0U;
@@ -135,6 +151,8 @@ static void Sequence_Finish(SequenceResult result)
     seq_runner.last_result = result;
     seq_runner.delay_deadline = 0U;
     seq_runner.current_step_retry_count = 0U;
+    seq_runner.deferred_fault_code = 0U;
+    seq_runner.deferred_fault_step = SEQUENCE_STEP_INVALID;
     seq_runner.step_trace_started = 0U;
     seq_runner.step_pending_logged = 0U;
     seq_runner.step_start_tick = 0U;
@@ -146,6 +164,7 @@ static void Sequence_Finish(SequenceResult result)
     seq_runner.recovery_finish_after_release = 0U;
     seq_runner.recovery_restart_after_home = 0U;
     seq_runner.recovery_deadline = 0U;
+    LandingBayPush_Reset();
     StatusRegs_ReleaseSnapshot();
 }
 
@@ -167,6 +186,16 @@ static void Sequence_CompleteCurrentStep(void)
 
     if (step->completion_reg != STATUS_REG_NONE) {
         StatusRegs_Update(step->completion_reg, step->completion_value);
+    }
+
+    if (seq_runner.id == SEQ_ID_LANDING &&
+        seq_runner.deferred_fault_code == 0U &&
+        LandingBayPush_HasCurrentFault()) {
+        seq_runner.deferred_fault_code =
+            LANDING_BAY_PUSH_CURRENT_FAULT_CODE;
+        seq_runner.deferred_fault_step = seq_runner.current_index;
+        StatusRegs_Update(REG_FAULT_CODE,
+                          seq_runner.deferred_fault_code);
     }
 
     seq_runner.current_index++;
@@ -244,12 +273,14 @@ void Sequence_Resume(void)
 void Sequence_Init(void)
 {
     memset(&seq_runner, 0, sizeof(seq_runner));
+    LandingBayPush_Reset();
     landing_same_bay_debug_enabled = 0U;
     seq_runner.id = SEQ_ID_INVALID;
     seq_runner.state = SEQUENCE_STATE_IDLE;
     seq_runner.last_result = SEQUENCE_RESULT_NONE;
     seq_runner.last_step = SEQUENCE_STEP_INVALID;
     seq_runner.last_error = 0U;
+    seq_runner.deferred_fault_step = SEQUENCE_STEP_INVALID;
     seq_runner.recovery_failed_step = SEQUENCE_STEP_INVALID;
     LOG_INFO("SEQUENCE", "initialized\r\n");
 }
@@ -392,6 +423,7 @@ static SequenceStartResult Sequence_StartInternal(SeqId id,
     }
 		// ========== 拍摄状态快照 ==========
     StatusRegs_TakeSnapshot();
+    LandingBayPush_Reset();
 
     seq_runner.id = id;
     seq_runner.selected_bay = empty_bay;
@@ -402,6 +434,8 @@ static SequenceStartResult Sequence_StartInternal(SeqId id,
     seq_runner.last_result = SEQUENCE_RESULT_NONE;
     seq_runner.last_step = SEQUENCE_STEP_INVALID;
     seq_runner.last_error = 0U;
+    seq_runner.deferred_fault_code = 0U;
+    seq_runner.deferred_fault_step = SEQUENCE_STEP_INVALID;
     seq_runner.delay_deadline = 0U;
     seq_runner.current_step_retry_count = 0U;   // 重置重试计数
     seq_runner.step_trace_started = 0U;
@@ -449,6 +483,10 @@ static uint8_t Sequence_GetAlarmRecoveryLimit(void)
 
 static void Sequence_ResetForAlarmRestart(void)
 {
+    LandingBayPush_Reset();
+    if (seq_runner.deferred_fault_code != 0U) {
+        StatusRegs_Update(REG_FAULT_CODE, 0U);
+    }
     seq_runner.current_index = 0U;
     seq_runner.current_step_retry_count = 0U;
     seq_runner.delay_deadline = 0U;
@@ -456,6 +494,8 @@ static void Sequence_ResetForAlarmRestart(void)
     seq_runner.step_pending_logged = 0U;
     seq_runner.step_start_tick = 0U;
     seq_runner.last_error = 0U;
+    seq_runner.deferred_fault_code = 0U;
+    seq_runner.deferred_fault_step = SEQUENCE_STEP_INVALID;
     seq_runner.recovery_finish_after_release = 0U;
     seq_runner.recovery_restart_after_home = 0U;
     seq_runner.recovery_deadline = 0U;
@@ -871,6 +911,7 @@ SequenceStartResult Sequence_StartRecovery(void)
     }
 
     StatusRegs_TakeSnapshot();
+    LandingBayPush_Reset();
     seq_runner.id = SEQ_ID_RECOVERY;
     seq_runner.selected_bay = 0U;
     seq_runner.target_empty_bay = 0U;
@@ -880,6 +921,8 @@ SequenceStartResult Sequence_StartRecovery(void)
     seq_runner.last_result = SEQUENCE_RESULT_NONE;
     seq_runner.last_step = SEQUENCE_STEP_INVALID;
     seq_runner.last_error = 0U;
+    seq_runner.deferred_fault_code = 0U;
+    seq_runner.deferred_fault_step = SEQUENCE_STEP_INVALID;
     seq_runner.delay_deadline = 0U;
     seq_runner.current_step_retry_count = 0U;
     seq_runner.alarm_recovery_count = 0U;

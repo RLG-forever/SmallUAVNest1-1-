@@ -618,14 +618,14 @@ uint8_t UpdateEmptyBay(void)
 
     /* 自动恢复重跑到本步骤时，目标值不变，因此不会再次循环增加机位。 */
     if (g_swap_state.empty_bay == target) {
-        StatusRegs_Update(REG_RESERVED2, target);
+        StatusRegs_Update(REG_EMPTY_BAY, target);
         LOG_INFO("SWAP", "empty bay already committed: value=%u\r\n",
                  (unsigned int)target);
         return MODBUS_RESULT_OK;
     }
 
     g_swap_state.empty_bay = target;
-    StatusRegs_Update(REG_RESERVED2, target);
+    StatusRegs_Update(REG_EMPTY_BAY, target);
     SwapState_Save();
     LOG_INFO("SWAP", "empty bay committed and saved: value=%u\r\n",
              (unsigned int)target);

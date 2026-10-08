@@ -22,6 +22,10 @@ static const PollBlock poll_blocks[] =
     {RAINFALL_SLAVE, RAINFALL_VALUE_REG, 1, REG_RAINFALL},    // 降雨量
     {WIND_SPEED_SLAVE, WIND_SPEED_VALUE_REG, 1, REG_WIND_SPEED}, // 风速
     {CABIN_TEMP_SLAVE, CABIN_TEMP_VALUE_REG, 1, REG_CABIN_TEMP}, // 机舱温度
+#if LANDING_BAY_PUSH_CURRENT_CHECK_ENABLE == 1U
+    {CHARGING_CURRENT_SLAVE, CHARGING_CURRENT_VALUE_REG,
+     1U, REG_CHARGING_CURRENT},
+#endif
 };
 #define POLL_BLOCK_COUNT (sizeof(poll_blocks) / sizeof(poll_blocks[0]))
 
