@@ -9,7 +9,7 @@ const uint8_t g_project_debug_enabled = PROJECT_DEBUG;
 
 /* 0=关闭；0x38=上电回零后执行一次起飞步骤；0x40=执行一次降落步骤。 */
 #ifndef STARTUP_DEBUG_COMMAND
-#define STARTUP_DEBUG_COMMAND             0U
+#define STARTUP_DEBUG_COMMAND             0x0U
 #endif
 
 /* 0 表示使用已保存的空仓号；1～3 表示调试降落流程时指定空仓号。 */

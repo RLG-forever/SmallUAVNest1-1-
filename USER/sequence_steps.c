@@ -139,6 +139,12 @@ static const int32_t battery_bay_positions[3] = {
     BATTERY_LOAD_BAY3_HEIGHT
 };
 
+static const int32_t motor1_load_battery_positions[3] = {
+    MOTOR1_LOAD_BATTERY_BAY1_POS,
+    MOTOR1_LOAD_BATTERY_BAY2_POS,
+    MOTOR1_LOAD_BATTERY_BAY3_POS
+};
+
 static const int32_t motor2_bay_work_positions[3] = {
     BATTERY_BAY1_REALEASE_POS,
     BATTERY_BAY2_REALEASE_POS,
@@ -196,6 +202,19 @@ static uint8_t MoveMotor1GetBayPos(const void *context)
     position_index = (uint8_t)(bay - 1U);
     return MoveOneToAbsPos(MOTOR1_SLAVE_ADDR,
                            battery_get_bay_positions[position_index]);
+}
+
+/* 装飞机电池：按流程锁定的新电池来源仓选择电机1的高度。 */
+static uint8_t MoveMotor1ToLoadBatteryPos(void)
+{
+    const uint8_t bay = Sequence_GetTargetEmptyBay();
+
+    if (bay < 1U || bay > 3U) {
+        return MODBUS_RESULT_PARAM;
+    }
+
+    return MoveOneToAbsPos(MOTOR1_SLAVE_ADDR,
+                           motor1_load_battery_positions[bay - 1U]);
 }
 
 /* 把电池装入电池仓：按仓号选择电机2的标定位置。 */
@@ -292,8 +311,9 @@ static uint8_t BatteryPushCheckAndRetry(void)
                      (unsigned int)landing_bay_push.repush_count,
                      (unsigned int)landing_bay_push.before_value);
         } else {
-            LOG_WARN("STEP", "bay push current pre-read failed: result=%u; continuing without current check\r\n",
+            LOG_ERROR("STEP", "bay push current pre-read failed: result=%u; homing required\r\n",
                      (unsigned int)result);
+            return result;
         }
         landing_bay_push.phase = LANDING_BAY_PUSH_MOVE;
         return MODBUS_RESULT_PENDING;
@@ -330,10 +350,10 @@ static uint8_t BatteryPushCheckAndRetry(void)
             return MODBUS_RESULT_PENDING;
         }
         if (result != MODBUS_RESULT_OK) {
-            LOG_WARN("STEP", "bay push current post-read failed: result=%u; continuing without current check\r\n",
+            LOG_ERROR("STEP", "bay push current post-read failed: result=%u; homing required\r\n",
                      (unsigned int)result);
             LandingBayPush_ResetAction();
-            return MODBUS_RESULT_OK;
+            return result;
         }
         StatusRegs_Update(REG_CHARGING_CURRENT,
                           landing_bay_push.read_value);
@@ -359,7 +379,7 @@ static uint8_t BatteryPushCheckAndRetry(void)
             return MODBUS_RESULT_PENDING;
         }
         landing_bay_push_current_fault = 1U;
-        LOG_ERROR("STEP", "bay push current increase failed after %u repushes: bay=%u, increase=%ld, fault=0x%04X; continuing landing\r\n",
+        LOG_ERROR("STEP", "bay push current increase failed after %u repushes: bay=%u, increase=%ld, fault=0x%04X; homing required\r\n",
                   (unsigned int)landing_bay_push.repush_count,
                   (unsigned int)Sequence_GetSelectedBay(),
                   (long)increase,
@@ -643,99 +663,100 @@ const uint8_t CLOSEDR_STEP_COUNT = (uint8_t)(sizeof(closedr_steps) / sizeof(clos
 // 一键起飞完整步骤表；中间步骤同时供飞机开机、关机流程复用
 const StepDef takeoff_steps[] =
 {
-    {Center_1, 0, STATUS_REG_NONE, 0},        //1.左右居中
-    {Center_2, 0, REG_CENTER_ROD_STATE, 4},     	  //2.前后居中
+    {Center_1, 0, STATUS_REG_NONE, 0}, // 0x01 左右居中
+    {Center_2, 0, REG_CENTER_ROD_STATE, 4}, // 0x02 前后居中
     /* 电机1移动到起降抬升标定位置。 */
-    EXEC_MOVE_ABS_STEP(MOTOR1_SLAVE_ADDR, MOTOR1_FLY_LIFT_POS, 0, STATUS_REG_NONE, 0),      //3.电机1上升
+    EXEC_MOVE_ABS_STEP(MOTOR1_SLAVE_ADDR, MOTOR1_FLY_LIFT_POS, 0, STATUS_REG_NONE, 0), // 0x03 电机1上升
     //飞机前进
-    {MovePlaneTransferIn, 0, STATUS_REG_NONE, 0},       //4.飞机前进
+    {MovePlaneTransferIn, 0, STATUS_REG_NONE, 0}, // 0x04 飞机前进
 
-    {OpenDr, 20250, REG_DOOR_STATE, 2},      // 飞机前进完成后打开舱门
-    {CloseACForTakeoff, 500, STATUS_REG_NONE, 0}, // 关闭空调，失败后继续开机
+    {OpenDr, 20250, REG_DOOR_STATE, 2}, // 0x05 飞机前进完成后打开舱门
+    {CloseACForTakeoff, 500, STATUS_REG_NONE, 0}, // 0x06 关闭空调，失败后继续开机
 
     // 电机2按当前开机尝试次数移动到靠近位置
-    {MoveTakeoffMotor2Near, 0, STATUS_REG_NONE, 0},      //5.电机2前进
+    {MoveTakeoffMotor2Near, 0, STATUS_REG_NONE, 0}, // 0x07 电机2前进
     // 电机2按当前开机尝试次数移动到远端位置
-    {MoveTakeoffMotor2Far, 0, STATUS_REG_NONE, 0},       //27.电机2前进
+    {MoveTakeoffMotor2Far, 0, STATUS_REG_NONE, 0}, // 0x08 电机2前进
     // 电机2返回本轮对应的靠近位置
-    {MoveTakeoffMotor2Near, 0, STATUS_REG_NONE, 0},      //28.电机2后退
+    {MoveTakeoffMotor2Near, 0, STATUS_REG_NONE, 0}, // 0x09 电机2后退
     // 电机2再次移动到本轮对应的远端位置
-    {MoveTakeoffMotor2Far, 0, STATUS_REG_NONE, 0},       //29.电机2前进
+    {MoveTakeoffMotor2Far, 0, STATUS_REG_NONE, 0}, // 0x0A 电机2前进
     //移动至原点位置0
-    EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, MOTOR2_RETURN_POS, 0, STATUS_REG_NONE, 0),     //30.电机2后退
+    EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, MOTOR2_RETURN_POS, 0, STATUS_REG_NONE, 0), // 0x0B 电机2后退
 
-    {WaitForUavPowerOn, 0, STATUS_REG_NONE, 0, NULL, NULL,  UAV_POWER_ON_WAIT_TIMEOUT_MS},   //等待无人机开机
+    {WaitForUavPowerOn, 0, STATUS_REG_NONE, 0, NULL, NULL,  UAV_POWER_ON_WAIT_TIMEOUT_MS}, // 0x0C 等待无人机开机
     //待修改
-    {Center_2, 0, STATUS_REG_NONE, 0},       //31.飞机后退
+    {Center_2, 0, STATUS_REG_NONE, 0}, // 0x0D 飞机后退
     //电机回零位
-    EXEC_MOVE_ABS_STEP(MOTOR1_SLAVE_ADDR, MOTOR1_RETURN_POS, 0, STATUS_REG_NONE, 0),      //32.电机1下降
+    EXEC_MOVE_ABS_STEP(MOTOR1_SLAVE_ADDR, MOTOR1_RETURN_POS, 0, STATUS_REG_NONE, 0), // 0x0E 电机1下降
     //飞机前进
-    EXEC_MOVE_ABS_ARRAY_STEP(plane_transfer_out_motors, 0, STATUS_REG_NONE, 0),     //33.飞机前进
+    EXEC_MOVE_ABS_ARRAY_STEP(plane_transfer_out_motors, 0, STATUS_REG_NONE, 0), // 0x0F 飞机前进
 
-    {LeaveCenter, 0, REG_CENTER_ROD_STATE, 2},   	  //34.居中杆释放
+    {LeaveCenter, 0, REG_CENTER_ROD_STATE, 2}, // 0x10 居中杆释放
 
-    {CheckAndCloseDoor, 16250, REG_DOOR_STATE, 4, NULL, NULL, UAV_DEPARTURE_WAIT_TIMEOUT_MS},                  // 等待无人机离巢后关闭舱门
+    {CheckAndCloseDoor, 16250, REG_DOOR_STATE, 4, NULL, NULL, UAV_DEPARTURE_WAIT_TIMEOUT_MS}, // 0x11 等待无人机离巢后关闭舱门
 
-    {OpenACForSequence, 500, STATUS_REG_NONE, 0}
+    {OpenACForSequence, 500, STATUS_REG_NONE, 0} // 0x12
 };
 const uint8_t TAKEOFF_STEP_COUNT = (uint8_t)(sizeof(takeoff_steps) / sizeof(takeoff_steps[0]));
 
 // 降落完成步骤表（取电换电都完成）
 const StepDef landing_steps[] =
 {
-    {Center_1, 0, STATUS_REG_NONE, 0},
+    {Center_1, 0, STATUS_REG_NONE, 0}, // 0x01
     //飞机前进
-    {MovePlaneTransferIn, 0, STATUS_REG_NONE, 0},
-    {CloseDr, 16250, REG_DOOR_STATE, 4},
-    {OpenACForSequence, 500, STATUS_REG_NONE, 0},
-    {Center_2, 0, REG_CENTER_ROD_STATE, 4},
+    {MovePlaneTransferIn, 0, STATUS_REG_NONE, 0}, // 0x02
+    {CloseDr, 16250, REG_DOOR_STATE, 4}, // 0x03
+    //{CloseDr, 0, REG_DOOR_STATE, 4},
+    {OpenACForSequence, 500, STATUS_REG_NONE, 0}, // 0x04
+    {Center_2, 0, REG_CENTER_ROD_STATE, 4}, // 0x05
     //上升到取电池高度
-    EXEC_MOVE_ABS_STEP(MOTOR1_SLAVE_ADDR, MOTOR1_TRANSFER_LIFT_POS, 0, STATUS_REG_NONE, 0),
+    EXEC_MOVE_ABS_STEP(MOTOR1_SLAVE_ADDR, MOTOR1_TRANSFER_LIFT_POS, 0, STATUS_REG_NONE, 0), // 0x06
     //飞机前进
-    {MovePlaneTransferIn, 0, STATUS_REG_NONE, 0},
+    {MovePlaneTransferIn, 0, STATUS_REG_NONE, 0}, // 0x07
     //横移电机移动到取飞机电机位置
-    EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, MOTOR2_AIRCRAFT_WORK_POS, 0, STATUS_REG_NONE, 0),
+    EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, MOTOR2_AIRCRAFT_WORK_POS, 0, STATUS_REG_NONE, 0), // 0x08
 
-    {Motor3Clamp, 1000, STATUS_REG_NONE, 0},
+    {Motor3Clamp, 1000, STATUS_REG_NONE, 0}, // 0x09
 
-    EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, MOTOR_HOME_POS, 0, STATUS_REG_NONE, 0),
-    {Center_2, 0, STATUS_REG_NONE, 0},
+    EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, MOTOR_HOME_POS, 0, STATUS_REG_NONE, 0), // 0x0A
+    {Center_2, 0, STATUS_REG_NONE, 0}, // 0x0B
 
     /* 根据序列启动时锁定的空仓号选择旧电池存放位置。 */
-    {NULL, 0, STATUS_REG_NONE, 0, MoveMotor1ToSelectedBay,   &battery_bay_current},
+    {NULL, 0, STATUS_REG_NONE, 0, MoveMotor1ToSelectedBay,   &battery_bay_current}, // 0x0C
     //横移电机移动到电池仓装电池位置
-    {NULL, 0, STATUS_REG_NONE, 0, MoveMotor2ToBayWorkPos,  &battery_bay_current},
+    {NULL, 0, STATUS_REG_NONE, 0, MoveMotor2ToBayWorkPos,  &battery_bay_current}, // 0x0D
     //松开夹爪
-    {Motor3Lossen, 1000, STATUS_REG_NONE, 0},
+    {Motor3Lossen, 1000, STATUS_REG_NONE, 0}, // 0x0E
     //横移电机移动到电池仓推进电池位置
-    {BatteryPushCheckAndRetry, 0, STATUS_REG_NONE, 0},
+    {BatteryPushCheckAndRetry, 0, STATUS_REG_NONE, 0, NULL, NULL, 0U, 1U}, // 0x0F
 
-    EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, MOTOR2_RETURN_POS, 0, STATUS_REG_NONE, 0),
+    EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, MOTOR2_RETURN_POS, 0, STATUS_REG_NONE, 0), // 0x10
 
     /* 根据本次序列锁定的目标仓号选择取电池位置。 */
-    {NULL, 0, STATUS_REG_NONE, 0, MoveMotor1GetBayPos,  &battery_bay_target},
-    EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, MOTOR2_BAY_LOAD_POS, 0, STATUS_REG_NONE, 0),
-    {Motor3Clamp, 1000, STATUS_REG_NONE, 0},
+    {NULL, 0, STATUS_REG_NONE, 0, MoveMotor1GetBayPos,  &battery_bay_target}, // 0x11
+    EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, MOTOR2_BAY_LOAD_POS, 0, STATUS_REG_NONE, 0), // 0x12
+    {Motor3Clamp, 1000, STATUS_REG_NONE, 0}, // 0x13
 
-    EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, MOTOR_HOME_POS, 0, STATUS_REG_NONE, 0),
+    EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, MOTOR_HOME_POS, 0, STATUS_REG_NONE, 0), // 0x14
     /* 新电池已从下一仓取出，该仓现在为空。 */
-    {UpdateEmptyBay, 500, STATUS_REG_NONE, 0},
-    //上升到装电池高度
-    EXEC_MOVE_ABS_STEP(MOTOR1_SLAVE_ADDR, MOTOR1_LOAD_BATTERY_POS, 0, STATUS_REG_NONE, 0),
-    {MovePlaneTransferIn, 0, STATUS_REG_NONE, 0},
+    {UpdateEmptyBay, 500, STATUS_REG_NONE, 0}, // 0x15
+    //按新电池来源仓上升到对应的装飞机电池高度
+    {MoveMotor1ToLoadBatteryPos, 0, STATUS_REG_NONE, 0}, // 0x16
+    {MovePlaneTransferIn, 0, STATUS_REG_NONE, 0}, // 0x17
 
     //横移电机装飞机电池释放位置
-    EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, MOTOR2_AIRCRAFT_RELEASE_POS, 0, STATUS_REG_NONE, 0),
+    EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, MOTOR2_AIRCRAFT_RELEASE_POS, 0, STATUS_REG_NONE, 0), // 0x18
 
-    {Motor3Lossen, 1000, STATUS_REG_NONE, 0},
+    {Motor3Lossen, 1000, STATUS_REG_NONE, 0}, // 0x19
 
     //横移电机推进去电池位置
-    EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, MOTOR2_AIRCRAFT_CLEAR_POS, 2000, STATUS_REG_NONE, 0),
+    EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, MOTOR2_AIRCRAFT_CLEAR_POS, 2000, STATUS_REG_NONE, 0), // 0x1A
 
-    EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, MOTOR2_RETURN_POS, 0, STATUS_REG_NONE, 0),
-    {Center_2, 0, STATUS_REG_NONE, 0},
-    EXEC_MOVE_ABS_STEP(MOTOR1_SLAVE_ADDR, MOTOR1_RETURN_POS, 0, STATUS_REG_NONE, 0),
-    EXEC_MOVE_ABS_ARRAY_STEP(plane_transfer_out_motors, 0, REG_SWAP_MECH_STATE, 4)
+    EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, MOTOR2_RETURN_POS, 0, STATUS_REG_NONE, 0), // 0x1B
+    {Center_2, 0, STATUS_REG_NONE, 0}, // 0x1C
+    EXEC_MOVE_ABS_STEP(MOTOR1_SLAVE_ADDR, MOTOR1_RETURN_POS, 0, STATUS_REG_NONE, 0), // 0x1D
+    EXEC_MOVE_ABS_ARRAY_STEP(plane_transfer_out_motors, 0, REG_SWAP_MECH_STATE, 4) // 0x1E
 
     //{LeaveCenter, 0, REG_CENTER_ROD_STATE, 2},
 };

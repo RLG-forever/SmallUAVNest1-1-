@@ -11,8 +11,10 @@
 #define MOTOR1_FLY_LIFT_POS                333000L
 //上下移电机 取飞机电池 高度位置
 #define MOTOR1_TRANSFER_LIFT_POS           333500L
-//上下移电机 装飞机电池 高度位置
-#define MOTOR1_LOAD_BATTERY_POS            333000L
+//上下移电机 装飞机电池 高度位置，按新电池来源仓分别标定
+#define MOTOR1_LOAD_BATTERY_BAY1_POS       333000L
+#define MOTOR1_LOAD_BATTERY_BAY2_POS       333000L
+#define MOTOR1_LOAD_BATTERY_BAY3_POS       333000L
 
 // 横移电机 回收流程前进位置
 #define MOTOR2_RECOVERY_FORWARD_POS        136000L

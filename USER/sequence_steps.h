@@ -18,6 +18,7 @@ typedef struct {
     StepContextFunc run_with_context;
     const void *context;
     uint32_t wait_timeout_ms;
+    uint8_t no_restart_from_here; // 降落从本步骤起，失败后回原点并结束
 } StepDef;
 
 

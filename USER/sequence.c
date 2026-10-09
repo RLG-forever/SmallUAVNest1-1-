@@ -37,6 +37,7 @@ struct {
     uint8_t selected_bay;
     uint8_t target_empty_bay;
     uint8_t landing_door_closed;
+    uint8_t landing_no_restart;
     SequenceState state;
     uint8_t pause_requested;
     SequenceResult last_result;
@@ -147,6 +148,7 @@ static void Sequence_Finish(SequenceResult result)
     seq_runner.selected_bay = 0U;
     seq_runner.target_empty_bay = 0U;
     seq_runner.landing_door_closed = 0U;
+    seq_runner.landing_no_restart = 0U;
     seq_runner.state = SEQUENCE_STATE_IDLE;
     seq_runner.pause_requested = 0U;
     seq_runner.last_result = result;
@@ -435,6 +437,7 @@ static SequenceStartResult Sequence_StartInternal(SeqId id,
     seq_runner.selected_bay = empty_bay;
     seq_runner.target_empty_bay = target_empty_bay;
     seq_runner.landing_door_closed = 0U;
+    seq_runner.landing_no_restart = 0U;
     seq_runner.current_index = 0U;
     seq_runner.state = SEQUENCE_STATE_RUNNING;
     seq_runner.pause_requested = 0U;
@@ -557,21 +560,21 @@ static void Sequence_BeginAlarmRecovery(uint8_t alarm_result)
     seq_runner.state = SEQUENCE_STATE_RECOVERY_RELEASE_CLAMP;
 }
 
-/* 到位停滞属于不可重跑故障：回零完成后结束原任务并进入待机。 */
-static void Sequence_BeginPositionStallRecovery(uint8_t stall_result)
+/* 不可重跑故障：保留故障码，回原点完成后结束原任务。 */
+static void Sequence_BeginHomingAfterFailure(uint16_t fault_code)
 {
     seq_runner.recovery_failed_step = seq_runner.current_index;
-    seq_runner.recovery_failed_slave = MotorControl_GetLastFailedSlave();
-    seq_runner.recovery_alarm_result = stall_result;
+    seq_runner.recovery_failed_slave = (uint8_t)(fault_code >> 8);
+    seq_runner.recovery_alarm_result = (uint8_t)fault_code;
     seq_runner.recovery_finish_after_release = 0U;
     seq_runner.recovery_restart_after_home = 0U;
     seq_runner.state = SEQUENCE_STATE_RECOVERY_RELEASE_CLAMP;
 
     LOG_ERROR("SEQ_TRACE",
-              "position stall caught: id=%u, step=%u, slave=0x%02X; full homing will run without restarting task\r\n",
+              "fault recovery without restart: id=%u, step=%u, fault=0x%04X; full homing required\r\n",
               (unsigned int)seq_runner.id,
               (unsigned int)seq_runner.recovery_failed_step,
-              (unsigned int)seq_runner.recovery_failed_slave);
+              (unsigned int)fault_code);
 }
 
 // 执行当前步骤（发送指令）
@@ -585,6 +588,10 @@ static void Sequence_ExecuteCurrentStep(void)
     const StepDef *step = &seq_runner.steps[seq_runner.current_index];
     uint8_t ret;
     uint8_t failed_slave;
+
+    if (seq_runner.id == SEQ_ID_LANDING && step->no_restart_from_here) {
+        seq_runner.landing_no_restart = 1U;
+    }
 
     if (!seq_runner.step_trace_started) {
         MotorControl_ClearLastFailedSlave();
@@ -669,7 +676,11 @@ static void Sequence_ExecuteCurrentStep(void)
                       Sequence_GetTraceStepName(seq_runner.id,
                                                 seq_runner.current_index),
                       (unsigned long)step->wait_timeout_ms);
-            Sequence_Finish(SEQUENCE_RESULT_ACTION_FAILED);
+            if (seq_runner.id == SEQ_ID_LANDING && seq_runner.landing_no_restart) {
+                Sequence_BeginHomingAfterFailure(MODBUS_RESULT_TIMEOUT);
+            } else {
+                Sequence_Finish(SEQUENCE_RESULT_ACTION_FAILED);
+            }
             return;
         }
         if (!seq_runner.step_pending_logged) {
@@ -685,7 +696,8 @@ static void Sequence_ExecuteCurrentStep(void)
         return;
     }
 
-    if (ret == MODBUS_RESULT_PENDING || MotorControl_IsBusy()) {
+    if (ret == MODBUS_RESULT_PENDING || ret == MODBUS_RESULT_BUSY ||
+        MotorControl_IsBusy()) {
         if (!seq_runner.step_pending_logged) {
             seq_runner.step_pending_logged = 1U;
             LOG_INFO("SEQ_TRACE",
@@ -697,6 +709,12 @@ static void Sequence_ExecuteCurrentStep(void)
                      (unsigned int)ret,
                      (unsigned int)MotorControl_IsBusy());
         }
+        return;
+    }
+
+    if (seq_runner.id == SEQ_ID_LANDING && seq_runner.landing_no_restart &&
+        LandingBayPush_HasCurrentFault()) {
+        Sequence_BeginHomingAfterFailure(LANDING_BAY_PUSH_CURRENT_FAULT_CODE);
         return;
     }
 
@@ -714,6 +732,13 @@ static void Sequence_ExecuteCurrentStep(void)
         } else {
             Sequence_CompleteCurrentStep();
         }
+        return;
+    }
+
+    if (seq_runner.id == SEQ_ID_LANDING && seq_runner.landing_no_restart) {
+        failed_slave = MotorControl_GetLastFailedSlave();
+        Sequence_BeginHomingAfterFailure(Sequence_ComposeFaultCode(
+            failed_slave, ret == STEP_RESULT_RETRY ? 0xFFU : ret));
         return;
     }
 
@@ -741,7 +766,8 @@ static void Sequence_ExecuteCurrentStep(void)
     }
 
     if (ret == MOTOR_CONTROL_RESULT_POSITION_STALL) {
-        Sequence_BeginPositionStallRecovery(ret);
+        Sequence_BeginHomingAfterFailure(Sequence_ComposeFaultCode(
+            MotorControl_GetLastFailedSlave(), ret));
         return;
     }
 
@@ -869,7 +895,7 @@ void Sequence_Process(void)
             seq_runner.last_error = fault_code != 0U ? fault_code : 0x00FFU;
             seq_runner.current_index = seq_runner.recovery_failed_step;
             LOG_WARN("SEQ_TRACE",
-                     "position stall recovery homing completed; original task stopped: id=%u, step=%u, slave=0x%02X\r\n",
+                     "fault recovery homing completed; original task stopped: id=%u, step=%u, slave=0x%02X\r\n",
                      (unsigned int)seq_runner.id,
                      (unsigned int)seq_runner.recovery_failed_step,
                      (unsigned int)seq_runner.recovery_failed_slave);
@@ -881,7 +907,7 @@ void Sequence_Process(void)
             MotorControl_FullHomeGetLastError());
         seq_runner.last_error = fault_code != 0U ? fault_code : 0x00FFU;
         LOG_ERROR("SEQ_TRACE",
-                  "alarm recovery full home failed: slave=0x%02X, result=%u\r\n",
+                  "recovery full home failed: slave=0x%02X, result=%u\r\n",
                   (unsigned int)MotorControl_FullHomeGetFailedSlave(),
                   (unsigned int)MotorControl_FullHomeGetLastError());
         Sequence_Finish(SEQUENCE_RESULT_ACTION_FAILED);
@@ -935,6 +961,7 @@ SequenceStartResult Sequence_StartRecovery(void)
     seq_runner.selected_bay = 0U;
     seq_runner.target_empty_bay = 0U;
     seq_runner.landing_door_closed = 0U;
+    seq_runner.landing_no_restart = 0U;
     seq_runner.current_index = 0U;
     seq_runner.state = SEQUENCE_STATE_RUNNING;
     seq_runner.pause_requested = 0U;
