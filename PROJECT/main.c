@@ -1,4 +1,4 @@
-#define PROJECT_DEBUG 1U
+#define PROJECT_DEBUG 0U
 
 #include "project.h"
 #include "debug_log.h"
@@ -35,6 +35,17 @@ const uint8_t g_project_debug_enabled = PROJECT_DEBUG;
     STARTUP_DEBUG_COMMAND != 0x40U
 #error STARTUP_DEBUG_COMMAND must be 0x00U, 0x38U or 0x40U
 #endif
+
+/* 1U：舱门动作仅返回成功，不控制电机；0U：正常控制舱门。独立于日志开关。 */
+#ifndef DOOR_DEBUG_NO_ACTION
+#define DOOR_DEBUG_NO_ACTION 0U
+#endif
+
+#if DOOR_DEBUG_NO_ACTION != 0U && DOOR_DEBUG_NO_ACTION != 1U
+#error DOOR_DEBUG_NO_ACTION must be 0U or 1U
+#endif
+
+const uint8_t g_door_debug_no_action = DOOR_DEBUG_NO_ACTION;
 
 TMRGEN       tmr = TIMR_DEFAULTS;
 LinterMotor  lim = LINTER_DEFAULTS;

@@ -21,6 +21,7 @@
 #define GATEWAY_REMOTE_OFF_DELAY_MS          (120UL * 60UL * 1000UL)
 
 typedef enum {
+    GATEWAY_CMD_HOME = GATEWAY_SERVICE_HOME_COMMAND_REG,
     GATEWAY_CMD_OPEN_DOOR = 0x0030U,
     GATEWAY_CMD_CLOSE_DOOR = 0x0031U,
     GATEWAY_CMD_CLOSE_CENTER = 0x0032U,
@@ -37,7 +38,6 @@ typedef enum {
     GATEWAY_CMD_CANCEL = 0x0043U,
     GATEWAY_CMD_OPEN_UP = 0x0044U, //与GATEWAY_CMD_OPEN_DOOR业务逻辑重复
     GATEWAY_CMD_CLOSE_DOWN = 0x0045U,
-    GATEWAY_CMD_HOME = GATEWAY_SERVICE_HOME_COMMAND_REG,
     GATEWAY_CMD_CHARGER_ON = 0x0048U,
     GATEWAY_CMD_CHARGER_OFF = 0x0049U,
     GATEWAY_CMD_OPEN_FLY = 0x0050U,
@@ -105,6 +105,10 @@ static uint8_t remote_off_command_active;
 static GatewayTakeoffState takeoff_state;
 static uint8_t takeoff_remote_attempt_count;
 static uint32_t takeoff_remote_deadline;
+static uint8_t takeoff_remote_command_pending;
+static uint8_t takeoff_preparation_pause_requested;
+static uint8_t takeoff_preparation_paused;
+static uint32_t takeoff_remote_wait_remaining_ms;
 static GatewayTakeoffCleanupState takeoff_cleanup_state;
 static uint8_t takeoff_cleanup_open_door_pending;
 static uint8_t takeoff_cleanup_pause_requested;
@@ -126,6 +130,41 @@ static void GatewayService_ResetTakeoffPowerFlow(void)
     takeoff_state = GATEWAY_TAKEOFF_STATE_IDLE;
     takeoff_remote_attempt_count = 0U;
     takeoff_remote_deadline = 0U;
+    takeoff_remote_command_pending = 0U;
+    takeoff_preparation_pause_requested = 0U;
+    takeoff_preparation_paused = 0U;
+    takeoff_remote_wait_remaining_ms = 0U;
+}
+
+static uint8_t GatewayService_IsTakeoffPreparation(void)
+{
+    return active_command.active &&
+           active_command.type == GATEWAY_ACTIVE_TAKEOFF_POWER &&
+           (takeoff_state == GATEWAY_TAKEOFF_STATE_START_REMOTE ||
+            takeoff_state == GATEWAY_TAKEOFF_STATE_WAIT_REMOTE);
+}
+
+/* 已发送的事务先取回结果；暂停后保留等待状态及剩余时间。 */
+static void GatewayService_PauseTakeoffPreparation(void)
+{
+    int32_t remaining;
+
+    if (takeoff_preparation_paused) {
+        return;
+    }
+    takeoff_remote_wait_remaining_ms = 0U;
+    if (takeoff_state == GATEWAY_TAKEOFF_STATE_WAIT_REMOTE) {
+        remaining = (int32_t)(takeoff_remote_deadline - GetTick());
+        if (remaining > 0) {
+            takeoff_remote_wait_remaining_ms = (uint32_t)remaining;
+        }
+    }
+    takeoff_preparation_paused = 1U;
+    StatusRegs_Update(REG_COMMAND_STATE, COMMAND_STATE_PAUSED);
+    StatusRegs_Update(REG_COMMAND_STEP, 0U);
+    LOG_INFO("GW_TRACE", "takeoff preparation paused: state=%u, remaining=%lu ms\r\n",
+             (unsigned int)takeoff_state,
+             (unsigned long)takeoff_remote_wait_remaining_ms);
 }
 
 static void GatewayService_ResetTakeoffCleanup(void)
@@ -261,11 +300,44 @@ static uint8_t GatewayService_StartTakeoffAttempt(uint16_t register_address)
 
     if (result == MODBUS_RESULT_OK) {
         takeoff_state = GATEWAY_TAKEOFF_STATE_SEQUENCE;
+        takeoff_remote_command_pending = 0U;
         StatusRegs_Update(REG_COMMAND_STEP, Sequence_GetCurrentStep());
         LOG_WARN("GW_TRACE", "takeoff 0x%02X sequence started\r\n",
                  (unsigned int)register_address);
     }
     return result;
+}
+
+static uint8_t GatewayService_ProcessTakeoffRemoteWrite(void)
+{
+    uint8_t result = ModbusMaster_06_WriteSingleReg(
+        MODBUS_MASTER_CLIENT_GATEWAY_TASK, MOTOR14_SLAVE_ADDR,
+        UAV_POWER_CTRL_REG, UAV_POWER_ON_VALUE);
+
+    if (result == MODBUS_RESULT_PENDING) {
+        takeoff_remote_command_pending = 1U;
+        return result;
+    }
+    if (result == MODBUS_RESULT_BUSY) {
+        return result;
+    }
+    takeoff_remote_command_pending = 0U;
+    if (result != MODBUS_RESULT_OK) {
+        GatewayService_ResetTakeoffPowerFlow();
+        GatewayService_FinishActive(COMMAND_STATE_FAILED,
+            ((uint16_t)MOTOR14_SLAVE_ADDR << 8) | result, 0U);
+        return result;
+    }
+
+    takeoff_remote_attempt_count++;
+    takeoff_remote_deadline = GetTick() + GATEWAY_REMOTE_ON_RETRY_INTERVAL_MS;
+    takeoff_state = GATEWAY_TAKEOFF_STATE_WAIT_REMOTE;
+    LOG_WARN("GW_TRACE",
+             "remote power-on attempt completed: %u/%u; waiting %lu seconds\r\n",
+             (unsigned int)takeoff_remote_attempt_count,
+             (unsigned int)GATEWAY_REMOTE_ON_MAX_ATTEMPTS,
+             (unsigned long)(GATEWAY_REMOTE_ON_RETRY_INTERVAL_MS / 1000U));
+    return MODBUS_RESULT_OK;
 }
 
 static uint8_t GatewayService_StartTakeoffCleanup(
@@ -517,6 +589,47 @@ static void GatewayService_FinishActive(CommandState state,
     }
 }
 
+/* 取消当前任务后执行完整回原点；空闲时也直接进入同一回原点流程。 */
+static uint8_t GatewayService_CancelAndHome(uint16_t value)
+{
+    uint8_t result;
+    uint8_t step = 0U;
+
+    /* 已下发的回原点动作没有可靠的停止命令，不能中途重启。 */
+    if (MotorControl_HomeIsBusy() || MotorControl_FullHomeIsBusy() ||
+        Sequence_IsRecovering()) {
+        return MODBUS_RESULT_BUSY;
+    }
+
+    if (Sequence_IsBusy()) {
+        step = Sequence_GetCurrentStep();
+        Sequence_Stop();
+    } else {
+        /* 同时释放异步电机批次和下游事务，避免回原点启动仍被占用。 */
+        MotorControl_Cancel();
+    }
+    remote_off_command_active = 0U;
+    if (active_command.active) {
+        GatewayService_FinishActive(COMMAND_STATE_CANCELLED, 0U, step);
+    }
+    GatewayService_ResetTakeoffPowerFlow();
+    GatewayService_ResetTakeoffCleanup();
+
+    result = GatewayService_ExecuteWrite(GATEWAY_CMD_HOME,
+                                         GATEWAY_SERVICE_HOME_ALL_VALUE);
+    if (result != MODBUS_RESULT_OK) {
+        GatewayService_SetCommandStatus(GATEWAY_CMD_CANCEL,
+                                        COMMAND_STATE_FAILED, result, 0U);
+        return result;
+    }
+
+    GatewayService_BeginActive(GATEWAY_CMD_CANCEL, value,
+                               GATEWAY_ACTIVE_HOMING);
+    StatusRegs_Update(REG_COMMAND_STEP,
+                      MotorControl_FullHomeGetCurrentSlave());
+    return MODBUS_RESULT_OK;
+}
+
 /* 执行单个网关寄存器命令，不负责编码从站应答。 */
 static uint8_t GatewayService_ExecuteWrite(uint16_t register_address,
                                            uint16_t value)
@@ -530,6 +643,7 @@ static uint8_t GatewayService_ExecuteWrite(uint16_t register_address,
     /* 回原点失败后仍允许网关重试；状态上报在锁定期间也保持可写。 */
     if (!control_enabled &&
         register_address != GATEWAY_CMD_HOME &&
+        register_address != GATEWAY_CMD_CANCEL &&
         register_address != GATEWAY_CMD_UAV_STATUS) {
         LOG_WARN("GW_TRACE",
                  "command rejected: control disabled, reg=0x%04X, value=0x%04X\r\n",
@@ -566,8 +680,7 @@ static uint8_t GatewayService_ExecuteWrite(uint16_t register_address,
             result = MODBUS_RESULT_OK;
             break;
         case GATEWAY_CMD_CANCEL:
-            Sequence_Stop();
-            result = MODBUS_RESULT_OK;
+            result = GatewayService_CancelAndHome(value);
             break;
         case GATEWAY_CMD_OPEN_DOOR_ALT:
         case GATEWAY_CMD_OPEN_UP:
@@ -749,7 +862,8 @@ static void GatewayService_ProcessActiveCommand(void)
         }
         if (MotorControl_FullHomeGetState() ==
             MOTOR_FULL_HOME_STATE_SUCCESS) {
-            if (active_command.value == GATEWAY_SERVICE_HOME_ALL_VALUE) {
+            if (active_command.register_address == GATEWAY_CMD_CANCEL ||
+                active_command.value == GATEWAY_SERVICE_HOME_ALL_VALUE) {
                 GatewayService_SetControlEnabled(1U);
             }
             GatewayService_FinishActive(
@@ -775,6 +889,16 @@ static void GatewayService_ProcessActiveCommand(void)
     }
 
     if (active_command.type == GATEWAY_ACTIVE_TAKEOFF_POWER) {
+        if (GatewayService_IsTakeoffPreparation() &&
+            takeoff_preparation_pause_requested) {
+            /* 只完成已经提交的写请求，避免暂停时遗留主站事务占用总线。 */
+            if (takeoff_remote_command_pending &&
+                GatewayService_ProcessTakeoffRemoteWrite() != MODBUS_RESULT_OK) {
+                return;
+            }
+            GatewayService_PauseTakeoffPreparation();
+            return;
+        }
         uav_status = StatusRegs_GetLive(REG_RC_UAV_STATE);
 
         /* 状态3只结束起飞命令，已经启动的机械序列继续执行。 */
@@ -824,31 +948,7 @@ static void GatewayService_ProcessActiveCommand(void)
                 return;
             }
 
-            result = ModbusMaster_06_WriteSingleReg(
-                MODBUS_MASTER_CLIENT_GATEWAY_TASK,
-                MOTOR14_SLAVE_ADDR,
-                UAV_POWER_CTRL_REG,
-                UAV_POWER_ON_VALUE);
-            if (result == MODBUS_RESULT_PENDING ||
-                result == MODBUS_RESULT_BUSY) {
-                return;
-            }
-            if (result != MODBUS_RESULT_OK) {
-                GatewayService_ResetTakeoffPowerFlow();
-                GatewayService_FinishActive(COMMAND_STATE_FAILED,
-                    ((uint16_t)MOTOR14_SLAVE_ADDR << 8) | result, 0U);
-                return;
-            }
-
-            takeoff_remote_attempt_count++;
-            takeoff_remote_deadline = GetTick() +
-                GATEWAY_REMOTE_ON_RETRY_INTERVAL_MS;
-            takeoff_state = GATEWAY_TAKEOFF_STATE_WAIT_REMOTE;
-            LOG_WARN("GW_TRACE",
-                     "remote power-on attempt completed: %u/%u; waiting %lu seconds\r\n",
-                     (unsigned int)takeoff_remote_attempt_count,
-                     (unsigned int)GATEWAY_REMOTE_ON_MAX_ATTEMPTS,
-                     (unsigned long)(GATEWAY_REMOTE_ON_RETRY_INTERVAL_MS / 1000U));
+            GatewayService_ProcessTakeoffRemoteWrite();
             return;
         }
 
@@ -1064,13 +1164,29 @@ static uint8_t GatewayService_HandleControlCommand(
              (unsigned int)Sequence_IsBusy(),
              (unsigned int)Sequence_GetCurrentStep());
 
-    /* 未配置可靠的回原点停止命令，运行期间不接受暂停或取消。 */
-    if (!control_enabled || MotorControl_HomeIsBusy() ||
+    /* 回原点运行期间不能停止；失败后允许取消命令重新完整回原点。 */
+    if ((!control_enabled &&
+         request->start_register != GATEWAY_CMD_CANCEL) ||
+        MotorControl_HomeIsBusy() ||
         MotorControl_FullHomeIsBusy() || Sequence_IsRecovering()) {
         return ModbusSlave_SendException(request, 0x06U) != 0U;
     }
 
+    /* 单次下游写操作没有可恢复的步骤边界，不将无效的暂停/恢复应答为成功。 */
+    if (active_command.active &&
+        active_command.type == GATEWAY_ACTIVE_ASYNC_WRITE &&
+        request->start_register != GATEWAY_CMD_CANCEL) {
+        return ModbusSlave_SendException(request, 0x06U) != 0U;
+    }
+
     if (request->start_register == GATEWAY_CMD_PAUSE) {
+        if (GatewayService_IsTakeoffPreparation()) {
+            takeoff_preparation_pause_requested = 1U;
+            if (!takeoff_remote_command_pending) {
+                GatewayService_PauseTakeoffPreparation();
+            }
+            return ModbusSlave_SendWriteAck(request) != 0U;
+        }
         if (active_command.active &&
             active_command.type == GATEWAY_ACTIVE_TAKEOFF_CLEANUP) {
             takeoff_cleanup_pause_requested = 1U;
@@ -1097,6 +1213,18 @@ static uint8_t GatewayService_HandleControlCommand(
             StatusRegs_Update(REG_COMMAND_STEP, step);
         }
     } else if (request->start_register == GATEWAY_CMD_RESUME) {
+        if (GatewayService_IsTakeoffPreparation()) {
+            if (takeoff_preparation_paused &&
+                takeoff_state == GATEWAY_TAKEOFF_STATE_WAIT_REMOTE) {
+                takeoff_remote_deadline = GetTick() + takeoff_remote_wait_remaining_ms;
+            }
+            takeoff_preparation_pause_requested = 0U;
+            takeoff_preparation_paused = 0U;
+            takeoff_remote_wait_remaining_ms = 0U;
+            StatusRegs_Update(REG_COMMAND_STATE, COMMAND_STATE_EXECUTING);
+            StatusRegs_Update(REG_COMMAND_STEP, 0U);
+            return ModbusSlave_SendWriteAck(request) != 0U;
+        }
         if (active_command.active &&
             active_command.type == GATEWAY_ACTIVE_TAKEOFF_CLEANUP) {
             takeoff_cleanup_pause_requested = 0U;
@@ -1114,27 +1242,12 @@ static uint8_t GatewayService_HandleControlCommand(
             StatusRegs_Update(REG_COMMAND_STEP, step);
         }
     } else {
-        if (active_command.active) {
-            if (active_command.type == GATEWAY_ACTIVE_SEQUENCE ||
-                active_command.type == GATEWAY_ACTIVE_TAKEOFF_POWER ||
-                active_command.type == GATEWAY_ACTIVE_TAKEOFF_CLEANUP) {
-                if (Sequence_IsBusy()) {
-                    Sequence_Stop();
-                } else if (active_command.type ==
-                               GATEWAY_ACTIVE_TAKEOFF_POWER &&
-                           ModbusMaster_IsBusy()) {
-                    ModbusMaster_Cancel();
-                }
-                step = Sequence_GetLastStep();
-                if (active_command.type == GATEWAY_ACTIVE_TAKEOFF_POWER) {
-                    GatewayService_ResetTakeoffPowerFlow();
-                }
-            } else {
-                ModbusMaster_Cancel();
-            }
-            GatewayService_FinishActive(COMMAND_STATE_CANCELLED, 0U, step);
-        } else {
-            Sequence_Stop();
+        uint8_t result = GatewayService_ExecuteWrite(
+            request->start_register, request->value);
+        if (result != MODBUS_RESULT_OK) {
+            uint8_t exception_code = result == MODBUS_RESULT_BUSY
+                                        ? 0x06U : 0x04U;
+            return ModbusSlave_SendException(request, exception_code) != 0U;
         }
     }
 
@@ -1315,13 +1428,26 @@ static uint8_t GatewayService_Handle10(const ModbusSlaveRequest *request)
         return GatewayService_HandleUavStatusWrite(request);
     }
 
-    if ((register_address == GATEWAY_CMD_HOME ||
+    if ((register_address == GATEWAY_CMD_CANCEL ||
+         register_address == GATEWAY_CMD_HOME ||
          register_address == GATEWAY_CMD_TAKEOFF ||
          register_address == GATEWAY_CMD_TAKEOFF_NO_CLOSE) &&
         request->register_count != 1U) {
         active = 0U;
         index = 0U;
         return ModbusSlave_SendException(request, 0x03U) != 0U;
+    }
+
+    if (request->register_count == 1U &&
+        register_address == GATEWAY_CMD_CANCEL) {
+        ModbusSlaveRequest control_request = *request;
+        control_request.value = value;
+        active = 0U;
+        index = 0U;
+        if (GatewayService_IsSameActive(register_address, value)) {
+            return ModbusSlave_SendWriteAck(request) != 0U;
+        }
+        return GatewayService_HandleControlCommand(&control_request);
     }
 
     if (request->register_count == 1U &&

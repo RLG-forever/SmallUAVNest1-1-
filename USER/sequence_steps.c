@@ -526,37 +526,30 @@ uint8_t WaitForUavPowerOn(void)
     return STEP_RESULT_WAIT;
 }
 
-// uint8_t StopDr(void)
-// {
-//     //return Motor_Control(MOTOR_ID_4, 1U, MOTOR4_CMD_STOP);
-//     return 0;
-// }
-
-// uint8_t OpenDr(void)
-// {
-//     //return Motor_Control(MOTOR_ID_4, 1U, MOTOR4_CMD_OPEN);
-//     return 0;
-// }
-
-// uint8_t CloseDr(void)
-// {
-//     //return Motor_Control(MOTOR_ID_4, 1U, MOTOR4_CMD_CLOSE);
-//     return 0;
-// }
-
 uint8_t StopDr(void)
 {
+    if (g_door_debug_no_action != 0U) {
+        return 0U;
+    }
     return Motor_Control(MOTOR_ID_4, 1U, MOTOR4_CMD_STOP);
 }
 
 uint8_t OpenDr(void)
 {
+    if (g_door_debug_no_action != 0U) {
+        return 0U;
+    }
     return Motor_Control(MOTOR_ID_4, 1U, MOTOR4_CMD_OPEN);
 }
 
 uint8_t CloseDr(void)
 {
-    uint8_t result = Motor_Control(MOTOR_ID_4, 1U, MOTOR4_CMD_CLOSE);
+    uint8_t result;
+
+    if (g_door_debug_no_action != 0U) {
+        return 0U;
+    }
+    result = Motor_Control(MOTOR_ID_4, 1U, MOTOR4_CMD_CLOSE);
 
     if (result == MODBUS_RESULT_OK) {
         StatusRegs_Update(REG_DOOR_STATE, 3U);
@@ -671,7 +664,7 @@ const StepDef takeoff_steps[] =
     //飞机前进
     {MovePlaneTransferIn, 0, STATUS_REG_NONE, 0}, // 0x04 飞机前进
 
-    {OpenDr, 20250, REG_DOOR_STATE, 2}, // 0x05 飞机前进完成后打开舱门
+    {OpenDr, 20250, REG_DOOR_STATE, 2}, // 0x05 飞机前进完成后打开舱门；舱门空动作调试时实际等待为 0 ms
     {CloseACForTakeoff, 500, STATUS_REG_NONE, 0}, // 0x06 关闭空调，失败后继续开机
 
     // 电机2按当前开机尝试次数移动到靠近位置
@@ -707,8 +700,7 @@ const StepDef landing_steps[] =
     {Center_1, 0, STATUS_REG_NONE, 0}, // 0x01
     //飞机前进
     {MovePlaneTransferIn, 0, STATUS_REG_NONE, 0}, // 0x02
-    {CloseDr, 16250, REG_DOOR_STATE, 4}, // 0x03
-    //{CloseDr, 0, REG_DOOR_STATE, 4},
+    {CloseDr, 20250, REG_DOOR_STATE, 4}, // 0x03 舱门空动作调试时实际等待为 0 ms
     {OpenACForSequence, 500, STATUS_REG_NONE, 0}, // 0x04
     {Center_2, 0, REG_CENTER_ROD_STATE, 4}, // 0x05
     //上升到取电池高度

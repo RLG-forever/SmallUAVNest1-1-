@@ -5,6 +5,14 @@
  * modbus_master.c，硬件访问已迁移到modbus_port.c */
 #include <stdint.h>
 
+/* 夹爪首次发送和重试的等待/总线静默时间，独立于PROJECT_DEBUG，解决夹爪不执行动作问题 */
+#ifndef CLAMP_PRE_SEND_WAIT_MS
+#define CLAMP_PRE_SEND_WAIT_MS 100UL
+#endif
+#if CLAMP_PRE_SEND_WAIT_MS > 60000UL
+#error "CLAMP_PRE_SEND_WAIT_MS must be between 0 and 60000"
+#endif
+
 /* 标识事务所有者，防止不同模块发送相同报文时误取对方的完成结果。 */
 typedef enum {
     MODBUS_MASTER_CLIENT_SEQUENCE = 0,

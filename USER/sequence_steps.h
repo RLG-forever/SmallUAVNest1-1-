@@ -113,6 +113,8 @@ uint8_t LeaveCenter(void);
 uint8_t OpenDr(void);
 uint8_t CloseDr(void);
 uint8_t StopDr(void);
+/* 在 main.c 中通过 DOOR_DEBUG_NO_ACTION 配置；非零时舱门函数直接返回成功。 */
+extern const uint8_t g_door_debug_no_action;
 uint8_t CheckAndCloseDoor(void);
 uint8_t WaitForUavPowerOn(void);
 uint8_t OpenAC(void);

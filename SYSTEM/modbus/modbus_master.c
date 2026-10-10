@@ -38,6 +38,7 @@ typedef enum {
  * 调用方必须以相同参数重复调用，直到取得最终结果。 */
 typedef enum {
     MASTER_TXN_FREE = 0,
+    MASTER_TXN_CLAMP_PRE_WAIT, /* 保留总线所有权，非阻塞等待夹爪发送前间隔。 */
     MASTER_TXN_SENDING,    /* 请求帧正在发送，等待发送完成。 */
     MASTER_TXN_WAITING,    /* 请求已发送，等待从站响应。 */
     MASTER_TXN_RETRY_WAIT, /* 本次尝试失败，等待重试间隔结束。 */
@@ -67,6 +68,12 @@ static uint8_t Master_RX_BUFF[MODBUS_RTU_MAX_ADU_LENGTH];
 
 static ModbusMasterTransaction master_transaction;
 static volatile uint8_t master_tx_done;
+static volatile uint32_t master_tx_done_tick;
+static volatile uint32_t master_last_bus_activity_tick;
+static volatile uint8_t master_bus_activity_seen;
+
+
+static uint8_t ModbusMaster_IsClampWriteTarget(void);
 
 /* 按 Modbus 调试工具常用格式打印完整 RTU 发送帧。 */
 static void ModbusMaster_LogTxFrame(const uint8_t *frame, uint16_t length)
@@ -104,6 +111,8 @@ static void ModbusMaster_LogRxFrame(const uint8_t *frame, uint16_t length)
 
 static void ModbusMaster_OnRxByte(uint8_t data)
 {
+    master_last_bus_activity_tick = GetTick();
+    master_bus_activity_seen = 1U;
     if (master_state == MASTER_WAIT_RESP && Master_FrameFlag == 0U &&
         Master_RX_CNT < sizeof(Master_RX_BUFF)) {
         Master_RX_BUFF[Master_RX_CNT++] = data;
@@ -119,6 +128,9 @@ static void ModbusMaster_OnFrameEnd(void)
 
 static void ModbusMaster_OnTxDone(void)
 {
+    master_tx_done_tick = GetTick();
+    master_last_bus_activity_tick = master_tx_done_tick;
+    master_bus_activity_seen = 1U;
     master_tx_done = 1U;
     if (master_state == MASTER_SENDING) {
         master_state = MASTER_WAIT_RESP;
@@ -202,6 +214,7 @@ static void ModbusMaster_BuildFrame(void)
 }
 
 static void ModbusMaster_RetryOrFinish(uint8_t result);
+static void ModbusMaster_PrepareAttempt(void);
 
 /*
  * Start the deadline when the RTU port is actually started.  This excludes
@@ -219,13 +232,46 @@ static uint32_t ModbusMaster_GetSendTimeoutMs(uint16_t frame_len)
 
 static void ModbusMaster_StartAttempt(void)
 {
+    uint32_t primask = __get_PRIMASK();
+    uint32_t send_tick;
+    uint8_t send_result;
+
+    /* 最后一次静默检查和端口启动之间不打印日志，也不允许RX中断插入。 */
+    __disable_irq();
+    send_tick = GetTick();
+    if (ModbusMaster_IsClampWriteTarget() && master_bus_activity_seen &&
+        (int32_t)(send_tick - master_last_bus_activity_tick) <
+            (int32_t)CLAMP_PRE_SEND_WAIT_MS) {
+        if (primask == 0U) {
+            __enable_irq();
+        }
+        return;
+    }
     ModbusMaster_ResetRx();
     master_transaction.attempts++;
     master_transaction.phase = MASTER_TXN_SENDING;
     master_state = MASTER_SENDING;
     master_tx_done = 0U;
+    /* 从实际端口启动计时，不把准备日志和发送前等待计入发送超时。 */
+    master_transaction.deadline =
+        send_tick + ModbusMaster_GetSendTimeoutMs(master_transaction.frame_len);
+    send_result = ModbusPort_MasterSend(master_transaction.frame,
+                                        master_transaction.frame_len);
+    if (primask == 0U) {
+        __enable_irq();
+    }
+    if (send_result != 0U) {
+        ModbusMaster_RetryOrFinish(MODBUS_RESULT_BUSY);
+    }
+}
+
+/* 首次发送和重试共用入口：日志先输出，夹爪再等待完整的发送前间隔。 */
+static void ModbusMaster_PrepareAttempt(void)
+{
+    master_state = MASTER_IDLE;
+    ModbusMaster_ResetRx();
     LOG_DEBUG("MODBUS", "attempt %u: client=%u, slave=0x%02X, fn=0x%02X, reg=0x%04X, count=%u\r\n",
-              (unsigned int)master_transaction.attempts,
+              (unsigned int)(master_transaction.attempts + 1U),
               (unsigned int)master_transaction.client,
               (unsigned int)master_transaction.slave,
               (unsigned int)master_transaction.function,
@@ -233,13 +279,11 @@ static void ModbusMaster_StartAttempt(void)
               (unsigned int)master_transaction.reg_num);
     ModbusMaster_LogTxFrame(master_transaction.frame,
                             master_transaction.frame_len);
-    /* 在打印日志结束后计算超时时间，同时根据发送的字节数计算超时时间，防止超时误判*/
-    master_transaction.deadline =
-        GetTick() +
-        ModbusMaster_GetSendTimeoutMs(master_transaction.frame_len);
-    if (ModbusPort_MasterSend(master_transaction.frame,
-                              master_transaction.frame_len) != 0U) {
-        ModbusMaster_RetryOrFinish(MODBUS_RESULT_BUSY);
+    if (ModbusMaster_IsClampWriteTarget()) {
+        master_transaction.phase = MASTER_TXN_CLAMP_PRE_WAIT;
+        master_transaction.deadline = GetTick() + CLAMP_PRE_SEND_WAIT_MS;
+    } else {
+        ModbusMaster_StartAttempt();
     }
 }
 
@@ -313,10 +357,14 @@ static void ModbusMaster_RetryOrFinish(uint8_t result)
                  (unsigned int)master_transaction.attempts,
                  (unsigned int)max_attempts,
                  (unsigned int)result);
-        master_transaction.phase = MASTER_TXN_RETRY_WAIT;
-        master_transaction.deadline = GetTick() + MODBUS_MASTER_RETRY_GAP_MS;
-        master_state = MASTER_RETRY_WAIT;
-        ModbusMaster_ResetRx();
+        if (ModbusMaster_IsClampWriteTarget()) {
+            ModbusMaster_PrepareAttempt();
+        } else {
+            master_transaction.phase = MASTER_TXN_RETRY_WAIT;
+            master_transaction.deadline = GetTick() + MODBUS_MASTER_RETRY_GAP_MS;
+            master_state = MASTER_RETRY_WAIT;
+            ModbusMaster_ResetRx();
+        }
     } else {
         ModbusMaster_SetResult(result);
     }
@@ -393,7 +441,10 @@ void ModbusMaster_Init(void)
 {
     memset(&master_transaction, 0, sizeof(master_transaction));
     master_tx_done = 0U;
+    master_tx_done_tick = 0U;
     master_state = MASTER_IDLE;
+    master_last_bus_activity_tick = 0U;
+    master_bus_activity_seen = 0U;
     ModbusPort_SetMasterCallbacks(ModbusMaster_OnRxByte,
                                   ModbusMaster_OnFrameEnd,
                                   ModbusMaster_OnTxDone);
@@ -408,11 +459,20 @@ void ModbusMaster_Process(void)
     uint32_t now = GetTick();
 
     switch (master_transaction.phase) {
+        case MASTER_TXN_CLAMP_PRE_WAIT:
+            /* 新命令等待满指定时间，同时要求最近收/发之后也静默满指定时间。 */
+            if ((int32_t)(now - master_transaction.deadline) >= 0 &&
+                (!master_bus_activity_seen ||
+                 (int32_t)(now - master_last_bus_activity_tick) >=
+                     (int32_t)CLAMP_PRE_SEND_WAIT_MS)) {
+                ModbusMaster_StartAttempt();
+            }
+            break;
         case MASTER_TXN_SENDING:
             if (master_tx_done) {
                 master_tx_done = 0U;
                 master_transaction.phase = MASTER_TXN_WAITING;
-                master_transaction.deadline = now + MODBUS_MASTER_TIMEOUT_MS;
+                master_transaction.deadline = master_tx_done_tick + MODBUS_MASTER_TIMEOUT_MS;
                 master_state = MASTER_WAIT_RESP;
             } else if ((int32_t)(now - master_transaction.deadline) >= 0) {
                 ModbusPort_MasterCancel();
@@ -422,8 +482,7 @@ void ModbusMaster_Process(void)
         case MASTER_TXN_WAITING:
             /*
              * The clamp controller does not provide a reliable Modbus reply.
-             * Ignore every frame received during its complete response window,
-             * including apparently valid frames, CRC errors and short frames.
+             * Do not use received frames to finish or retry this transaction.
              * When the fixed response timeout expires, RetryOrFinish() converts
              * the timeout to success for this no-reply write target.
              */
@@ -455,7 +514,7 @@ void ModbusMaster_Process(void)
             break;
         case MASTER_TXN_RETRY_WAIT:
             if ((int32_t)(now - master_transaction.deadline) >= 0) {
-                ModbusMaster_StartAttempt();
+                ModbusMaster_PrepareAttempt();
             }
             break;
         default:
@@ -524,7 +583,7 @@ static uint8_t ModbusMaster_Submit(ModbusMasterClient client,
               (unsigned int)function, (unsigned int)start_reg,
               (unsigned int)reg_num);
     ModbusMaster_BuildFrame();
-    ModbusMaster_StartAttempt();
+    ModbusMaster_PrepareAttempt();
     return MODBUS_RESULT_PENDING;
 }
 

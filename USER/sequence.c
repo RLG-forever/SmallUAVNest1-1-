@@ -590,8 +590,19 @@ static void Sequence_BeginHomingAfterFailure(uint16_t fault_code)
 static void Sequence_ExecuteCurrentStep(void)
 {
     const StepDef *step = &seq_runner.steps[seq_runner.current_index];
+    uint32_t post_delay_ms = step->post_delay_ms;
     uint8_t ret;
     uint8_t failed_slave;
+
+    /* 舱门空动作调试时，取消降落关门和起飞步骤表中开门动作的完成后等待。 */
+    if (g_door_debug_no_action != 0U &&
+        ((seq_runner.id == SEQ_ID_LANDING && step->run == CloseDr) ||
+         ((seq_runner.id == SEQ_ID_TAKEOFF ||
+           seq_runner.id == SEQ_ID_TAKEOFF_NO_CLOSE ||
+           seq_runner.id == SEQ_ID_OPENFLY ||
+           seq_runner.id == SEQ_ID_CLOSEFLY) && step->run == OpenDr))) {
+        post_delay_ms = 0U;
+    }
 
     if (seq_runner.id == SEQ_ID_LANDING && step->no_restart_from_here) {
         seq_runner.landing_no_restart = 1U;
@@ -609,7 +620,7 @@ static void Sequence_ExecuteCurrentStep(void)
                  (unsigned int)seq_runner.step_count,
                  Sequence_GetTraceStepName(seq_runner.id,
                                            seq_runner.current_index),
-                 (unsigned long)step->post_delay_ms);
+                 (unsigned long)post_delay_ms);
     }
 
     /* 只跳过本次降落已完成的关门步骤，避免使用上电默认状态跳过首次关门。 */
@@ -717,8 +728,8 @@ static void Sequence_ExecuteCurrentStep(void)
     }
 
     if (ret == MODBUS_RESULT_OK) {
-        if (step->post_delay_ms > 0U) {
-            seq_runner.delay_deadline = GetTick() + step->post_delay_ms;
+        if (post_delay_ms > 0U) {
+            seq_runner.delay_deadline = GetTick() + post_delay_ms;
             seq_runner.state = SEQUENCE_STATE_WAITING;
             LOG_INFO("SEQ_TRACE",
                      "step action accepted: id=%u, step=%u, name=%s; waiting delay=%lu ms\r\n",
@@ -726,7 +737,7 @@ static void Sequence_ExecuteCurrentStep(void)
                      (unsigned int)seq_runner.current_index,
                      Sequence_GetTraceStepName(seq_runner.id,
                                                seq_runner.current_index),
-                     (unsigned long)step->post_delay_ms);
+                     (unsigned long)post_delay_ms);
         } else {
             Sequence_CompleteCurrentStep();
         }
