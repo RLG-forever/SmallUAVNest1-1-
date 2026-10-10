@@ -11,6 +11,48 @@ static uint8_t startup_full_homing_pending;
 static MotorFullHomeState last_full_home_state =
     MOTOR_FULL_HOME_STATE_IDLE;
 
+/* 成功或无需重置时继续启动；写Flash失败时阻止自动回零。保留moving标志。 */
+static uint8_t FullHomeService_ResetStartupPositions(void)
+{
+#if STARTUP_RESET_MOTOR78_POSITION == 0U
+    int32_t saved_motor7_position;
+    int32_t saved_motor8_position;
+    int64_t difference;
+
+    if (!MotorPositionStore_WasMotionInterrupted()) {
+        return 1U;
+    }
+    if (!MotorPositionStore_Get(&saved_motor7_position,
+                                &saved_motor8_position)) {
+        LOG_WARN("MAIN", "startup motor7/8 position check skipped: saved positions unavailable\r\n");
+        return 1U;
+    }
+
+    difference = (int64_t)saved_motor7_position -
+                 (int64_t)saved_motor8_position;
+    if (difference < 0) {
+        difference = -difference;
+    }
+    LOG_INFO("MAIN",
+             "startup motor7/8 interrupted movement check: motor7=%ld, motor8=%ld, difference=%lu, limit=%lu\r\n",
+             (long)saved_motor7_position, (long)saved_motor8_position,
+             (unsigned long)difference,
+             (unsigned long)STARTUP_MOTOR78_POSITION_DIFF_LIMIT);
+    if (difference <= (int64_t)STARTUP_MOTOR78_POSITION_DIFF_LIMIT) {
+        return 1U;
+    }
+    LOG_WARN("MAIN", "interrupted motor7/8 movement difference exceeds limit; resetting both saved positions\r\n");
+#else
+    LOG_WARN("MAIN", "startup motor7/8 position reset forced by configuration\r\n");
+#endif
+
+    if (!MotorPositionStore_Save(0L, 0L)) {
+        return 0U;
+    }
+    LOG_WARN("MAIN", "startup motor7/8 saved positions reset to zero\r\n");
+    return 1U;
+}
+
 /**
  * @brief 启动上电后的全回原点流程，并初始化对应的命令状态。
  * @note  调用前必须完成Modbus主站、状态寄存器、Flash及电机位置存储初始化。
@@ -22,6 +64,14 @@ uint8_t FullHomeService_StartInitial(void)
     uint8_t home_start_result;
     int32_t saved_motor7_position = 0L;
     int32_t saved_motor8_position = 0L;
+
+    if (!FullHomeService_ResetStartupPositions()) {
+        startup_full_homing_pending = 0U;
+        StatusRegs_Update(REG_COMMAND_STATE, COMMAND_STATE_FAILED);
+        StatusRegs_Update(REG_FAULT_CODE, MODBUS_RESULT_ECHO);
+        LOG_ERROR("MAIN", "motor7/8 position reset failed; automatic startup homing blocked\r\n");
+        return 0U;
+    }
 
     /* 电机7、8需要使用掉电前保存的位置完成回零前的安全预移动。 */
     saved_position_valid = MotorPositionStore_Get(

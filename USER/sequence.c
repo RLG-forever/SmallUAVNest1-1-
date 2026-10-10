@@ -204,6 +204,10 @@ static void Sequence_CompleteCurrentStep(void)
         seq_runner.deferred_fault_step = seq_runner.current_index;
         StatusRegs_Update(REG_FAULT_CODE,
                           seq_runner.deferred_fault_code);
+        LOG_WARN("SEQ_TRACE",
+                 "bay push current fault recorded; continuing landing sequence: step=%u, fault=0x%04X\r\n",
+                 (unsigned int)seq_runner.deferred_fault_step,
+                 (unsigned int)seq_runner.deferred_fault_code);
     }
 
     seq_runner.current_index++;
@@ -709,12 +713,6 @@ static void Sequence_ExecuteCurrentStep(void)
                      (unsigned int)ret,
                      (unsigned int)MotorControl_IsBusy());
         }
-        return;
-    }
-
-    if (seq_runner.id == SEQ_ID_LANDING && seq_runner.landing_no_restart &&
-        LandingBayPush_HasCurrentFault()) {
-        Sequence_BeginHomingAfterFailure(LANDING_BAY_PUSH_CURRENT_FAULT_CODE);
         return;
     }
 

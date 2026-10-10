@@ -379,11 +379,12 @@ static uint8_t BatteryPushCheckAndRetry(void)
             return MODBUS_RESULT_PENDING;
         }
         landing_bay_push_current_fault = 1U;
-        LOG_ERROR("STEP", "bay push current increase failed after %u repushes: bay=%u, increase=%ld, fault=0x%04X; homing required\r\n",
+        LOG_ERROR("STEP", "bay push current increase failed after %u repushes: bay=%u, increase=%ld, fault=0x%04X; continuing sequence\r\n",
                   (unsigned int)landing_bay_push.repush_count,
                   (unsigned int)Sequence_GetSelectedBay(),
                   (long)increase,
                   (unsigned int)LANDING_BAY_PUSH_CURRENT_FAULT_CODE);
+        /* 保留电流故障标志供序列上报，允许后续换电动作继续执行。 */
         LandingBayPush_ResetAction();
         return MODBUS_RESULT_OK;
 
