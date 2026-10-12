@@ -47,7 +47,7 @@ typedef struct {
 #define MOTOR14_SLAVE_ADDR 0x14   // 电机14从站地址(控制遥控器的舵机)
 
 #define MOTOR1_RETURN_POS 10000L    //升降电机1的停住位置
-#define MOTOR2_RETURN_POS 100000L   //升降电机2的停住位置
+#define MOTOR2_RETURN_POS 90000L   //升降电机2的停住位置
 
 /* 降落流程：检查旧电池是否成功推入电池仓。 */
 #ifndef LANDING_BAY_PUSH_RETRY_BACK_POS
@@ -64,7 +64,7 @@ typedef struct {
 
 /* 控制电流后台轮询和降落时电池仓推进前后的电流检查，默认关闭。 */
 #ifndef LANDING_BAY_PUSH_CURRENT_CHECK_ENABLE
-#define LANDING_BAY_PUSH_CURRENT_CHECK_ENABLE 1U
+#define LANDING_BAY_PUSH_CURRENT_CHECK_ENABLE 0U
 #endif
 #if LANDING_BAY_PUSH_CURRENT_CHECK_ENABLE != 0U && \
     LANDING_BAY_PUSH_CURRENT_CHECK_ENABLE != 1U

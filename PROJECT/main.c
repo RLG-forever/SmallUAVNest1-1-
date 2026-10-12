@@ -1,4 +1,4 @@
-#define PROJECT_DEBUG 0U
+#define PROJECT_DEBUG 1U
 
 #include "project.h"
 #include "debug_log.h"
@@ -12,7 +12,7 @@ const uint8_t g_project_debug_enabled = PROJECT_DEBUG;
 #define STARTUP_DEBUG_COMMAND             0x0U
 #endif
 
-/* 0 表示使用已保存的空仓号；1～3 表示调试降落流程时指定空仓号。 */
+/* 0 表示使用已保存的空仓号；1～3 表示调试降落流程时指定空仓号。独立于 PROJECT_DEBUG。 */
 #ifndef STARTUP_DEBUG_EMPTY_BAY
 #define STARTUP_DEBUG_EMPTY_BAY        0U
 #endif
@@ -21,7 +21,7 @@ const uint8_t g_project_debug_enabled = PROJECT_DEBUG;
 #error STARTUP_DEBUG_EMPTY_BAY must be 0U, 1U, 2U or 3U
 #endif
 
-/* 调试模式下执行 0x40 命令（上电自动或网关触发）时，在指定仓号存取电池。 */
+/* 1U：执行 0x40 命令（上电自动或网关触发）时在同一仓号存取电池。独立于 PROJECT_DEBUG。 */
 #ifndef STARTUP_DEBUG_SAME_BAY
 #define STARTUP_DEBUG_SAME_BAY          0U
 #endif
@@ -82,15 +82,15 @@ int main(void)
 	W25QXX_Init();          // 初始化SPI Flash
 	SwapState_Init();   // 从Flash读取空仓号
 	MotorPositionStore_Init();
-	LOG_INFO("MAIN", "initialization completed\r\n");
+	LOG_INFO("MAIN", "initialization completed\r\n" );
   __enable_irq();  /* 开启全局中断 */
-#if PROJECT_DEBUG != 0U && STARTUP_DEBUG_EMPTY_BAY != 0U
+#if STARTUP_DEBUG_EMPTY_BAY != 0U
     if (SwapState_GetEmptyBay() != STARTUP_DEBUG_EMPTY_BAY) {
         SwapState_SetEmptyBay((uint8_t)STARTUP_DEBUG_EMPTY_BAY);
     }
 #endif
     Sequence_SetLandingSameBayDebugEnabled(
-        (uint8_t)(PROJECT_DEBUG != 0U && STARTUP_DEBUG_SAME_BAY != 0U));
+        (uint8_t)(STARTUP_DEBUG_SAME_BAY != 0U));
     StatusRegs_Update(REG_EMPTY_BAY, SwapState_GetEmptyBay());
     LOG_INFO("MAIN", "startup empty bay=%u, debug override=%u\r\n",
              (unsigned int)SwapState_GetEmptyBay(),
@@ -129,8 +129,7 @@ int main(void)
                 debug_command_started = 1U;
                 LOG_INFO("MAIN", "startup debug command 0x%02X started, same_bay=%u\r\n",
                          (unsigned int)STARTUP_DEBUG_COMMAND,
-                         (unsigned int)(PROJECT_DEBUG != 0U &&
-                                        STARTUP_DEBUG_COMMAND == 0x40U &&
+                         (unsigned int)(STARTUP_DEBUG_COMMAND == 0x40U &&
                                         STARTUP_DEBUG_SAME_BAY != 0U));
             }
         }

@@ -678,7 +678,7 @@ const StepDef takeoff_steps[] =
     //移动至原点位置0
     EXEC_MOVE_ABS_STEP(MOTOR2_SLAVE_ADDR, MOTOR2_RETURN_POS, 0, STATUS_REG_NONE, 0), // 0x0B 电机2后退
 
-    {WaitForUavPowerOn, 0, STATUS_REG_NONE, 0, NULL, NULL,  UAV_POWER_ON_WAIT_TIMEOUT_MS}, // 0x0C 等待无人机开机
+    {WaitForUavPowerOn, 10000UL, STATUS_REG_NONE, 0, NULL, NULL, UAV_POWER_ON_WAIT_TIMEOUT_MS}, // 0x0C 确认无人机开机后再等待 10 秒
     //待修改
     {Center_2, 0, STATUS_REG_NONE, 0}, // 0x0D 飞机后退
     //电机回零位

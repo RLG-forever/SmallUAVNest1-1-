@@ -265,6 +265,13 @@ void GatewayService_Process(void)
         return;
     }
 
+    /* 计时到期后，遥控器已关机则清除定时任务，避免重复关闭。 */
+    if (StatusRegs_GetLive(REG_RC_UAV_STATE) == 0U) {
+        remote_off_pending = 0U;
+        LOG_INFO("GATEWAY", "remote already powered off; scheduled power-off skipped\r\n");
+        return;
+    }
+
     result = ModbusMaster_06_WriteSingleReg(MODBUS_MASTER_CLIENT_GATEWAY_TASK,
                                             MOTOR14_SLAVE_ADDR,
                                             0x0001U, 0x0001U);

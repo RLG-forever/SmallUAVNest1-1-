@@ -3,12 +3,15 @@
 
 #define DEVICE_PROFILE_NAME                         "LiShui"
 
+// 开启电池推入电池仓时的电流变化检查
+#define LANDING_BAY_PUSH_CURRENT_CHECK_ENABLE        0U
+
 // 电机通用原点位置
 #define MOTOR_HOME_POS                           0L
 // 上下移电机 回收流程标定位置
 #define MOTOR1_RECOVERY_POS                315000L
 //上下移电机 开飞机电池 高度位置
-#define MOTOR1_FLY_LIFT_POS                327000L
+#define MOTOR1_FLY_LIFT_POS                326700L
 //上下移电机 取飞机电池 高度位置
 #define MOTOR1_TRANSFER_LIFT_POS           329000L
 //上下移电机 装飞机电池 高度位置，按新电池来源仓分别标定
@@ -20,12 +23,12 @@
 #define MOTOR2_RECOVERY_FORWARD_POS        136000L
 
 //横移电机 靠近飞机电池开关 位置
-#define MOTOR2_FLY_NEAR_POS                285000L
+#define MOTOR2_FLY_NEAR_POS                283000L
 //横移电机 打开飞机电池开关 前进的相对位置
 #define MOTOR2_FLY_FAR_RELA_POS              8000L
 
 //横移电机 取飞机电池 位置
-#define MOTOR2_AIRCRAFT_WORK_POS           290000L
+#define MOTOR2_AIRCRAFT_WORK_POS           280000L
 //横移电机装 飞机电池 释放位置
 #define MOTOR2_AIRCRAFT_RELEASE_POS        284000L
 //横移电机装 飞机电池 时推电池位置
@@ -77,8 +80,8 @@
 #define CENTER_REAR_POS                    256000L
 
 //电机9和10的center1夹紧位置
-#define CENTER_SIDE_A_POS                  91000L
+#define CENTER_SIDE_A_POS                  95000L
 //电机11和12的center1夹紧位置
-#define CENTER_SIDE_B_POS                 101000L
+#define CENTER_SIDE_B_POS                 102000L
 
 #endif

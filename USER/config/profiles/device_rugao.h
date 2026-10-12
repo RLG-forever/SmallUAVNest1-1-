@@ -3,6 +3,9 @@
 
 #define DEVICE_PROFILE_NAME                         "RuGao"
 
+// 开启电池推入电池仓时的电流变化检查
+#define LANDING_BAY_PUSH_CURRENT_CHECK_ENABLE        0U
+
 // 电机通用原点位置
 #define MOTOR_HOME_POS                           0L
 // 上下移电机 回收流程标定位置

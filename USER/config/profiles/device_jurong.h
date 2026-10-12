@@ -3,6 +3,9 @@
 
 #define DEVICE_PROFILE_NAME                         "JuRong"
 
+// 开启电池推入电池仓时的电流变化检查
+#define LANDING_BAY_PUSH_CURRENT_CHECK_ENABLE        1U
+
 // 电机通用原点位置
 #define MOTOR_HOME_POS                           0L
 // 上下移电机 回收流程标定位置
@@ -52,7 +55,7 @@
 //电池仓 取电池 高度位置
 #define BATTERY_GET_BAY1_HEIGHT            139000L
 #define BATTERY_GET_BAY2_HEIGHT             75000L
-#define BATTERY_GET_BAY3_HEIGHT              7000L
+#define BATTERY_GET_BAY3_HEIGHT              8000L
 
 //横移电机移动到 电池仓  推进去电池位置
 #define MOTOR2_BAY_RELEASE_POS             362000L
