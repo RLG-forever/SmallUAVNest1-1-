@@ -26,7 +26,7 @@ static ModbusPortTxDoneCallback master_tx_done_callback;
 static ModbusPortRxByteCallback slave_rx_callback;
 static ModbusPortFrameEndCallback slave_frame_end_callback;
 
-/* 总线静默达到3.5个字符时间时，判定一帧RTU报文结束。 */
+/* 功能：按波特率计算Modbus RTU的3.5字符帧间隔，单位微秒。 */
 uint32_t ModbusPort_FrameT35Us(uint32_t baudrate)
 {
     uint32_t timeout_us;
@@ -47,6 +47,7 @@ uint32_t ModbusPort_FrameT35Us(uint32_t baudrate)
     return timeout_us;
 }
 
+/* 功能：登记主站的收字节、帧结束和发送完成回调。 */
 void ModbusPort_SetMasterCallbacks(ModbusPortRxByteCallback rx_callback,
                                    ModbusPortFrameEndCallback frame_end_callback,
                                    ModbusPortTxDoneCallback tx_done_callback)
@@ -56,6 +57,7 @@ void ModbusPort_SetMasterCallbacks(ModbusPortRxByteCallback rx_callback,
     master_tx_done_callback = tx_done_callback;
 }
 
+/* 功能：登记从站的收字节和帧结束回调。 */
 void ModbusPort_SetSlaveCallbacks(ModbusPortRxByteCallback rx_callback,
                                   ModbusPortFrameEndCallback frame_end_callback)
 {
@@ -63,6 +65,7 @@ void ModbusPort_SetSlaveCallbacks(ModbusPortRxByteCallback rx_callback,
     slave_frame_end_callback = frame_end_callback;
 }
 
+/* 功能：初始化主站USART1、RS485方向引脚和接收中断。 */
 void ModbusPort_InitMaster(uint32_t baudrate)
 {
     GPIO_InitTypeDef gpio;
@@ -107,6 +110,7 @@ void ModbusPort_InitMaster(uint32_t baudrate)
     NVIC_Init(&nvic);
 }
 
+/* 功能：初始化从站USART2、RS485方向引脚和接收中断。 */
 void ModbusPort_InitSlave(uint32_t baudrate)
 {
     GPIO_InitTypeDef gpio;
@@ -150,6 +154,7 @@ void ModbusPort_InitSlave(uint32_t baudrate)
     NVIC_Init(&nvic);
 }
 
+/* 功能：用TIM3实现从站RTU帧间隔检测。 */
 void ModbusPort_InitSlaveFrameTimer(uint32_t baudrate)
 {
     TIM_TimeBaseInitTypeDef timer;
@@ -172,6 +177,7 @@ void ModbusPort_InitSlaveFrameTimer(uint32_t baudrate)
     NVIC_Init(&nvic);
 }
 
+/* 功能：用TIM4实现主站RTU帧间隔检测。 */
 void ModbusPort_InitMasterFrameTimer(uint32_t baudrate)
 {
     TIM_TimeBaseInitTypeDef timer;
@@ -194,7 +200,7 @@ void ModbusPort_InitMasterFrameTimer(uint32_t baudrate)
     NVIC_Init(&nvic);
 }
 
-/* 发送前置位DE；仅在TC确认最后一个停止位已离开发送移位寄存器后才释放DE。 */
+/* 功能：复制主站待发帧，置位RS485发送方向并启动TXE中断。 */
 uint8_t ModbusPort_MasterSend(const uint8_t *data, uint16_t len)
 {
     if (data == NULL || len == 0U || len > MODBUS_PORT_TX_BUFFER_SIZE || master_tx.active) {
@@ -211,6 +217,7 @@ uint8_t ModbusPort_MasterSend(const uint8_t *data, uint16_t len)
     return 0U;
 }
 
+/* 功能：复制从站待发帧，置位RS485发送方向并启动TXE中断。 */
 uint8_t ModbusPort_SlaveSend(const uint8_t *data, uint16_t len)
 {
     if (data == NULL || len == 0U || len > MODBUS_PORT_TX_BUFFER_SIZE || slave_tx.active) {
@@ -227,6 +234,7 @@ uint8_t ModbusPort_SlaveSend(const uint8_t *data, uint16_t len)
     return 0U;
 }
 
+/* 功能：中止主站发送，释放RS485方向并停止帧间隔定时器。 */
 void ModbusPort_MasterCancel(void)
 {
     USART_ITConfig(USART1, USART_IT_TXE, DISABLE);
@@ -238,6 +246,7 @@ void ModbusPort_MasterCancel(void)
     ModbusPort_MasterStopFrameTimer();
 }
 
+/* 功能：清零并重新启动主站帧间隔计时。 */
 void ModbusPort_MasterRestartFrameTimer(void)
 {
     TIM_Cmd(TIM4, DISABLE);
@@ -246,12 +255,14 @@ void ModbusPort_MasterRestartFrameTimer(void)
     TIM_Cmd(TIM4, ENABLE);
 }
 
+/* 功能：停止主站帧间隔计时并清零计数。 */
 void ModbusPort_MasterStopFrameTimer(void)
 {
     TIM_Cmd(TIM4, DISABLE);
     TIM_SetCounter(TIM4, 0U);
 }
 
+/* 功能：清零并重新启动从站帧间隔计时。 */
 void ModbusPort_SlaveRestartFrameTimer(void)
 {
     TIM_Cmd(TIM3, DISABLE);
@@ -260,13 +271,14 @@ void ModbusPort_SlaveRestartFrameTimer(void)
     TIM_Cmd(TIM3, ENABLE);
 }
 
+/* 功能：停止从站帧间隔计时并清零计数。 */
 void ModbusPort_SlaveStopFrameTimer(void)
 {
     TIM_Cmd(TIM3, DISABLE);
     TIM_SetCounter(TIM3, 0U);
 }
 
-/* 中断只负责搬运字节和发布事件；帧解析在主从站任务上下文完成，业务代码不在中断中运行。 */
+/* 功能：处理USART1主站发送、发送完成、接收和接收溢出事件。 */
 void USART1_IRQHandler(void)
 {
     if (USART_GetITStatus(USART1, USART_IT_TXE) != RESET) {
@@ -302,6 +314,7 @@ void USART1_IRQHandler(void)
     }
 }
 
+/* 功能：处理USART2从站发送、发送完成、接收和接收溢出事件。 */
 void USART2_IRQHandler(void)
 {
     if (USART_GetITStatus(USART2, USART_IT_TXE) != RESET) {
@@ -333,6 +346,7 @@ void USART2_IRQHandler(void)
     }
 }
 
+/* 功能：TIM3帧间隔到期时通知从站协议层当前帧已结束。 */
 void TIM3_IRQHandler(void)
 {
     if (TIM_GetITStatus(TIM3, TIM_IT_Update) != RESET) {
@@ -344,6 +358,7 @@ void TIM3_IRQHandler(void)
     }
 }
 
+/* 功能：TIM4帧间隔到期时通知主站协议层当前响应帧已结束。 */
 void TIM4_IRQHandler(void)
 {
     if (TIM_GetITStatus(TIM4, TIM_IT_Update) != RESET) {

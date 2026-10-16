@@ -75,7 +75,7 @@ static volatile uint8_t master_bus_activity_seen;
 
 static uint8_t ModbusMaster_IsClampWriteTarget(void);
 
-/* 按 Modbus 调试工具常用格式打印完整 RTU 发送帧。 */
+/* 功能：按十六进制格式打印完整RTU发送帧。 */
 static void ModbusMaster_LogTxFrame(const uint8_t *frame, uint16_t length)
 {
     uint16_t index;
@@ -92,7 +92,7 @@ static void ModbusMaster_LogTxFrame(const uint8_t *frame, uint16_t length)
     printf("\r\n");
 }
 
-/* Print a completed receive frame from task context, never from the ISR. */
+/* 功能：在任务上下文打印完整RTU接收帧。 */
 static void ModbusMaster_LogRxFrame(const uint8_t *frame, uint16_t length)
 {
     uint16_t index;
@@ -109,6 +109,7 @@ static void ModbusMaster_LogRxFrame(const uint8_t *frame, uint16_t length)
     printf("\r\n");
 }
 
+/* 功能：保存USART1收到的一个响应字节，并记录总线活动时间。 */
 static void ModbusMaster_OnRxByte(uint8_t data)
 {
     master_last_bus_activity_tick = GetTick();
@@ -119,6 +120,7 @@ static void ModbusMaster_OnRxByte(uint8_t data)
     }
 }
 
+/* 功能：帧间隔结束时置位主站响应帧完成标志。 */
 static void ModbusMaster_OnFrameEnd(void)
 {
     if (Master_RX_CNT > 0U && Master_FrameFlag == 0U) {
@@ -126,6 +128,7 @@ static void ModbusMaster_OnFrameEnd(void)
     }
 }
 
+/* 功能：记录主站发送完成时间并切换状态机等待响应。 */
 static void ModbusMaster_OnTxDone(void)
 {
     master_tx_done_tick = GetTick();
@@ -137,6 +140,7 @@ static void ModbusMaster_OnTxDone(void)
     }
 }
 
+/* 功能：在临界区中清空主站接收计数和帧完成标志。 */
 static void ModbusMaster_ResetRx(void)
 {
     uint32_t primask;
@@ -151,7 +155,7 @@ static void ModbusMaster_ResetRx(void)
     }
 }
 
-/* 检查调用参数是否与当前事务完全一致，用于继续查询同一笔事务的状态或结果。 */
+/* 功能：判断调用参数是否与当前主站事务完全一致，以允许继续查询或取结果。 */
 static uint8_t ModbusMaster_RequestMatches(ModbusMasterClient client,
                                            uint8_t slave, uint8_t function,
                                            uint16_t start_reg, uint16_t reg_num,
@@ -176,7 +180,7 @@ static uint8_t ModbusMaster_RequestMatches(ModbusMasterClient client,
     return 1U;
 }
 
-/* 按当前事务参数组装 Modbus RTU 请求帧，并在帧尾附加 CRC16。 */
+/* 功能：按当前事务参数组装02/03/06/10请求帧并附加CRC16。 */
 static void ModbusMaster_BuildFrame(void)
 {
     uint16_t crc;
@@ -220,6 +224,7 @@ static void ModbusMaster_PrepareAttempt(void);
  * Start the deadline when the RTU port is actually started.  This excludes
  * blocking debug output and allows long 0x10 frames to finish at 9600 baud.
  */
+/* 功能：按帧长和波特率计算实际发送允许时间，并附加固定余量。 */
 static uint32_t ModbusMaster_GetSendTimeoutMs(uint16_t frame_len)
 {
     uint32_t wire_time_ms;
@@ -230,6 +235,7 @@ static uint32_t ModbusMaster_GetSendTimeoutMs(uint16_t frame_len)
     return wire_time_ms + MODBUS_MASTER_SEND_MARGIN_MS;
 }
 
+/* 功能：启动一次主站发送，必要时先等待夹爪要求的静默窗口。 */
 static void ModbusMaster_StartAttempt(void)
 {
     uint32_t primask = __get_PRIMASK();
@@ -265,7 +271,7 @@ static void ModbusMaster_StartAttempt(void)
     }
 }
 
-/* 首次发送和重试共用入口：日志先输出，夹爪再等待完整的发送前间隔。 */
+/* 功能：记录本次尝试并按目标设备决定立即发送或先等待静默时间。 */
 static void ModbusMaster_PrepareAttempt(void)
 {
     master_state = MASTER_IDLE;
@@ -287,6 +293,7 @@ static void ModbusMaster_PrepareAttempt(void)
     }
 }
 
+/* 功能：把事务置为最终结果状态并复位接收状态。 */
 static void ModbusMaster_SetResult(uint8_t result)
 {
     master_transaction.result = result;
@@ -309,6 +316,7 @@ static void ModbusMaster_SetResult(uint8_t result)
     ModbusMaster_ResetRx();
 }
 
+/* 功能：判断当前写事务是否指向不返回可靠应答的夹紧电机。 */
 static uint8_t ModbusMaster_IsClampWriteTarget(void)
 {
     if (master_transaction.function != 0x06U &&
@@ -319,6 +327,7 @@ static uint8_t ModbusMaster_IsClampWriteTarget(void)
     return master_transaction.slave == MODBUS_MASTER_NO_REPLY_CLAMP_SLAVE;
 }
 
+/* 功能：判断当前写事务是否属于允许“无应答超时转成功”的设备。 */
 static uint8_t ModbusMaster_IsNoReplyWriteTarget(void)
 {
     if (master_transaction.function != 0x06U &&
@@ -331,6 +340,7 @@ static uint8_t ModbusMaster_IsNoReplyWriteTarget(void)
            master_transaction.start_reg == MODBUS_MASTER_NO_REPLY_HOME_REG;
 }
 
+/* 功能：根据错误类型安排重试，达到上限或不可重试时结束事务。 */
 static void ModbusMaster_RetryOrFinish(uint8_t result)
 {
     /* 后台传感器轮询失败后直接交还总线，其他客户端仍最多尝试三次。 */
@@ -370,7 +380,7 @@ static void ModbusMaster_RetryOrFinish(uint8_t result)
     }
 }
 
-/* 校验当前接收缓冲区中的 Modbus RTU 响应，并解析读取的数据。 */
+/* 功能：校验当前响应帧的CRC、地址、功能码、长度并解析读取数据。 */
 static uint8_t ModbusMaster_ValidateResponse(void)
 {
     uint16_t len = Master_RX_CNT;
@@ -436,7 +446,7 @@ static uint8_t ModbusMaster_ValidateResponse(void)
     return MODBUS_RESULT_OK;
 }
 
-/* 在端口和帧间隔定时器初始化后，注册主站端口回调。 */
+/* 功能：清空主站事务状态并注册底层端口回调。 */
 void ModbusMaster_Init(void)
 {
     memset(&master_transaction, 0, sizeof(master_transaction));
@@ -452,7 +462,7 @@ void ModbusMaster_Init(void)
     LOG_INFO("MODBUS", "master initialized\r\n");
 }
 
-/* 必须在主循环中高频调用，用于推进超时与重试状态机。 */
+/* 功能：在主循环中推进发送、等待响应、校验、超时和重试状态机。 */
 void ModbusMaster_Process(void)
 {
     uint8_t result;
@@ -522,11 +532,13 @@ void ModbusMaster_Process(void)
     }
 }
 
+/* 功能：查询主站当前是否存在未完成事务。 */
 uint8_t ModbusMaster_IsBusy(void)
 {
     return master_transaction.phase != MASTER_TXN_FREE;
 }
 
+/* 功能：取消当前主站事务，释放端口和接收状态。 */
 void ModbusMaster_Cancel(void)
 {
     if (master_transaction.phase != MASTER_TXN_FREE) {
@@ -542,7 +554,7 @@ void ModbusMaster_Cancel(void)
     ModbusMaster_ResetRx();
 }
 
-/* 提交新事务，或读取与当前参数匹配的已完成事务结果。 */
+/* 功能：提交新事务，或接收与当前参数匹配的已完成事务结果。 */
 static uint8_t ModbusMaster_Submit(ModbusMasterClient client,
                                   uint8_t slave, uint8_t function,
                                   uint16_t start_reg, uint16_t reg_num,
@@ -587,6 +599,7 @@ static uint8_t ModbusMaster_Submit(ModbusMasterClient client,
     return MODBUS_RESULT_PENDING;
 }
 
+/* 功能：提交02离散输入读取请求并返回异步事务状态。 */
 uint8_t ModbusMaster_02_ReadDiscreteInputs(ModbusMasterClient client,
                                           uint8_t slave_addr,
                                           uint16_t start_input,
@@ -605,6 +618,7 @@ uint8_t ModbusMaster_02_ReadDiscreteInputs(ModbusMasterClient client,
                               start_input, input_num, NULL, read_buff);
 }
 
+/* 功能：提交03保持寄存器读取请求并返回异步事务状态。 */
 uint8_t ModbusMaster_03_ReadHoldReg(ModbusMasterClient client,
                                    uint8_t slave_addr, uint16_t start_reg,
                                    uint16_t reg_num, uint16_t *read_buff)
@@ -620,6 +634,7 @@ uint8_t ModbusMaster_03_ReadHoldReg(ModbusMasterClient client,
                               start_reg, reg_num, NULL, read_buff);
 }
 
+/* 功能：提交06单寄存器写请求并返回异步事务状态。 */
 uint8_t ModbusMaster_06_WriteSingleReg(ModbusMasterClient client,
                                       uint8_t slave_addr, uint16_t reg_addr,
                                       uint16_t reg_data)
@@ -633,6 +648,7 @@ uint8_t ModbusMaster_06_WriteSingleReg(ModbusMasterClient client,
                               reg_addr, 1U, &reg_data, NULL);
 }
 
+/* 功能：提交10多寄存器写请求并返回异步事务状态。 */
 uint8_t ModbusMaster_10_WriteMultiReg(ModbusMasterClient client,
                                      uint8_t slave_addr, uint16_t start_reg,
                                      uint16_t reg_num,

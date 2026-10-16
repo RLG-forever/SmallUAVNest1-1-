@@ -16,6 +16,7 @@ static uint8_t slave_request_logged;
 static uint8_t slave_address;
 static ModbusSlaveHandlers slave_handlers;
 
+/* 功能：端口检测到3.5字符静默后置位帧完成标志。 */
 static void ModbusSlave_OnFrameEnd(void)
 {
     if (slave_rx_count > 0U) {
@@ -23,7 +24,7 @@ static void ModbusSlave_OnFrameEnd(void)
     }
 }
 
-/* USART 中断只收集字节；帧解析和业务处理全部留在主循环。 */
+/* 功能：在USART中断中收集一个字节并重启帧间隔定时器。 */
 static void ModbusSlave_OnRxByte(uint8_t byte)
 {
     if (slave_frame_ready) {
@@ -38,7 +39,7 @@ static void ModbusSlave_OnRxByte(uint8_t byte)
     ModbusPort_SlaveRestartFrameTimer();
 }
 
-/* 重置中断与主循环共享的接收状态，并保持调用前的中断屏蔽状态。 */
+/* 功能：重置从站接收状态，并保持调用前的中断屏蔽状态。 */
 static void ModbusSlave_ResetFrame(void)
 {
     uint32_t primask = __get_PRIMASK();
@@ -52,6 +53,7 @@ static void ModbusSlave_ResetFrame(void)
     }
 }
 
+/* 功能：校验从站地址，初始化接收状态并注册底层端口回调。 */
 void ModbusSlave_Init(uint8_t address)
 {
     slave_address = (address >= 1U && address <= 247U) ? address : 1U;
@@ -65,6 +67,7 @@ void ModbusSlave_Init(uint8_t address)
              (unsigned int)slave_address);
 }
 
+/* 功能：注册03/06/10功能码的业务处理回调。 */
 void ModbusSlave_RegisterHandlers(const ModbusSlaveHandlers *handlers)
 {
     if (handlers == NULL) {
@@ -74,6 +77,7 @@ void ModbusSlave_RegisterHandlers(const ModbusSlaveHandlers *handlers)
     }
 }
 
+/* 功能：给业务响应附加CRC16，并通过USART2异步发送。 */
 uint8_t ModbusSlave_SendFrame(const uint8_t *payload, uint16_t payload_length)
 {
     uint8_t tx_buffer[MODBUS_RTU_MAX_ADU_LENGTH];
@@ -91,6 +95,7 @@ uint8_t ModbusSlave_SendFrame(const uint8_t *payload, uint16_t payload_length)
     return ModbusPort_SlaveSend(tx_buffer, payload_length + 2U);
 }
 
+/* 功能：构造并发送Modbus异常响应帧。 */
 uint8_t ModbusSlave_SendException(const ModbusSlaveRequest *request,
                                   uint8_t exception_code)
 {
@@ -105,6 +110,7 @@ uint8_t ModbusSlave_SendException(const ModbusSlaveRequest *request,
     return ModbusSlave_SendFrame(response, sizeof(response));
 }
 
+/* 功能：构造06或10功能码的正常写响应，06回显值，10回显寄存器数量。 */
 uint8_t ModbusSlave_SendWriteAck(const ModbusSlaveRequest *request)
 {
     uint8_t response[6];
@@ -125,6 +131,10 @@ uint8_t ModbusSlave_SendWriteAck(const ModbusSlaveRequest *request)
     return ModbusSlave_SendFrame(response, sizeof(response));
 }
 
+/*
+ * 功能：解析03/06/10请求的地址、数量和数据区。
+ * 返回：0表示成功，非0表示应回送的Modbus异常码。
+ */
 static uint8_t ModbusSlave_ParseRequest(ModbusSlaveRequest *request,
                                         uint16_t frame_length)
 {
@@ -168,6 +178,7 @@ static uint8_t ModbusSlave_ParseRequest(ModbusSlaveRequest *request,
     return 0U;
 }
 
+/* 功能：在主循环中校验从站帧、分派业务回调并管理分步响应。 */
 void ModbusSlave_Process(void)
 {
     ModbusSlaveRequest request;

@@ -8,7 +8,7 @@
 #define RELAY_GPIO_PORT GPIOE
 #define RELAY_ALL_PINS (RELAY_FORWARD_PIN | RELAY_BACKWARD_PIN)
 
-/* 继电器方向由本地GPIO直接控制，本驱动不等待Modbus通信。 */
+/* 功能：初始化继电器方向控制引脚，并默认将正反转输出全部关闭。 */
 void Relay_Init(void)
 {
     GPIO_InitTypeDef gpio;
@@ -23,6 +23,7 @@ void Relay_Init(void)
     GPIO_ResetBits(RELAY_GPIO_PORT, RELAY_ALL_PINS);
 }
 
+/* 功能：先关闭两路继电器，再根据目标状态只接通正向或反向一路。 */
 void Relay_Control(RelayState state)
 {
     GPIO_ResetBits(RELAY_GPIO_PORT, RELAY_ALL_PINS);
@@ -33,10 +34,14 @@ void Relay_Control(RelayState state)
     }
 }
 
+/* 功能：控制继电器进入正向输出状态。 */
 void Relay_Forward(void)  { Relay_Control(RELAY_FORWARD); }
+/* 功能：控制继电器进入反向输出状态。 */
 void Relay_Backward(void) { Relay_Control(RELAY_BACKWARD); }
+/* 功能：关闭继电器正反向输出。 */
 void Relay_Stop(void)     { Relay_Control(RELAY_STOP); }
 
+/* 功能：兼容旧接口，正向运行5秒后自动停止。 */
 void RELAY(void)
 {
     Relay_Forward();

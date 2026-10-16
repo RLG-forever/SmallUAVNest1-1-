@@ -19,14 +19,7 @@ static void (*s_TIM_CallBack4)(void);
 /* 系统运行时间（毫秒），用于 GetTick */
 volatile int32_t g_iRunTime = 0;
 
-/*
-*********************************************************************************************************
-*    函数名: bsp_InitSysTick
-*    功能说明: 配置 SysTick 为 1ms 中断，用于软件定时器和系统时间
-*    形    参: 无
-*    返 回 值: 无
-*********************************************************************************************************
-*/
+/* 功能：预留SysTick初始化入口；当前系统时基改由Tick_Init统一配置。 */
 void bsp_InitSysTick(void)
 {
     /* 系统时钟频率 SystemCoreClock，例如 168MHz */
@@ -36,15 +29,7 @@ void bsp_InitSysTick(void)
 //    }
 }
 
-/*
-*********************************************************************************************************
-*    函数名: TIM5_IRQHandler
-*    功能说明: TIM5_IRQHandler 中断服务程序
-*    形    参: 无
-*    返 回 值: 无
-*********************************************************************************************************
-*/
-
+/* 功能：初始化TIM5为1 ms周期中断，供系统运行时间和软件定时器计数。 */
 void TIM5_Init(void)
 {
     TIM_TimeBaseInitTypeDef TIM_TimeBaseStructure;
@@ -77,6 +62,7 @@ void TIM5_Init(void)
     TIM_Cmd(TIM5, ENABLE);
 }
 
+/* 功能：TIM5中断中累加运行时间，并递减所有软件定时器计数。 */
 void TIM5_IRQHandler(void)
 {
     if (TIM_GetITStatus(TIM5, TIM_IT_Update) != RESET)
@@ -101,14 +87,7 @@ void TIM5_IRQHandler(void)
 
 
 
-/*
-*********************************************************************************************************
-*    函数名: bsp_InitHardTimer
-*    功能说明: 初始化硬件定时器（TIM2），配置为1us计数周期，自由运行
-*    形    参: 无
-*    返 回 值: 无
-*********************************************************************************************************
-*/
+/* 功能：把TIM2配置为1 us计数、自由运行的硬件定时器并开启比较中断。 */
 void bsp_InitHardTimer(void)
 {
     TIM_TimeBaseInitTypeDef TIM_TimeBaseStructure;
@@ -179,16 +158,7 @@ void bsp_InitHardTimer(void)
 //   
 ////		TIM_Cmd(TIM4, ENABLE);
 //}
-/*
-*********************************************************************************************************
-*    函数名: bsp_StartHardTimer
-*    功能说明: 启动一个硬件定时器（单次模式）
-*    形    参: _CC         : 比较通道（1~4），通常用1
-*              _uiTimeOut  : 超时时间（微秒），不能超过定时器最大周期
-*              _pCallBack  : 超时回调函数
-*    返 回 值: 无
-*********************************************************************************************************
-*/
+/* 功能：在指定TIM2比较通道上启动一次超时，并登记到期回调函数。 */
 void bsp_StartHardTimer(uint8_t _CC, uint32_t _uiTimeOut, void (*_pCallBack)(void))
 {
     uint32_t cnt_now = TIM_GetCounter(TIM_HARD);
@@ -220,7 +190,7 @@ void bsp_StartHardTimer(uint8_t _CC, uint32_t _uiTimeOut, void (*_pCallBack)(voi
     }
 }
 
-/* 取消单次比较中断，防止已终止的业务流程收到过期定时器回调。 */
+/* 功能：取消单次比较中断，防止已终止流程收到过期定时器回调。 */
 void bsp_StopHardTimer(uint8_t _CC)
 {
     if (_CC == 1U) {
@@ -242,14 +212,7 @@ void bsp_StopHardTimer(uint8_t _CC)
     }
 }
 
-/*
-*********************************************************************************************************
-*    函数名: TIM2_IRQHandler
-*    功能说明: TIM2 中断服务程序（需要在 stm32f4xx_it.c 中调用本函数，或者直接在此实现）
-*    形    参: 无
-*    返 回 值: 无
-*********************************************************************************************************
-*/
+/* 功能：处理TIM2四个比较通道的到期事件并调用对应单次回调。 */
 void TIM2_IRQHandler(void)
 {
     if (TIM_GetITStatus(TIM_HARD, TIM_IT_CC1)) {
@@ -279,6 +242,7 @@ void TIM2_IRQHandler(void)
 *    以下为软件定时器函数（如果需要长延时，推荐使用软件定时器）
 *********************************************************************************************************
 */
+/* 功能：启动一个单次软件定时器，到期后只置位一次标志。 */
 void bsp_StartTimer(uint8_t _id, uint32_t _period)
 {
     if (_id >= TMR_COUNT) return;
@@ -290,6 +254,7 @@ void bsp_StartTimer(uint8_t _id, uint32_t _period)
     __enable_irq();
 }
 
+/* 功能：查询并清除软件定时器到期标志。 */
 uint8_t bsp_CheckTimer(uint8_t _id)
 {
     if (_id >= TMR_COUNT) return 0;
@@ -300,6 +265,7 @@ uint8_t bsp_CheckTimer(uint8_t _id)
     return 0;
 }
 
+/* 功能：停止指定软件定时器并清除剩余时间和到期标志。 */
 void bsp_StopTimer(uint8_t _id)
 {
     if (_id >= TMR_COUNT) return;
@@ -310,6 +276,7 @@ void bsp_StopTimer(uint8_t _id)
     __enable_irq();
 }
 
+/* 功能：启动周期软件定时器，每次到期后自动重装周期。 */
 void bsp_StartAutoTimer(uint8_t _id, uint32_t _period)
 {
     if (_id >= TMR_COUNT) return;

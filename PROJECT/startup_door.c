@@ -40,6 +40,7 @@ typedef struct {
 
 static StartupDoorContext startup_door;
 
+/* 功能：记录上电舱门流程的失败状态、错误码和失败步骤。 */
 static uint8_t StartupDoorSequence_Fail(uint8_t error)
 {
     StartupDoorState failed_state = startup_door.state;
@@ -58,7 +59,7 @@ static uint8_t StartupDoorSequence_Fail(uint8_t error)
 }
 
 /**
- * @brief 非阻塞推进上电舱门初始化流程。
+ * @brief 功能：非阻塞推进上电舱门初始化流程。
  * @note  依次执行舱门回零、关门到位确认和空调开启。调试开关关闭时整段跳过。
  */
 uint8_t StartupDoorSequence_Task(void)

@@ -125,6 +125,7 @@ static void GatewayService_FinishActive(CommandState state,
                                         uint16_t fault_code,
                                         uint8_t step);
 
+/* 功能：清零起飞前遥控开机流程的尝试次数、等待时间和暂停状态。 */
 static void GatewayService_ResetTakeoffPowerFlow(void)
 {
     takeoff_state = GATEWAY_TAKEOFF_STATE_IDLE;
@@ -136,6 +137,7 @@ static void GatewayService_ResetTakeoffPowerFlow(void)
     takeoff_remote_wait_remaining_ms = 0U;
 }
 
+/* 功能：判断当前活动命令是否处于起飞前的遥控开机准备阶段。 */
 static uint8_t GatewayService_IsTakeoffPreparation(void)
 {
     return active_command.active &&
@@ -144,7 +146,7 @@ static uint8_t GatewayService_IsTakeoffPreparation(void)
             takeoff_state == GATEWAY_TAKEOFF_STATE_WAIT_REMOTE);
 }
 
-/* 已发送的事务先取回结果；暂停后保留等待状态及剩余时间。 */
+/* 功能：暂停起飞准备，保留已发事务和等待阶段的剩余时间。 */
 static void GatewayService_PauseTakeoffPreparation(void)
 {
     int32_t remaining;
@@ -167,6 +169,7 @@ static void GatewayService_PauseTakeoffPreparation(void)
              (unsigned long)takeoff_remote_wait_remaining_ms);
 }
 
+/* 功能：清零起飞收尾子状态。 */
 static void GatewayService_ResetTakeoffCleanup(void)
 {
     takeoff_cleanup_state = GATEWAY_TAKEOFF_CLEANUP_IDLE;
@@ -174,6 +177,7 @@ static void GatewayService_ResetTakeoffCleanup(void)
     takeoff_cleanup_pause_requested = 0U;
 }
 
+/* 功能：在静态命令映射表中查找网关寄存器对应的电机控制目标。 */
 static uint8_t GatewayService_FindTarget(uint16_t gateway_register,
                                          GatewayCommandTarget *target)
 {
@@ -193,6 +197,7 @@ static uint8_t GatewayService_FindTarget(uint16_t gateway_register,
     return 0U;
 }
 
+/* 功能：安排延迟关闭遥控器和无人机电源。 */
 void GatewayService_ScheduleRemotePowerOff(uint32_t delay_ms)
 {
     remote_off_deadline = GetTick() + delay_ms;
@@ -201,6 +206,7 @@ void GatewayService_ScheduleRemotePowerOff(uint32_t delay_ms)
              (unsigned long)delay_ms);
 }
 
+/* 功能：取消尚未执行的远程关机计划。 */
 void GatewayService_CancelRemotePowerOff(void)
 {
     if (remote_off_pending || remote_off_command_active) {
@@ -209,6 +215,7 @@ void GatewayService_CancelRemotePowerOff(void)
     remote_off_pending = 0U;
 }
 
+/* 功能：启停网关动作命令的受理权限，状态上报和回零重试不受影响。 */
 void GatewayService_SetControlEnabled(uint8_t enabled)
 {
     uint8_t new_state = enabled ? 1U : 0U;
@@ -221,6 +228,7 @@ void GatewayService_SetControlEnabled(uint8_t enabled)
              control_enabled ? "enabled" : "disabled");
 }
 
+/* 功能：在主循环中推进活动命令、延迟关机和远程关机事务。 */
 void GatewayService_Process(void)
 {
     uint8_t result;
@@ -286,6 +294,7 @@ void GatewayService_Process(void)
     remote_off_pending = 0U;
 }
 
+/* 功能：把业务序列启动结果转换为网关层的异步结果码。 */
 static uint8_t GatewayService_StartSequence(SeqId id)
 {
     SequenceStartResult result = Sequence_Start(id);
@@ -299,6 +308,7 @@ static uint8_t GatewayService_StartSequence(SeqId id)
     return MODBUS_RESULT_PARAM;
 }
 
+/* 功能：启动一轮起飞序列，并记录起飞状态机的当前阶段。 */
 static uint8_t GatewayService_StartTakeoffAttempt(uint16_t register_address)
 {
     SeqId sequence_id = register_address == GATEWAY_CMD_TAKEOFF_NO_CLOSE
@@ -315,6 +325,7 @@ static uint8_t GatewayService_StartTakeoffAttempt(uint16_t register_address)
     return result;
 }
 
+/* 功能：向遥控器从站发送一次开机写请求，并推进尝试次数。 */
 static uint8_t GatewayService_ProcessTakeoffRemoteWrite(void)
 {
     uint8_t result = ModbusMaster_06_WriteSingleReg(
@@ -347,6 +358,7 @@ static uint8_t GatewayService_ProcessTakeoffRemoteWrite(void)
     return MODBUS_RESULT_OK;
 }
 
+/* 功能：根据居中杆和舱门状态判断并启动起飞后的必要收尾动作。 */
 static uint8_t GatewayService_StartTakeoffCleanup(
     uint16_t register_address, uint16_t value,
     uint16_t center_rod_state, uint16_t door_state)
@@ -392,6 +404,7 @@ static uint8_t GatewayService_StartTakeoffCleanup(
     return MODBUS_RESULT_OK;
 }
 
+/* 功能：推进“释放居中杆→开舱门”的起飞收尾状态机。 */
 static void GatewayService_ProcessTakeoffCleanup(void)
 {
     SequenceResult sequence_result;
@@ -463,7 +476,7 @@ static void GatewayService_ProcessTakeoffCleanup(void)
                                 MODBUS_RESULT_PARAM, step);
 }
 
-/* 检测是否是在时间窗口内重复的指令 */
+/* 功能：判断当前写命令是否为短时间窗口内重复的上一条已完成命令。 */
 static uint8_t GatewayService_IsRecentDuplicate(uint16_t register_address,
                                                  uint16_t value)
 {
@@ -473,6 +486,7 @@ static uint8_t GatewayService_IsRecentDuplicate(uint16_t register_address,
                GATEWAY_DUPLICATE_WINDOW_MS;
 }
 
+/* 功能：记录最近成功完成的写命令，用于重复报文过滤。 */
 static void GatewayService_RecordCompletedWrite(uint16_t register_address,
                                                 uint16_t value)
 {
@@ -482,7 +496,7 @@ static void GatewayService_RecordCompletedWrite(uint16_t register_address,
 }
 
 /**
- * @brief 判断收到的写命令是否与当前正在执行的命令完全相同。
+ * @brief 功能：判断收到的写命令是否与当前正在执行的命令完全相同。
  * @param register_address 命令寄存器地址。
  * @param value 命令写入值。
  * @return 相同返回1，否则返回0。
@@ -496,6 +510,7 @@ static uint8_t GatewayService_IsSameActive(uint16_t register_address,
 }
 
 /* 起飞或降落序列执行期间，0x44 只确认收到，不启动另一套机械动作。 */
+/* 功能：忽略起飞/降落动作期间重复的0x44开门确认命令。 */
 static uint8_t GatewayService_AckOpenUpDuringFlightSequence(
     uint16_t register_address)
 {
@@ -508,7 +523,7 @@ static uint8_t GatewayService_AckOpenUpDuringFlightSequence(
 }
 
 /**
- * @brief 判断指定寄存器是否为暂停、恢复或取消控制命令。
+ * @brief 功能：判断指定寄存器是否为暂停、恢复或取消控制命令。
  * @param register_address 命令寄存器地址。
  * @return 控制命令返回1，否则返回0。
  */
@@ -520,7 +535,7 @@ static uint8_t GatewayService_IsControlCommand(uint16_t register_address)
 }
 
 /**
- * @brief 统一更新可供上游主站读取的命令执行状态。
+ * @brief 功能：统一更新可供上游主站读取的命令执行状态。
  * @param register_address 当前或最后执行的命令寄存器地址。
  * @param state 命令执行状态。
  * @param fault_code 故障码，无故障时为0。
@@ -538,7 +553,7 @@ static void GatewayService_SetCommandStatus(uint16_t register_address,
 }
 
 /**
- * @brief 登记一个已被接受、需要后台继续推进的活动命令。
+ * @brief 功能：登记一个已被接受、需要后台继续推进的活动命令。
  * @param register_address 命令寄存器地址。
  * @param value 命令写入值。
  * @param type 活动命令类型。
@@ -560,7 +575,7 @@ static void GatewayService_BeginActive(uint16_t register_address,
 }
 
 /**
- * @brief 结束当前活动命令并保存最终状态及短时间去重信息。
+ * @brief 功能：结束当前活动命令并保存最终状态及短时间去重信息。
  * @param state 最终状态。
  * @param fault_code 最终故障码。
  * @param step 最终步骤或失败步骤。
@@ -596,7 +611,7 @@ static void GatewayService_FinishActive(CommandState state,
     }
 }
 
-/* 取消当前任务后执行完整回原点；空闲时也直接进入同一回原点流程。 */
+/* 功能：取消当前任务后执行完整回原点；空闲时也进入同一回原点流程。 */
 static uint8_t GatewayService_CancelAndHome(uint16_t value)
 {
     uint8_t result;
@@ -637,7 +652,7 @@ static uint8_t GatewayService_CancelAndHome(uint16_t value)
     return MODBUS_RESULT_OK;
 }
 
-/* 执行单个网关寄存器命令，不负责编码从站应答。 */
+/* 功能：执行单个网关寄存器命令，不负责编码从站应答。 */
 static uint8_t GatewayService_ExecuteWrite(uint16_t register_address,
                                            uint16_t value)
 {
@@ -843,7 +858,7 @@ static uint8_t GatewayService_ExecuteWrite(uint16_t register_address,
 }
 
 /**
- * @brief 在主循环中推进已接受的异步写命令或监视动作序列结果。
+ * @brief 功能：在主循环中推进已接受的异步写命令或监视动作序列结果。
  * @note 命令完成后会更新状态寄存器并清除活动命令标志。
  */
 static void GatewayService_ProcessActiveCommand(void)
@@ -1153,7 +1168,7 @@ static void GatewayService_ProcessActiveCommand(void)
 }
 
 /**
- * @brief 处理暂停、恢复和取消命令，这些命令允许在设备忙碌时执行。
+ * @brief 功能：处理暂停、恢复和取消命令，这些命令允许在设备忙碌时执行。
  * @param request 上游主站的06写请求。
  * @return 返回0表示应答已发送，非0表示需要在后续主循环重试。
  */
@@ -1262,7 +1277,7 @@ static uint8_t GatewayService_HandleControlCommand(
 }
 
 /**
- * @brief 尝试接受并启动一个新的06写命令。
+ * @brief 功能：尝试接受并启动一个新的06写命令。
  * @param request 上游主站的06写请求。
  * @return 返回0表示应答已发送，非0表示需要在后续主循环重试。
  * @note 内部返回PENDING时立即正常应答，并由活动命令状态机继续执行。
@@ -1308,7 +1323,7 @@ static uint8_t GatewayService_AcceptNewCommand(
     return ModbusSlave_SendWriteAck(request) != 0U;
 }
 
-/* 状态上报不是动作命令：即使动作序列运行中也必须接收，且不参与命令去重。 */
+/* 功能：接收无人机状态上报，动作序列运行中仍可写入且不参与命令去重。 */
 static uint8_t GatewayService_HandleUavStatusWrite(
     const ModbusSlaveRequest *request)
 {
@@ -1324,6 +1339,7 @@ static uint8_t GatewayService_HandleUavStatusWrite(
     return ModbusSlave_SendWriteAck(request) != 0U;
 }
 
+/* 功能：处理上游03读请求，返回状态寄存器快照或实时值。 */
 static uint8_t GatewayService_Handle03(const ModbusSlaveRequest *request)
 {
     uint16_t start_register = request->start_register;
@@ -1348,6 +1364,7 @@ static uint8_t GatewayService_Handle03(const ModbusSlaveRequest *request)
                                  3U + register_count * 2U) != 0U;
 }
 
+/* 功能：处理上游06单寄存器写请求，完成命令分类、去重和异步受理。 */
 static uint8_t GatewayService_Handle06(const ModbusSlaveRequest *request)
 {
     LOG_INFO("GW_TRACE",
@@ -1404,7 +1421,7 @@ static uint8_t GatewayService_Handle06(const ModbusSlaveRequest *request)
     return GatewayService_AcceptNewCommand(request);
 }
 
-/* 每次主循环只执行 0x10 请求中的一个寄存器，避免阻塞其他任务。 */
+/* 功能：分轮处理上游10多寄存器写请求，每次主循环只执行一个寄存器。 */
 static uint8_t GatewayService_Handle10(const ModbusSlaveRequest *request)
 {
     static uint16_t index;
@@ -1526,6 +1543,7 @@ static uint8_t GatewayService_Handle10(const ModbusSlaveRequest *request)
     return ModbusSlave_SendWriteAck(request) != 0U;
 }
 
+/* 功能：清空网关命令状态并注册03/06/10从站处理回调。 */
 void GatewayService_Init(void)
 {
     const ModbusSlaveHandlers handlers = {

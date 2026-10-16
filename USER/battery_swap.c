@@ -49,6 +49,7 @@ typedef struct {
     uint32_t checksum;
 } MotorPositionStateV1;
 
+/* 功能：计算电机位置状态结构的轻量校验值。 */
 static uint32_t MotorPositionStore_Checksum(
     const MotorPositionState *state)
 {
@@ -65,6 +66,7 @@ static uint32_t MotorPositionStore_Checksum(
     return checksum;
 }
 
+/* 功能：校验版本2位置状态结构的魔数、版本、有效位和校验和。 */
 static uint8_t MotorPositionStore_IsValid(
     const MotorPositionState *state)
 {
@@ -78,6 +80,7 @@ static uint8_t MotorPositionStore_IsValid(
     return 1U;
 }
 
+/* 功能：兼容校验旧版仅保存电机7/8位置的数据结构。 */
 static uint8_t MotorPositionStore_IsLegacyValid(
     const MotorPositionStateV1 *state)
 {
@@ -93,6 +96,7 @@ static uint8_t MotorPositionStore_IsLegacyValid(
             state->version == 1U && state->checksum == checksum) ? 1U : 0U;
 }
 
+/* 功能：计算循环日志记录的校验值，覆盖序号、状态、标志和位置数据。 */
 static uint32_t MotorPositionJournal_Checksum(
     const MotorPositionJournalRecord *record)
 {
@@ -111,6 +115,7 @@ static uint32_t MotorPositionJournal_Checksum(
     return checksum;
 }
 
+/* 功能：校验一条位置日志记录是否完整且已提交。 */
 static uint8_t MotorPositionJournal_IsValid(
     const MotorPositionJournalRecord *record)
 {
@@ -121,12 +126,14 @@ static uint8_t MotorPositionJournal_IsValid(
                ? 1U : 0U;
 }
 
+/* 功能：按32位序号回绕规则判断candidate是否比reference更新。 */
 static uint8_t MotorPositionJournal_IsNewer(uint32_t candidate,
                                             uint32_t reference)
 {
     return ((int32_t)(candidate - reference) > 0) ? 1U : 0U;
 }
 
+/* 功能：返回循环日志中当前记录之后的下一条记录地址。 */
 static uint32_t MotorPositionJournal_NextAddress(uint32_t address)
 {
     address += MOTOR_POSITION_JOURNAL_RECORD_SIZE;
@@ -137,6 +144,7 @@ static uint32_t MotorPositionJournal_NextAddress(uint32_t address)
     return address;
 }
 
+/* 功能：检查一条日志记录地址是否仍保持擦除后的全0xFF状态。 */
 static uint8_t MotorPositionJournal_RecordIsErased(uint32_t address)
 {
     uint8_t bytes[MOTOR_POSITION_JOURNAL_RECORD_SIZE];
@@ -151,6 +159,7 @@ static uint8_t MotorPositionJournal_RecordIsErased(uint32_t address)
     return 1U;
 }
 
+/* 功能：检查一个Flash扇区中的全部日志记录是否均已擦除。 */
 static uint8_t MotorPositionJournal_SectorIsErased(uint32_t sector_addr)
 {
     uint32_t address;
@@ -165,6 +174,7 @@ static uint8_t MotorPositionJournal_SectorIsErased(uint32_t sector_addr)
     return 1U;
 }
 
+/* 功能：从当前写指针开始查找下一条可写的已擦除记录。 */
 static void MotorPositionJournal_FindNextErased(void)
 {
     uint32_t address = motor_position_journal_next_addr;
@@ -182,6 +192,7 @@ static void MotorPositionJournal_FindNextErased(void)
             motor_position_journal_latest_addr);
 }
 
+/* 功能：扫描整个循环日志，加载序号最新且校验有效的电机位置。 */
 static void MotorPositionJournal_Scan(void)
 {
     MotorPositionJournalRecord record;
@@ -222,6 +233,7 @@ static void MotorPositionJournal_Scan(void)
     MotorPositionJournal_FindNextErased();
 }
 
+/* 功能：保证下一日志扇区已擦除，避免电机运动过程中执行长擦除。 */
 uint8_t MotorPositionStore_PrepareJournal(void)
 {
     uint32_t current_sector;
@@ -266,6 +278,7 @@ uint8_t MotorPositionStore_PrepareJournal(void)
     return 1U;
 }
 
+/* 功能：编码并写入一条位置日志，校验成功后推进日志写指针。 */
 static uint8_t MotorPositionStore_Write(void)
 {
     MotorPositionJournalRecord record;
@@ -322,6 +335,7 @@ static uint8_t MotorPositionStore_Write(void)
     return 1U;
 }
 
+/* 功能：启动时加载日志位置，必要时迁移旧格式，日志无效则进入未标定状态。 */
 void MotorPositionStore_Init(void)
 {
     MotorPositionStateV1 legacy_state;
@@ -394,6 +408,7 @@ void MotorPositionStore_Init(void)
     MotorPositionStore_PrepareJournal();
 }
 
+/* 功能：把电机7/8的位置一次性写入位置存储日志。 */
 uint8_t MotorPositionStore_Save(int32_t motor7_position,
                                 int32_t motor8_position)
 {
@@ -407,6 +422,7 @@ uint8_t MotorPositionStore_Save(int32_t motor7_position,
     return MotorPositionStore_UpdateBatch(slave_addrs, positions, 2U);
 }
 
+/* 功能：读取电机7/8的已保存位置；任一位置无效时返回0。 */
 uint8_t MotorPositionStore_Get(int32_t *motor7_position,
                                int32_t *motor8_position)
 {
@@ -430,6 +446,7 @@ uint8_t MotorPositionStore_Get(int32_t *motor7_position,
     return 1U;
 }
 
+/* 功能：导出全部8个电机5~12的位置以及对应有效位掩码。 */
 uint8_t MotorPositionStore_GetAll(
     int32_t positions[MOTOR_POSITION_STORE_COUNT], uint16_t *valid_mask)
 {
@@ -443,6 +460,7 @@ uint8_t MotorPositionStore_GetAll(
     return 1U;
 }
 
+/* 功能：批量合并电机位置到缓存，并只在实际变化时写入Flash日志。 */
 uint8_t MotorPositionStore_UpdateBatch(const uint8_t *slave_addrs,
                                        const int32_t *positions,
                                        uint8_t count)
@@ -495,6 +513,7 @@ uint8_t MotorPositionStore_UpdateBatch(const uint8_t *slave_addrs,
     return 1U;
 }
 
+/* 功能：写入moving标志，标记电机7/8开始运动，用于掉电中断检测。 */
 uint8_t MotorPositionStore_BeginMotion(void)
 {
     if (motor_position_motion_active) {
@@ -509,6 +528,7 @@ uint8_t MotorPositionStore_BeginMotion(void)
     return 1U;
 }
 
+/* 功能：清除moving标志，标记电机7/8运动已正常结束。 */
 uint8_t MotorPositionStore_EndMotion(void)
 {
     if (!motor_position_motion_active) {
@@ -523,12 +543,13 @@ uint8_t MotorPositionStore_EndMotion(void)
     return 1U;
 }
 
+/* 功能：查询上次运行是否在电机7/8运动中异常掉电或复位。 */
 uint8_t MotorPositionStore_WasMotionInterrupted(void)
 {
     return motor_position_motion_active;
 }
 
-/* 初始化：读取Flash，若无效则设为默认值（1号仓空） */
+/* 功能：从Flash读取空仓号；数据越界时恢复为默认空仓1。 */
 void SwapState_Init(void)
 {
 		W25QXX_Read((u8*)&g_swap_state, SWAP_STATE_ADDR, sizeof(g_swap_state));
@@ -546,7 +567,7 @@ void SwapState_Init(void)
     }
 }
 
-/* 保存状态到Flash（自动擦除所在扇区） */
+/* 功能：把当前空仓号保存到Flash状态区。 */
 void SwapState_Save(void)
 {
     LOG_INFO("SWAP", "saving state: flash_addr=0x%lX\r\n",
@@ -556,13 +577,13 @@ void SwapState_Save(void)
              (unsigned int)g_swap_state.empty_bay);
 }
 
-/* 获取当前空仓号 */
+/* 功能：返回当前缓存的空仓编号。 */
 uint8_t SwapState_GetEmptyBay(void)
 {
     return g_swap_state.empty_bay;
 }
 
-/* 设置空仓号并保存 */
+/* 功能：校验空仓编号后更新缓存并立即保存到Flash。 */
 void SwapState_SetEmptyBay(uint8_t bay)
 {
     if (bay < 1 || bay > 3) {
@@ -573,7 +594,7 @@ void SwapState_SetEmptyBay(uint8_t bay)
     SwapState_Save();
 }
 
-/* 执行换电操作（由外部触发） */
+/* 功能：兼容旧接口执行一次顺序换仓，并更新下一个空仓号。 */
 void BatterySwap_Perform(void)
 {
     uint8_t empty_bay = g_swap_state.empty_bay;
@@ -602,8 +623,8 @@ void BatterySwap_Perform(void)
 }
 
 /*
- * 用于落地序列步骤表：从本次锁定的目标仓取出电池且电机2退回原点后，
- * 将目标仓提交为空仓；调试同仓模式下目标仓与原空仓相同。
+ * 功能：把落地序列启动时锁定的目标仓提交为新的空仓并保存。
+ * 返回：MODBUS_RESULT_OK表示提交成功，MODBUS_RESULT_PARAM表示目标仓无效。
  */
 uint8_t UpdateEmptyBay(void)
 {

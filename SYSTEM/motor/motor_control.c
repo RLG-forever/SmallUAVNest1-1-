@@ -149,6 +149,7 @@ static uint8_t motor2_home_completed;
 /* 电机动作结束后单独保留失败从站，供上层生成故障码。 */
 static uint8_t motor_last_failed_slave;
 
+/* 功能：记录单电机直接命令的结果及失败从站地址。 */
 static void MotorControl_RecordDirectResult(uint8_t slave_addr,
                                             uint8_t result)
 {
@@ -220,6 +221,7 @@ static const uint8_t motor_home_level_pairs[MOTOR_HOME_LEVEL_PAIR_COUNT][2] = {
     {MOTOR11_SLAVE_ADDR, MOTOR12_SLAVE_ADDR}
 };
 
+/* 功能：返回电机当前位置寄存器的实际地址。 */
 static uint16_t MotorControl_GetPositionRegister(
     const MotorControlParams *motor)
 {
@@ -232,11 +234,13 @@ static uint16_t MotorControl_GetPositionRegister(
     return MOTOR_CONTROL_POSITION_REG;
 }
 
+/* 功能：按无符号回绕规则判断当前时刻是否到达截止时刻。 */
 static uint8_t MotorControl_IsTimeReached(uint32_t now, uint32_t deadline)
 {
     return (uint8_t)((int32_t)(now - deadline) >= 0);
 }
 
+/* 功能：把高、低16位组合成有符号32位位置值。 */
 static int32_t MotorControl_CombinePosition(uint16_t high_word,
                                             uint16_t low_word)
 {
@@ -246,12 +250,14 @@ static int32_t MotorControl_CombinePosition(uint16_t high_word,
     return (int32_t)raw_position;
 }
 
+/* 功能：从控制参数中还原目标的32位绝对位置。 */
 static int32_t MotorControl_CommandPosition(const MotorControlParams *motor)
 {
     return MotorControl_CombinePosition(motor->value_high_word,
                                         motor->value_low_word);
 }
 
+/* 功能：判断当前位置与目标位置的差值是否在到位容差内。 */
 static uint8_t MotorControl_PositionReached(int32_t current,
                                             int32_t target)
 {
@@ -263,11 +269,13 @@ static uint8_t MotorControl_PositionReached(int32_t current,
     return (uint8_t)(difference <= MOTOR_CONTROL_POSITION_TOLERANCE);
 }
 
+/* 功能：返回64位有符号整数的绝对值。 */
 static int64_t MotorControl_AbsI64(int64_t value)
 {
     return value < 0 ? -value : value;
 }
 
+/* 功能：采样一个电机的位置，并判断连续样本是否稳定落在目标容差内。 */
 static uint8_t MotorControl_PositionSettled(uint8_t index, int32_t position)
 {
     uint8_t sample_index;
@@ -316,6 +324,7 @@ static uint8_t MotorControl_PositionSettled(uint8_t index, int32_t position)
                      MOTOR_CONTROL_STABLE_POSITION_DELTA);
 }
 
+/* 功能：返回与指定电机成对运动的另一台电机地址。 */
 static uint8_t MotorControl_GetPairedSlave(uint8_t slave_addr)
 {
     switch (slave_addr) {
@@ -340,6 +349,7 @@ static uint8_t MotorControl_GetPairedSlave(uint8_t slave_addr)
     }
 }
 
+/* 功能：登记一次成对电机急停请求，供批处理状态机或回零状态机执行。 */
 static uint8_t MotorControl_StartPairedEmergencyStop(uint8_t fault_slave,
                                                       uint8_t error)
 {
@@ -360,6 +370,7 @@ static uint8_t MotorControl_StartPairedEmergencyStop(uint8_t fault_slave,
     return 1U;
 }
 
+/* 功能：向故障电机的配对电机下发急停命令并结束急停请求。 */
 static uint8_t MotorControl_ProcessPairedEmergencyStop(void)
 {
     uint8_t result;
@@ -392,6 +403,7 @@ static uint8_t MotorControl_ProcessPairedEmergencyStop(void)
 }
 
 #if MOTOR_HOME_LEVEL_ENABLE
+/* 功能：判断本次回零批次是否包含指定从站。 */
 static uint8_t MotorControl_HomeBatchContains(uint8_t slave_addr)
 {
     uint8_t index;
@@ -405,6 +417,7 @@ static uint8_t MotorControl_HomeBatchContains(uint8_t slave_addr)
 }
 #endif
 
+/* 功能：读取驱动器当前位置，并结合Flash基准恢复业务绝对位置。 */
 static uint8_t MotorControl_HomeReadPosition(uint8_t slave_addr,
                                              int32_t *position)
 {
@@ -462,6 +475,7 @@ static uint8_t MotorControl_HomeReadPosition(uint8_t slave_addr,
     return result;
 }
 
+/* 功能：判断预回零两次采样位置差是否小于稳定阈值。 */
 static uint8_t MotorControl_PreHomePositionStable(int32_t current,
                                                   int32_t previous)
 {
@@ -473,6 +487,7 @@ static uint8_t MotorControl_PreHomePositionStable(int32_t current,
     return (uint8_t)(difference <= MOTOR_PREHOME_STABLE_TOLERANCE);
 }
 
+/* 功能：读取电机7/8驱动器的原始当前位置。 */
 static uint8_t MotorControl_PreHomeReadPosition(uint8_t slave_addr,
                                                 int32_t *position)
 {
@@ -493,6 +508,7 @@ static uint8_t MotorControl_PreHomeReadPosition(uint8_t slave_addr,
     return result;
 }
 
+/* 功能：向电机7或8下发送进式相对位移命令。 */
 static uint8_t MotorControl_PreHomeWriteRelative(uint8_t index)
 {
     uint16_t commands[2];
@@ -511,6 +527,7 @@ static uint8_t MotorControl_PreHomeWriteRelative(uint8_t index)
         commands);
 }
 
+/* 功能：记录预回零失败从站和错误码，并把状态机置为失败。 */
 static void MotorControl_PreHomeFail(uint8_t slave_addr, uint8_t error)
 {
     motor_prehome.failed_slave = slave_addr;
@@ -521,6 +538,7 @@ static void MotorControl_PreHomeFail(uint8_t slave_addr, uint8_t error)
               (unsigned int)slave_addr, (unsigned int)error);
 }
 
+/* 功能：预回零稳定后更新Flash位置并允许后续正式回零。 */
 static void MotorControl_PreHomeSetReady(void)
 {
     const uint8_t slave_addrs[2] = {
@@ -562,6 +580,7 @@ static void MotorControl_PreHomeSetReady(void)
     LOG_INFO("PREHOME", "ready for normal homing\r\n");
 }
 
+/* 功能：初始化预回零稳定检测的采样、超时和周期快照时间。 */
 static void MotorControl_PreHomeBeginStableCheck(void)
 {
     uint32_t now = GetTick();
@@ -576,6 +595,7 @@ static void MotorControl_PreHomeBeginStableCheck(void)
     motor_prehome.state = MOTOR_PREHOME_STATE_WAIT_POLL;
 }
 
+/* 功能：按1秒周期保存预回零过程中的电机7/8位置检查点。 */
 static void MotorControl_PreHomeSaveCheckpoint(void)
 {
     const uint8_t slave_addrs[2] = {
@@ -620,6 +640,7 @@ static void MotorControl_PreHomeSaveCheckpoint(void)
         GetTick() + MOTOR_POSITION_CHECKPOINT_INTERVAL_MS;
 }
 
+/* 功能：推进电机7/8预回零前的报警检查顺序。 */
 static void MotorControl_PreHomeAdvanceAlarmCheck(void)
 {
     if (motor_prehome.alarm_index == 0U) {
@@ -632,6 +653,7 @@ static void MotorControl_PreHomeAdvanceAlarmCheck(void)
     }
 }
 
+/* 功能：查询电机7/8预回零状态机是否仍在执行。 */
 uint8_t MotorControl_PreHomeIsBusy(void)
 {
     return (uint8_t)(
@@ -640,26 +662,31 @@ uint8_t MotorControl_PreHomeIsBusy(void)
         motor_prehome.state != MOTOR_PREHOME_STATE_FAILED);
 }
 
+/* 功能：返回电机7/8预回零的当前状态。 */
 MotorPreHomeState MotorControl_PreHomeGetState(void)
 {
     return motor_prehome.state;
 }
 
+/* 功能：返回预回零当前操作的从站地址。 */
 uint8_t MotorControl_PreHomeGetCurrentSlave(void)
 {
     return motor_prehome.current_slave;
 }
 
+/* 功能：返回预回零失败的从站地址。 */
 uint8_t MotorControl_PreHomeGetFailedSlave(void)
 {
     return motor_prehome.failed_slave;
 }
 
+/* 功能：返回预回零最后的错误码。 */
 uint8_t MotorControl_PreHomeGetLastError(void)
 {
     return motor_prehome.last_error;
 }
 
+/* 功能：校验资源空闲后初始化电机7/8预回零上下文。 */
 static uint8_t MotorControl_PreHomeStartInternal(
     uint8_t saved_position_valid,
     int32_t motor7_saved_position,
@@ -690,6 +717,7 @@ static uint8_t MotorControl_PreHomeStartInternal(
     return MODBUS_RESULT_OK;
 }
 
+/* 功能：启动电机7/8预回零并执行预移动前的报警检查。 */
 uint8_t MotorControl_PreHomeStart(uint8_t saved_position_valid,
                                   int32_t motor7_saved_position,
                                   int32_t motor8_saved_position)
@@ -701,6 +729,7 @@ uint8_t MotorControl_PreHomeStart(uint8_t saved_position_valid,
         1U);
 }
 
+/* 功能：分阶段推进电机7/8报警处理、初值读取、相对预移动和稳定确认。 */
 void MotorControl_PreHomeProcess(void)
 {
     uint8_t result;
@@ -1082,6 +1111,7 @@ void MotorControl_PreHomeProcess(void)
     }
 }
 
+/* 功能：判断本次调用参数是否与当前电机批处理完全一致。 */
 static uint8_t MotorControl_RequestMatches(const MotorControlParams *motors,
                                            uint8_t count,
                                            uint8_t check_position)
@@ -1108,6 +1138,7 @@ static uint8_t MotorControl_RequestMatches(const MotorControlParams *motors,
     return 1U;
 }
 
+/* 功能：结束电机批处理，保存到位位置、清除运动标志并输出结果。 */
 static uint8_t MotorControl_FinishBatch(uint8_t result, uint8_t *results,
                                         int32_t *positions)
 {
@@ -1169,6 +1200,7 @@ static uint8_t MotorControl_FinishBatch(uint8_t result, uint8_t *results,
     return result;
 }
 
+/* 功能：读取当前批处理电机的当前位置并还原为32位有符号值。 */
 static uint8_t MotorControl_ReadCurrentPosition(int32_t *position)
 {
     uint8_t result;
@@ -1196,11 +1228,7 @@ static uint8_t MotorControl_ReadCurrentPosition(int32_t *position)
     return result;
 }
 
-/*
- * 普通绝对位置批次中，7/8轴每秒各读一次并追加一条
- * Flash快照。仅在主站无未完成事务时启动快照读取，避免抢占
- * 批处理状态机正在等待的Modbus事务。
- */
+/* 功能：运动期间按1秒周期读取并保存电机7/8的位置检查点。 */
 static uint8_t MotorControl_BatchCheckpointProcess(void)
 {
     const uint8_t slave_addrs[2] = {
@@ -1288,7 +1316,7 @@ static uint8_t MotorControl_BatchCheckpointProcess(void)
     return 1U;
 }
 
-/* 堵转状态由电机服务模块统一持有，避免头文件静态变量产生多个副本。 */
+/* 功能：查询多电机回零状态机是否正在执行。 */
 uint8_t MotorControl_HomeIsBusy(void)
 {
     return (motor_home.state != MOTOR_HOME_STATE_IDLE &&
@@ -1296,6 +1324,7 @@ uint8_t MotorControl_HomeIsBusy(void)
             motor_home.state != MOTOR_HOME_STATE_FAILED) ? 1U : 0U;
 }
 
+/* 功能：记录回零失败从站和错误码，并清除电机2完成门禁。 */
 static void MotorControl_HomeFail(uint8_t slave_addr, uint8_t error)
 {
     if (slave_addr == MOTOR2_SLAVE_ADDR) {
@@ -1311,6 +1340,7 @@ static void MotorControl_HomeFail(uint8_t slave_addr, uint8_t error)
               (unsigned int)motor_home.last_status_word);
 }
 
+/* 功能：回零前置检查通过后开始逐个下发回零速度命令。 */
 static void MotorControl_HomeBeginCommandPhase(void)
 {
     motor_home.command_index = 0U;
@@ -1319,6 +1349,7 @@ static void MotorControl_HomeBeginCommandPhase(void)
     LOG_INFO("MOTOR", "homing precheck completed\r\n");
 }
 
+/* 功能：选择下一组可调平电机；调平关闭时直接进入回零命令阶段。 */
 static void MotorControl_HomeSelectNextPair(void)
 {
 #if MOTOR_HOME_LEVEL_ENABLE
@@ -1347,6 +1378,7 @@ static void MotorControl_HomeSelectNextPair(void)
 #endif
 }
 
+/* 功能：保存当前水平调平电机对的两个位置。 */
 static uint8_t MotorControl_HomeSaveCurrentPair(void)
 {
     uint8_t slave_addrs[2];
@@ -1359,6 +1391,7 @@ static uint8_t MotorControl_HomeSaveCurrentPair(void)
     return MotorPositionStore_UpdateBatch(slave_addrs, positions, 2U);
 }
 
+/* 功能：推进回零前报警检查；全部检查完成后再进入水平调整。 */
 static void MotorControl_HomeAdvancePrecheck(void)
 {
     motor_home.precheck_index++;
@@ -1373,11 +1406,13 @@ static void MotorControl_HomeAdvancePrecheck(void)
     MotorControl_HomeSelectNextPair();
 }
 
+/* 功能：生成当前回零批次的全部电机完成位掩码。 */
 static uint16_t MotorControl_HomeAllMask(void)
 {
     return (uint16_t)((1UL << motor_home.motor_count) - 1UL);
 }
 
+/* 功能：定位回零批次中第一台尚未完成回零的电机。 */
 static void MotorControl_HomeSelectFirstIncomplete(void)
 {
     motor_home.status_index = 0U;
@@ -1388,6 +1423,7 @@ static void MotorControl_HomeSelectFirstIncomplete(void)
     }
 }
 
+/* 功能：校验回零资源、速度和顺序，并在软件门禁下初始化回零批次。 */
 static uint8_t MotorControl_HomeStartInternal(const uint8_t *addresses,
                                               uint8_t count,
                                               uint16_t speed_command,
@@ -1462,6 +1498,7 @@ static uint8_t MotorControl_HomeStartInternal(const uint8_t *addresses,
     return MODBUS_RESULT_OK;
 }
 
+/* 功能：按默认电机顺序启动完整多电机回零流程。 */
 uint8_t MotorControl_HomeStart(uint16_t speed_command)
 {
     return MotorControl_HomeStartInternal(
@@ -1474,6 +1511,7 @@ uint8_t MotorControl_HomeStart(uint16_t speed_command)
                   sizeof(motor_home_addresses[0])));
 }
 
+/* 功能：启动开机第一阶段回零，仅包含预回零前的固定电机组。 */
 static uint8_t MotorControl_HomeStartBeforePreHome(uint16_t speed_command)
 {
     return MotorControl_HomeStartInternal(
@@ -1483,6 +1521,7 @@ static uint8_t MotorControl_HomeStartBeforePreHome(uint16_t speed_command)
         speed_command, NULL, 0U);
 }
 
+/* 功能：启动预回零完成后的电机1/2正式回零。 */
 static uint8_t MotorControl_HomeStartAfterPreHome(uint16_t speed_command)
 {
     return MotorControl_HomeStartInternal(
@@ -1492,6 +1531,7 @@ static uint8_t MotorControl_HomeStartAfterPreHome(uint16_t speed_command)
         speed_command, NULL, 0U);
 }
 
+/* 功能：启动电机7/8的最终回零阶段。 */
 static uint8_t MotorControl_HomeStartMotor78(uint16_t speed_command)
 {
     return MotorControl_HomeStartInternal(
@@ -1501,6 +1541,7 @@ static uint8_t MotorControl_HomeStartMotor78(uint16_t speed_command)
         speed_command, NULL, 0U);
 }
 
+/* 功能：校验从站地址合法后，启动单台电机回零。 */
 uint8_t MotorControl_HomeStartSingle(uint8_t slave_addr,
                                      uint16_t speed_command)
 {
@@ -1519,6 +1560,7 @@ uint8_t MotorControl_HomeStartSingle(uint8_t slave_addr,
     return MODBUS_RESULT_PARAM;
 }
 
+/* 功能：推进报警处理、可选水平调整、命令下发、状态轮询和电机1/2门禁。 */
 void MotorControl_HomeProcess(void)
 {
     uint8_t result;
@@ -2035,36 +2077,43 @@ void MotorControl_HomeProcess(void)
     }
 }
 
+/* 功能：返回多电机回零状态。 */
 MotorHomeState MotorControl_HomeGetState(void)
 {
     return motor_home.state;
 }
 
+/* 功能：返回回零当前操作的从站地址。 */
 uint8_t MotorControl_HomeGetCurrentSlave(void)
 {
     return motor_home.current_slave;
 }
 
+/* 功能：返回回零失败的从站地址。 */
 uint8_t MotorControl_HomeGetFailedSlave(void)
 {
     return motor_home.failed_slave;
 }
 
+/* 功能：返回回零最后的错误码。 */
 uint8_t MotorControl_HomeGetLastError(void)
 {
     return motor_home.last_error;
 }
 
+/* 功能：返回最近一次读取的回零状态字。 */
 uint16_t MotorControl_HomeGetStatusWord(void)
 {
     return motor_home.last_status_word;
 }
 
+/* 功能：返回当前回零批次已经完成的电机位掩码。 */
 uint16_t MotorControl_HomeGetCompletedMask(void)
 {
     return motor_home.completed_mask;
 }
 
+/* 功能：记录完整回零失败的从站和错误码。 */
 static void MotorControl_FullHomeFail(uint8_t slave_addr, uint8_t error)
 {
     motor_full_home.failed_slave = slave_addr;
@@ -2075,6 +2124,7 @@ static void MotorControl_FullHomeFail(uint8_t slave_addr, uint8_t error)
               (unsigned int)slave_addr, (unsigned int)error);
 }
 
+/* 功能：推进完整回零开始前的逐台电机报警检查。 */
 static void MotorControl_FullHomeAdvanceAlarmCheck(void)
 {
     motor_full_home.alarm_index++;
@@ -2092,6 +2142,7 @@ static void MotorControl_FullHomeAdvanceAlarmCheck(void)
     LOG_INFO("MOTOR", "all motor alarms cleared before full homing\r\n");
 }
 
+/* 功能：查询上电完整回零流程是否正在执行。 */
 uint8_t MotorControl_FullHomeIsBusy(void)
 {
     return (uint8_t)(
@@ -2107,31 +2158,37 @@ uint8_t MotorControl_FullHomeIsBusy(void)
         motor_full_home.state == MOTOR_FULL_HOME_STATE_FINAL_HOMING);
 }
 
+/* 功能：返回完整回零状态机的当前状态。 */
 MotorFullHomeState MotorControl_FullHomeGetState(void)
 {
     return motor_full_home.state;
 }
 
+/* 功能：返回本次完整回零请求使用的阶段类型。 */
 MotorFullHomeStage MotorControl_FullHomeGetStage(void)
 {
     return motor_full_home.requested_stage;
 }
 
+/* 功能：返回完整回零当前操作的从站地址。 */
 uint8_t MotorControl_FullHomeGetCurrentSlave(void)
 {
     return motor_full_home.current_slave;
 }
 
+/* 功能：返回完整回零失败的从站地址。 */
 uint8_t MotorControl_FullHomeGetFailedSlave(void)
 {
     return motor_full_home.failed_slave;
 }
 
+/* 功能：返回完整回零最后的错误码。 */
 uint8_t MotorControl_FullHomeGetLastError(void)
 {
     return motor_full_home.last_error;
 }
 
+/* 功能：启动包含报警清除、预回零和分阶段回零的完整流程。 */
 uint8_t MotorControl_FullHomeStart(uint8_t saved_position_valid,
                                    int32_t motor7_saved_position,
                                    int32_t motor8_saved_position,
@@ -2145,6 +2202,7 @@ uint8_t MotorControl_FullHomeStart(uint8_t saved_position_valid,
         speed_command);
 }
 
+/* 功能：按调试阶段或完整阶段初始化上电回零状态机。 */
 uint8_t MotorControl_FullHomeStageStart(MotorFullHomeStage stage,
                                         uint8_t saved_position_valid,
                                         int32_t motor7_saved_position,
@@ -2231,6 +2289,7 @@ uint8_t MotorControl_FullHomeStageStart(MotorFullHomeStage stage,
     return MODBUS_RESULT_OK;
 }
 
+/* 功能：读取指定电机回零状态字的完成位。 */
 static uint8_t MotorControl_FullHomeReadHomeStatus(uint8_t slave_addr,
                                                    uint8_t *homed)
 {
@@ -2250,6 +2309,7 @@ static uint8_t MotorControl_FullHomeReadHomeStatus(uint8_t slave_addr,
     return result;
 }
 
+/* 功能：推进报警清除、预回零、初始回零、电机2/1回零及最终7/8回零。 */
 void MotorControl_FullHomeProcess(void)
 {
     uint8_t result;
@@ -2628,6 +2688,7 @@ void MotorControl_FullHomeProcess(void)
     }
 }
 
+/* 功能：向指定从站的一个电机控制寄存器写入单条命令。 */
 uint8_t Motor_Single_Control(uint8_t slave_addr, uint8_t motor_num, uint16_t motor_cmd)
 {
     uint8_t result;
@@ -2658,6 +2719,7 @@ uint8_t Motor_Single_Control(uint8_t slave_addr, uint8_t motor_num, uint16_t mot
     return result;
 }
 
+/* 功能：按电机逻辑编号转换成从站和寄存器，再执行单寄存器写。 */
 uint8_t Motor_Control(uint8_t motor_id, uint8_t reg_num, uint16_t motor_cmd)
 {
     uint8_t slave_addr;
@@ -2734,6 +2796,7 @@ uint8_t Motor_Control(uint8_t motor_id, uint8_t reg_num, uint16_t motor_cmd)
     return result;
 }
 
+/* 功能：向同一从站连续写入多个控制寄存器命令。 */
 uint8_t Motor_Batch_Control(uint8_t slave_addr, uint16_t start_reg,
                             uint16_t reg_num, const uint16_t *motor_cmds)
 {
@@ -2755,6 +2818,7 @@ uint8_t Motor_Batch_Control(uint8_t slave_addr, uint16_t start_reg,
     return result;
 }
 
+/* 功能：查询普通电机批处理是否正在执行。 */
 uint8_t MotorControl_IsBusy(void)
 {
     return (uint8_t)(ModbusMaster_IsBusy() || motor_batch.active ||
@@ -2763,16 +2827,19 @@ uint8_t MotorControl_IsBusy(void)
                      MotorControl_FullHomeIsBusy());
 }
 
+/* 功能：返回最近一次电机动作失败的从站地址。 */
 uint8_t MotorControl_GetLastFailedSlave(void)
 {
     return motor_last_failed_slave;
 }
 
+/* 功能：清除上一次电机动作的失败从站记录。 */
 void MotorControl_ClearLastFailedSlave(void)
 {
     motor_last_failed_slave = 0U;
 }
 
+/* 功能：取消普通电机批处理和当前主站事务。 */
 void MotorControl_Cancel(void)
 {
     if (MotorControl_HomeIsBusy()) {
@@ -2786,6 +2853,7 @@ void MotorControl_Cancel(void)
     memset(&motor_full_home, 0, sizeof(motor_full_home));
 }
 
+/* 功能：把抬升上/下等逻辑目标转换为电机绝对位置命令。 */
 uint8_t MotorControl_WriteTarget(MotorControlTarget target, uint16_t value)
 {
     uint8_t result;
@@ -2809,6 +2877,7 @@ uint8_t MotorControl_WriteTarget(MotorControlTarget target, uint16_t value)
     return result;
 }
 
+/* 功能：分阶段执行批量控制写入、可选位置确认、报警扫描和成对急停。 */
 static uint8_t MotorControl_BatchMoveInternal(
     const MotorControlParams *motors, uint8_t count, uint8_t *results,
     uint8_t check_position, int32_t *positions)
@@ -3179,12 +3248,14 @@ static uint8_t MotorControl_BatchMoveInternal(
     }
 }
 
+/* 功能：启动带位置校验的电机批量控制，并在全部到位后返回成功。 */
 uint8_t MotorControl_BatchMove(const MotorControlParams *motors, uint8_t count,
                                uint8_t *results)
 {
     return MotorControl_BatchMoveInternal(motors, count, results, 1U, NULL);
 }
 
+/* 功能：执行带位置校验的批量控制，并输出每台电机的到位位置。 */
 uint8_t MotorControl_BatchMoveCapture(const MotorControlParams *motors,
                                       uint8_t count, uint8_t *results,
                                       int32_t *positions)
@@ -3196,6 +3267,7 @@ uint8_t MotorControl_BatchMoveCapture(const MotorControlParams *motors,
                                           positions);
 }
 
+/* 功能：把有符号绝对位置转换为控制字后启动内部批处理。 */
 static uint8_t MotorControl_MoveToAbsPosInternal(
     const MotorMoveAbsPosParams *motors, uint8_t count, uint8_t *results,
     int32_t *positions)
@@ -3223,12 +3295,14 @@ static uint8_t MotorControl_MoveToAbsPosInternal(
                                           positions);
 }
 
+/* 功能：批量移动到有符号绝对位置，并校验全部电机到位。 */
 uint8_t MotorControl_MoveToAbsPos(const MotorMoveAbsPosParams *motors,
                                  uint8_t count, uint8_t *results)
 {
     return MotorControl_MoveToAbsPosInternal(motors, count, results, NULL);
 }
 
+/* 功能：批量移动到绝对位置，并返回每台电机最终到位位置。 */
 uint8_t MotorControl_MoveToAbsPosCapture(const MotorMoveAbsPosParams *motors,
                                         uint8_t count, uint8_t *results,
                                         int32_t *positions)
@@ -3240,17 +3314,20 @@ uint8_t MotorControl_MoveToAbsPosCapture(const MotorMoveAbsPosParams *motors,
                                              positions);
 }
 
+/* 功能：批量下发绝对位置但不读取当前位置，写应答成功即返回。 */
 uint8_t MotorControl_BatchMoveNoPositionCheck(
     const MotorControlParams *motors, uint8_t count, uint8_t *results)
 {
     return MotorControl_BatchMoveInternal(motors, count, results, 0U, NULL);
 }
 
+/* 功能：兼容旧接口查询电机批处理状态。 */
 uint8_t ModbusBatch_IsBusy(void)
 {
     return motor_batch.active;
 }
 
+/* 功能：兼容旧接口取消电机批处理。 */
 void ModbusBatch_Cancel(void)
 {
     memset(&motor_batch, 0, sizeof(motor_batch));

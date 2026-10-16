@@ -75,6 +75,7 @@ static const MotorMoveAbsPosParams leave_center_motors[] = {
     EXEC_ABS_POS(MOTOR11_SLAVE_ADDR, MOTOR_HOME_POS)
 };
 
+/* 功能：向一台电机下发有符号绝对位置，并返回异步批处理状态。 */
 static uint8_t MoveOneToAbsPos(uint8_t slave_addr, int32_t position)
 {
     const MotorMoveAbsPosParams motor =
@@ -83,7 +84,7 @@ static uint8_t MoveOneToAbsPos(uint8_t slave_addr, int32_t position)
     return MotorControl_MoveToAbsPos(&motor, 1U, NULL);
 }
 
-/* 第二轮开机尝试时整体前移，近端和远端仍保持原有相对距离。 */
+/* 功能：计算电机2本轮开机尝试的靠近位置；重试时整体前移固定偏移。 */
 static int32_t GetTakeoffMotor2NearPosition(void)
 {
     int32_t position = MOTOR2_FLY_NEAR_POS;
@@ -94,12 +95,14 @@ static int32_t GetTakeoffMotor2NearPosition(void)
     return position;
 }
 
+/* 功能：把电机2移动到本轮开机尝试的靠近位置。 */
 static uint8_t MoveTakeoffMotor2Near(void)
 {
     return MoveOneToAbsPos(MOTOR2_SLAVE_ADDR,
                            GetTakeoffMotor2NearPosition());
 }
 
+/* 功能：把电机2移动到本轮开机尝试的远端位置。 */
 static uint8_t MoveTakeoffMotor2Far(void)
 {
     return MoveOneToAbsPos(
@@ -107,12 +110,14 @@ static uint8_t MoveTakeoffMotor2Far(void)
         GetTakeoffMotor2NearPosition() + MOTOR2_FLY_FAR_RELA_POS);
 }
 
+/* 功能：批量下发一组电机的绝对位置。 */
 static uint8_t MoveArrayToAbsPos(const MotorMoveAbsPosParams *motors,
                                  uint8_t count)
 {
     return MotorControl_MoveToAbsPos(motors, count, NULL);
 }
 
+/* 功能：飞机平台转移到指定位置，并保存电机7/8本次到位位置。 */
 static uint8_t MovePlaneTransferIn(void)
 {
     int32_t positions[EXEC_ARRAY_COUNT(plane_transfer_in_motors)];
@@ -167,6 +172,7 @@ static const int32_t battery_get_bay_positions[3] = {
 static const uint8_t battery_bay_current = BATTERY_BAY_CURRENT;
 static const uint8_t battery_bay_target = BATTERY_BAY_TARGET;
 
+/* 功能：根据当前仓和偏移选择电机1的电池仓标定高度。 */
 static uint8_t MoveMotor1ToSelectedBay(const void *context)
 {
     const uint8_t *bay_offset = (const uint8_t *)context;
@@ -183,6 +189,7 @@ static uint8_t MoveMotor1ToSelectedBay(const void *context)
                            battery_bay_positions[position_index]);
 }
 
+/* 功能：根据当前仓或锁定目标仓选择电机1的取电池高度。 */
 static uint8_t MoveMotor1GetBayPos(const void *context)
 {
     const uint8_t *bay_offset = (const uint8_t *)context;
@@ -204,7 +211,7 @@ static uint8_t MoveMotor1GetBayPos(const void *context)
                            battery_get_bay_positions[position_index]);
 }
 
-/* 装飞机电池：按流程锁定的新电池来源仓选择电机1的高度。 */
+/* 功能：按流程锁定的新电池来源仓选择电机1的装电池高度。 */
 static uint8_t MoveMotor1ToLoadBatteryPos(void)
 {
     const uint8_t bay = Sequence_GetTargetEmptyBay();
@@ -217,7 +224,7 @@ static uint8_t MoveMotor1ToLoadBatteryPos(void)
                            motor1_load_battery_positions[bay - 1U]);
 }
 
-/* 把电池装入电池仓：按仓号选择电机2的标定位置。 */
+/* 功能：按当前仓号选择电机2的工作标定位置。 */
 static uint8_t MoveMotor2ToBayWorkPos(const void *context)
 {
     const uint8_t *bay_offset = (const uint8_t *)context;
@@ -234,7 +241,7 @@ static uint8_t MoveMotor2ToBayWorkPos(const void *context)
                            motor2_bay_work_positions[bay - 1U]);
 }
 
-/* 把电池推入电池仓：按当前仓号选择电机2的标定位置。 */
+/* 功能：按当前仓号选择电机2的推进标定位置。 */
 static uint8_t MoveMotor2ToBayReleasePos(const void *context)
 {
     const uint8_t *bay_offset = (const uint8_t *)context;
@@ -267,23 +274,26 @@ static struct {
 } landing_bay_push;
 static uint8_t landing_bay_push_current_fault;
 
+/* 功能：清除降落电池推进检测的临时状态和本次故障标志。 */
 void LandingBayPush_Reset(void)
 {
     memset(&landing_bay_push, 0, sizeof(landing_bay_push));
     landing_bay_push_current_fault = 0U;
 }
 
+/* 功能：查询本次降落流程是否已经记录电池推进电流异常。 */
 uint8_t LandingBayPush_HasCurrentFault(void)
 {
     return landing_bay_push_current_fault;
 }
 
+/* 功能：仅清零推进检测的内部过程状态，保留最终故障标志。 */
 static void LandingBayPush_ResetAction(void)
 {
     memset(&landing_bay_push, 0, sizeof(landing_bay_push));
 }
 
-/* 在同一步骤中非阻塞地完成电流读取、推进及重推。 */
+/* 功能：在同一非阻塞步骤中完成推进前电流读取、推进、复测和最多两次重推。 */
 static uint8_t BatteryPushCheckAndRetry(void)
 {
     uint8_t result;
@@ -405,56 +415,62 @@ static uint8_t BatteryPushCheckAndRetry(void)
     }
 }
 
-// 电机1移动到回收流程标定位置
+/* 功能：把电机1移动到回收流程的抬升标定位置。 */
 uint8_t Motor1Up1(void)
 {
     return MoveOneToAbsPos(MOTOR1_SLAVE_ADDR, MOTOR1_RECOVERY_POS);
 }
-// 电机2移动到回收流程前进标定位置
+/* 功能：把电机2移动到回收流程的前进标定位置。 */
 uint8_t Motor2Forward(void)
 {
     return MoveOneToAbsPos(MOTOR2_SLAVE_ADDR, MOTOR2_RECOVERY_FORWARD_POS);
 }
 
+/* 功能：控制夹紧电机执行夹紧动作。 */
 uint8_t Motor3Clamp(void)
 {
     return Motor_Control(MOTOR_CLAMP_ID, 2U, MOTOR_CLAMP_CMD_CLAMP);
 }
 
-//电机2回零
+/* 功能：把电机2移回软件定义的机械原点位置。 */
 uint8_t Motor2Back(void)
 {
     return MoveOneToAbsPos(MOTOR2_SLAVE_ADDR, MOTOR_HOME_POS);
 }
 
-//电机1回到原点位置0
+/* 功能：把电机1移回软件定义的机械原点位置。 */
 uint8_t Motor1Down1(void)
 {
     return MoveOneToAbsPos(MOTOR1_SLAVE_ADDR, MOTOR_HOME_POS);
 }
 
+/* 功能：控制夹紧电机执行松开动作。 */
 uint8_t Motor3Lossen(void)
 {
     return Motor_Control(MOTOR_CLAMP_ID, 1U, MOTOR_CLAMP_CMD_RELEASE);
 }
 
+/* 功能：把电机1移动到电池转移抬升位置。 */
 uint8_t Motor1Up3(void)
 {
     return MoveOneToAbsPos(MOTOR1_SLAVE_ADDR, MOTOR1_TRANSFER_LIFT_POS);
 }
 
+/* 功能：把飞机平台沿前移方向移动到标定位置。 */
 uint8_t FlyForward(void)
 {
     return MoveArrayToAbsPos(fly_forward_motors,
                              EXEC_ARRAY_COUNT(fly_forward_motors));
 }
 
+/* 功能：把飞机平台移回基准位置。 */
 uint8_t FlyBack(void)
 {
     return MoveArrayToAbsPos(fly_back_motors,
                              EXEC_ARRAY_COUNT(fly_back_motors));
 }
 
+/* 功能：启动继电器正向动作，3秒后自动停止。 */
 uint8_t RelayCtrl(void)
 {
 		static uint8_t active = 0U;
@@ -474,24 +490,28 @@ uint8_t RelayCtrl(void)
 		return MODBUS_RESULT_OK;
 }
 
+/* 功能：驱动左右居中机构进入第1组标定位置。 */
 uint8_t Center_1(void)
 {
     return MoveArrayToAbsPos(center_1_motors,
                              EXEC_ARRAY_COUNT(center_1_motors));
 }
 
+/* 功能：驱动前后居中机构进入第2组标定位置。 */
 uint8_t Center_2(void)
 {
     return MoveArrayToAbsPos(center_2_motors,
                              EXEC_ARRAY_COUNT(center_2_motors));
 }
 
+/* 功能：把居中相关机构全部释放回原点。 */
 uint8_t LeaveCenter(void)
 {
     return MoveArrayToAbsPos(leave_center_motors,
                              EXEC_ARRAY_COUNT(leave_center_motors));
 }
 
+/* 功能：等待无人机离巢状态成立后关闭舱门。 */
 uint8_t CheckAndCloseDoor(void)
 {
     uint16_t uav_status = StatusRegs_GetLive(REG_RC_UAV_STATE);
@@ -510,6 +530,7 @@ uint8_t CheckAndCloseDoor(void)
     return ret;
 }
 
+/* 功能：检查遥控器和无人机状态是否满足起飞开机条件。 */
 uint8_t WaitForUavPowerOn(void)
 {
     uint16_t uav_status = StatusRegs_GetLive(REG_RC_UAV_STATE);
@@ -526,6 +547,7 @@ uint8_t WaitForUavPowerOn(void)
     return STEP_RESULT_WAIT;
 }
 
+/* 功能：向舱门电机下发停止命令；调试跳过模式下直接返回成功。 */
 uint8_t StopDr(void)
 {
     if (g_door_debug_no_action != 0U) {
@@ -534,6 +556,7 @@ uint8_t StopDr(void)
     return Motor_Control(MOTOR_ID_4, 1U, MOTOR4_CMD_STOP);
 }
 
+/* 功能：向舱门电机下发开门命令；调试跳过模式下直接返回成功。 */
 uint8_t OpenDr(void)
 {
     if (g_door_debug_no_action != 0U) {
@@ -542,6 +565,7 @@ uint8_t OpenDr(void)
     return Motor_Control(MOTOR_ID_4, 1U, MOTOR4_CMD_OPEN);
 }
 
+/* 功能：向舱门电机下发关门命令，并在命令受理后更新舱门状态。 */
 uint8_t CloseDr(void)
 {
     uint8_t result;
@@ -557,6 +581,7 @@ uint8_t CloseDr(void)
     return result;
 }
 
+/* 功能：通过下游Modbus写命令打开空调。 */
 uint8_t OpenAC(void)
 {
 	//打开空调
@@ -573,7 +598,7 @@ uint8_t OpenAC(void)
     return ctrl_ret3;
 }
 
-/* 起飞收尾或降落时开空调失败只记录告警，不阻止序列继续执行。 */
+/* 功能：序列收尾时打开空调，失败只告警并继续执行。 */
 static uint8_t OpenACForSequence(void)
 {
     uint8_t result = ModbusMaster_06_WriteSingleReg(
@@ -594,6 +619,7 @@ static uint8_t OpenACForSequence(void)
     return MODBUS_RESULT_OK;
 }
 
+/* 功能：通过下游Modbus写命令关闭空调。 */
 uint8_t CloseAC(void)
 {
 	//关闭空调
@@ -610,7 +636,7 @@ uint8_t CloseAC(void)
     return ctrl_ret3;
 }
 
-/* 起飞准备时关闭空调失败只记录告警，不阻止后续开机步骤。 */
+/* 功能：起飞准备时关闭空调，失败只告警并继续后续步骤。 */
 uint8_t CloseACForTakeoff(void)
 {
     uint8_t result = ModbusMaster_06_WriteSingleReg(

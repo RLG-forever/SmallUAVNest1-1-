@@ -4,6 +4,7 @@
 
 #include <stddef.h>
 
+/* 功能：校验上下文后，把步骤表参数转交给异步绝对位置批处理。 */
 uint8_t ExecSteps_MoveToAbsPos(const void *context)
 {
     const ExecMoveAbsPosParams *params =

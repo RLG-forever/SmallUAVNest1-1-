@@ -11,7 +11,10 @@ static uint8_t startup_full_homing_pending;
 static MotorFullHomeState last_full_home_state =
     MOTOR_FULL_HOME_STATE_IDLE;
 
-/* 成功或无需重置时继续启动；写Flash失败时阻止自动回零。保留moving标志。 */
+/*
+ * 功能：检查上次电机7/8运动是否被掉电中断；需要时把其保存位置重置为零。
+ * 返回：1 表示可以继续启动回零，0 表示位置备份写入失败。
+ */
 static uint8_t FullHomeService_ResetStartupPositions(void)
 {
 #if STARTUP_RESET_MOTOR78_POSITION == 0U
@@ -54,7 +57,7 @@ static uint8_t FullHomeService_ResetStartupPositions(void)
 }
 
 /**
- * @brief 启动上电后的全回原点流程，并初始化对应的命令状态。
+ * @brief 功能：启动上电后的全回原点流程，并初始化对应的命令状态。
  * @note  调用前必须完成Modbus主站、状态寄存器、Flash及电机位置存储初始化。
  * @return 1表示全回原点状态机已启动，0表示启动失败。
  */
@@ -100,7 +103,7 @@ uint8_t FullHomeService_StartInitial(void)
 }
 
 /**
- * @brief 监控全回原点状态，并统一管理业务使能及上电回原点的状态上报。
+ * @brief 功能：监控全回原点状态，并统一管理业务使能和启动状态上报。
  * @note  必须在MotorControl_FullHomeProcess()之后调用，才能获取本轮最新状态。
  */
 void FullHomeService_Process(void)
@@ -171,6 +174,7 @@ void FullHomeService_Process(void)
     last_full_home_state = full_home_state;
 }
 
+/* 功能：查询正常业务是否已经解锁；全回零成功前返回0，成功后返回1。 */
 uint8_t FullHomeService_IsNormalOperationsEnabled(void)
 {
     return normal_operations_enabled;

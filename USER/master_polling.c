@@ -52,6 +52,10 @@ static uint32_t rain_history_clear_deadline;
 static uint8_t rain_history_clear_initialized;
 static uint8_t rain_history_clear_pending;
 
+/*
+ * 功能：把空调四个只读状态位合并为一个业务状态码。
+ *       合并规则为1=制冷，2=制热，3=待机。
+ */
 static void MasterPolling_UpdateAirConditionerState(const uint16_t *states)
 {
     uint16_t state = 3U; // 四项都停止：待机
@@ -71,7 +75,7 @@ static void MasterPolling_UpdateAirConditionerState(const uint16_t *states)
 
 
 /**
- * @brief 分时读取环境传感器、电流和空调状态的非阻塞轮询任务。
+ * @brief 功能：分时读取环境传感器、电流和空调状态的非阻塞轮询任务。
  * @note  每次调用只推进当前块；轮询间隔由MASTER_POLLING_INTERVAL_MS配置。
  */
 void MasterPolling_Task(void)

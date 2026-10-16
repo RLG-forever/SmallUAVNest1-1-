@@ -11,7 +11,7 @@ static uint16_t status_cache[STATUS_REG_COUNT];
 static uint16_t status_snapshot[STATUS_REG_COUNT];
 static volatile uint8_t snapshot_active;
 
-/* 保存进入临界区前的中断状态，避免在中断原本关闭时被错误地重新开启。 */
+/* 功能：保存进入临界区前的中断状态，避免原本关闭中断时被错误开启。 */
 static uint32_t StatusRegs_EnterCritical(void)
 {
     uint32_t primask = __get_PRIMASK();
@@ -20,6 +20,7 @@ static uint32_t StatusRegs_EnterCritical(void)
     return primask;
 }
 
+/* 功能：按进入临界区前保存的中断状态恢复全局中断。 */
 static void StatusRegs_ExitCritical(uint32_t primask)
 {
     if (primask == 0U) {
@@ -27,6 +28,7 @@ static void StatusRegs_ExitCritical(uint32_t primask)
     }
 }
 
+/* 功能：清空实时寄存器和快照，并设置上电默认舱门状态。 */
 void StatusRegs_Init(void)
 {
     uint32_t primask = StatusRegs_EnterCritical();
@@ -41,6 +43,7 @@ void StatusRegs_Init(void)
     StatusRegs_ExitCritical(primask);
 }
 
+/* 功能：在临界区中更新一个实时状态寄存器和对应的Modbus响应缓存。 */
 void StatusRegs_Update(StatusRegAddr addr, uint16_t value)
 {
     uint32_t primask;
@@ -54,6 +57,7 @@ void StatusRegs_Update(StatusRegAddr addr, uint16_t value)
     StatusRegs_ExitCritical(primask);
 }
 
+/* 功能：批量更新连续的状态寄存器，同时刷新Modbus响应缓存。 */
 void StatusRegs_UpdateBatch(uint16_t start_addr, const uint16_t *values,
                             uint8_t count)
 {
@@ -72,6 +76,7 @@ void StatusRegs_UpdateBatch(uint16_t start_addr, const uint16_t *values,
     StatusRegs_ExitCritical(primask);
 }
 
+/* 功能：读取状态寄存器；序列快照有效时优先返回快照值。 */
 uint16_t StatusRegs_Get(StatusRegAddr addr)
 {
     uint32_t primask;
@@ -86,6 +91,7 @@ uint16_t StatusRegs_Get(StatusRegAddr addr)
     return value;
 }
 
+/* 功能：忽略序列快照，直接读取当前实时状态寄存器。 */
 uint16_t StatusRegs_GetLive(StatusRegAddr addr)
 {
     uint32_t primask;
@@ -100,6 +106,7 @@ uint16_t StatusRegs_GetLive(StatusRegAddr addr)
     return value;
 }
 
+/* 功能：冻结当前实时状态，供正在执行的序列读取稳定的过程状态。 */
 void StatusRegs_TakeSnapshot(void)
 {
     uint32_t primask = StatusRegs_EnterCritical();
@@ -111,6 +118,7 @@ void StatusRegs_TakeSnapshot(void)
     StatusRegs_ExitCritical(primask);
 }
 
+/* 功能：释放序列状态快照，后续读取恢复为实时值。 */
 void StatusRegs_ReleaseSnapshot(void)
 {
     uint32_t primask = StatusRegs_EnterCritical();
@@ -119,6 +127,7 @@ void StatusRegs_ReleaseSnapshot(void)
     StatusRegs_ExitCritical(primask);
 }
 
+/* 功能：查询当前是否处于序列状态快照模式。 */
 uint8_t StatusRegs_IsSnapshotActive(void)
 {
     uint32_t primask = StatusRegs_EnterCritical();
@@ -128,6 +137,7 @@ uint8_t StatusRegs_IsSnapshotActive(void)
     return active;
 }
 
+/* 功能：把连续状态寄存器按Modbus大端格式写入03响应数据区。 */
 void StatusRegs_GetBatch(uint16_t start_addr, uint8_t count, uint8_t *response)
 {
     uint32_t primask;
@@ -147,6 +157,10 @@ void StatusRegs_GetBatch(uint16_t start_addr, uint8_t count, uint8_t *response)
     StatusRegs_ExitCritical(primask);
 }
 
+/*
+ * 功能：根据三块电池的充电状态判断无人机内电池编号。
+ * 返回：恰好一块电池处于未充电状态时返回其1~3编号，否则返回0。
+ */
 uint8_t GetBatteryInUAV(void)
 {
     uint16_t bat1_charging = StatusRegs_Get(REG_BAT1_CHARGE_STATE);

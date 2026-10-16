@@ -50,11 +50,16 @@ const uint8_t g_door_debug_no_action = DOOR_DEBUG_NO_ACTION;
 TMRGEN       tmr = TIMR_DEFAULTS;
 LinterMotor  lim = LINTER_DEFAULTS;
 
+/* 功能：配置 SysTick 为 1 ms 周期中断，为 Tick_Increment() 提供系统时基。 */
 void SysTickInit(void)
 {
 	SysTick_Config(SystemCoreClock / 1000);	//Set SysTick Timer for 1ms interrupts  
 }
 
+/*
+ * 功能：完成系统上电初始化，并按固定顺序持续调度通信、启动流程、
+ *       动作序列、网关命令和后台轮询。
+ */
 int main(void)
 {
 	uint8_t startup_door_sequence_pending = 1U;

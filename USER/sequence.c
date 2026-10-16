@@ -62,6 +62,7 @@ struct {
 
 static uint8_t landing_same_bay_debug_enabled;
 
+/* 功能：把轨迹日志中的步骤索引转换成可读步骤名称。 */
 static const char *Sequence_GetTraceStepName(SeqId id, uint8_t step_index)
 {
     static const char *const takeoff_step_names[] = {
@@ -108,11 +109,13 @@ static const char *Sequence_GetTraceStepName(SeqId id, uint8_t step_index)
     return takeoff_step_names[full_index];
 }
 
+/* 功能：按无符号回绕规则判断当前时刻是否已经到达截止时刻。 */
 static uint8_t Sequence_IsTimeReached(uint32_t now, uint32_t deadline)
 {
     return ((int32_t)(now - deadline) >= 0) ? 1U : 0U;
 }
 
+/* 功能：结束当前序列，锁定最终结果、故障码和步骤，并释放快照。 */
 static void Sequence_Finish(SequenceResult result)
 {
     const uint8_t deferred_fault_applied =
@@ -171,6 +174,7 @@ static void Sequence_Finish(SequenceResult result)
     StatusRegs_ReleaseSnapshot();
 }
 
+/* 功能：提交当前步骤的完成寄存器，推进到下一步或结束序列。 */
 static void Sequence_CompleteCurrentStep(void)
 {
     const StepDef *step = &seq_runner.steps[seq_runner.current_index];
@@ -232,6 +236,7 @@ static void Sequence_CompleteCurrentStep(void)
     }
 }
 
+/* 功能：请求在当前步骤边界暂停；不会中断已经下发的单步动作。 */
 void Sequence_Pause(void)
 {
     if (seq_runner.state != SEQUENCE_STATE_RUNNING &&
@@ -260,6 +265,7 @@ void Sequence_Pause(void)
              (unsigned int)seq_runner.current_index);
 }
 
+/* 功能：清除暂停请求并恢复序列运行。 */
 void Sequence_Resume(void)
 {
     if (seq_runner.state == SEQUENCE_STATE_PAUSED) {
@@ -282,6 +288,7 @@ void Sequence_Resume(void)
     }
 }
 
+/* 功能：清空序列运行上下文，使模块进入空闲状态。 */
 void Sequence_Init(void)
 {
     memset(&seq_runner, 0, sizeof(seq_runner));
@@ -297,16 +304,19 @@ void Sequence_Init(void)
     LOG_INFO("SEQUENCE", "initialized\r\n");
 }
 
+/* 功能：查询是否有序列正在运行、暂停或恢复中。 */
 uint8_t Sequence_IsBusy(void)
 {
     return (seq_runner.state != SEQUENCE_STATE_IDLE) ? 1U : 0U;
 }
 
+/* 功能：查询序列是否停在步骤边界等待恢复。 */
 uint8_t Sequence_IsPaused(void)
 {
     return (seq_runner.state == SEQUENCE_STATE_PAUSED) ? 1U : 0U;
 }
 
+/* 功能：查询序列是否处于告警后自动释放、回零或重启的恢复阶段。 */
 uint8_t Sequence_IsRecovering(void)
 {
     return (seq_runner.state == SEQUENCE_STATE_RECOVERY_RELEASE_CLAMP ||
@@ -314,6 +324,8 @@ uint8_t Sequence_IsRecovering(void)
             seq_runner.state == SEQUENCE_STATE_RECOVERY_START_HOME ||
             seq_runner.state == SEQUENCE_STATE_RECOVERY_HOMING) ? 1U : 0U;
 }
+
+/* 功能：校验序列ID和空闲条件，选择步骤表并初始化一次序列执行。 */
 static SequenceStartResult Sequence_StartInternal(SeqId id,
                                                   uint8_t same_bay_debug)
 {
@@ -470,6 +482,7 @@ static SequenceStartResult Sequence_StartInternal(SeqId id,
     return SEQ_START_OK;
 }
 
+/* 功能：配置后续降落任务是否在同一仓取放电池。 */
 void Sequence_SetLandingSameBayDebugEnabled(uint8_t enabled)
 {
     landing_same_bay_debug_enabled = enabled != 0U ? 1U : 0U;
@@ -477,17 +490,20 @@ void Sequence_SetLandingSameBayDebugEnabled(uint8_t enabled)
              (unsigned int)landing_same_bay_debug_enabled);
 }
 
+/* 功能：使用当前全局同仓配置启动指定序列。 */
 SequenceStartResult Sequence_Start(SeqId id)
 {
     return Sequence_StartInternal(id, landing_same_bay_debug_enabled);
 }
 
+/* 功能：把电机从站地址和底层错误码组合为16位故障码。 */
 static uint16_t Sequence_ComposeFaultCode(uint8_t slave_addr,
                                           uint8_t error_code)
 {
     return ((uint16_t)slave_addr << 8) | error_code;
 }
 
+/* 功能：返回当前序列允许的自动告警恢复次数。 */
 static uint8_t Sequence_GetAlarmRecoveryLimit(void)
 {
     return seq_runner.id == SEQ_ID_LANDING
@@ -495,6 +511,7 @@ static uint8_t Sequence_GetAlarmRecoveryLimit(void)
                : SEQUENCE_ALARM_RECOVERY_LIMIT;
 }
 
+/* 功能：告警恢复回零成功后清零步骤状态，并从第0步重新执行。 */
 static void Sequence_ResetForAlarmRestart(void)
 {
     LandingBayPush_Reset();
@@ -530,6 +547,7 @@ static void Sequence_ResetForAlarmRestart(void)
              (unsigned int)seq_runner.selected_bay);
 }
 
+/* 功能：捕获电机告警并进入“松开夹爪→全回零→重启或结束”的恢复流程。 */
 static void Sequence_BeginAlarmRecovery(uint8_t alarm_result)
 {
     uint8_t recovery_limit = Sequence_GetAlarmRecoveryLimit();
@@ -564,7 +582,7 @@ static void Sequence_BeginAlarmRecovery(uint8_t alarm_result)
     seq_runner.state = SEQUENCE_STATE_RECOVERY_RELEASE_CLAMP;
 }
 
-/* 不可重跑故障：保留故障码，回原点完成后结束原任务。 */
+/* 功能：对不可重启故障执行释放、回零，并在回零后结束原任务。 */
 static void Sequence_BeginHomingAfterFailure(uint16_t fault_code)
 {
     seq_runner.recovery_failed_step = seq_runner.current_index;
@@ -581,11 +599,9 @@ static void Sequence_BeginHomingAfterFailure(uint16_t fault_code)
               (unsigned int)fault_code);
 }
 
-// 执行当前步骤（发送指令）
-
 /**
- * @brief 推进当前序列步骤。
- * @note  步骤或底层 Modbus 批处理未完成时直接返回，下一轮主循环继续推进。
+ * @brief 功能：推进当前序列步骤，处理等待、重试、失败和告警恢复。
+ * @note  步骤或底层Modbus批处理未完成时直接返回，下一轮主循环继续推进。
  */
 static void Sequence_ExecuteCurrentStep(void)
 {
@@ -797,6 +813,8 @@ static void Sequence_ExecuteCurrentStep(void)
               (unsigned long)(GetTick() - seq_runner.step_start_tick));
     Sequence_Finish(SEQUENCE_RESULT_ACTION_FAILED);
 }
+
+/* 功能：按当前状态推进序列、步骤延时或告警恢复状态机。 */
 void Sequence_Process(void)
 {
     uint8_t result;
@@ -928,6 +946,8 @@ void Sequence_Process(void)
         return;
     }
 }
+
+/* 功能：根据三块电池的充电状态判断无人机内是否仍有旧电池。 */
 static uint8_t HasOldBatteryInUAV(void)
 {
     // 读取三块电池的充电状态（0=充电中，1=未充电）
@@ -944,7 +964,7 @@ static uint8_t HasOldBatteryInUAV(void)
     return (not_charging_count == 1) ? 1 : 0;
 }
 
-/* Start the explicit mechanical recovery sequence. */
+/* 功能：显式启动机械恢复序列，并根据无人机内有无旧电池选择步骤表。 */
 SequenceStartResult Sequence_StartRecovery(void)
 {
     if (Sequence_IsBusy()) {
@@ -991,35 +1011,40 @@ SequenceStartResult Sequence_StartRecovery(void)
     return SEQ_START_OK;
 }
 
+/* 功能：返回当前运行序列的ID，空闲时返回SEQ_ID_INVALID。 */
 SeqId Sequence_GetCurrentId(void)
 {
     if (!Sequence_IsBusy()) return SEQ_ID_INVALID;
     return seq_runner.id;
 }
 
+/* 功能：返回当前步骤编号，空闲时返回SEQUENCE_STEP_INVALID。 */
 uint8_t Sequence_GetCurrentStep(void)
 {
     if (!Sequence_IsBusy()) return SEQUENCE_STEP_INVALID;
     return seq_runner.current_index;
 }
 
+/* 功能：返回起飞流程因等待无人机开机而重新执行的次数。 */
 uint8_t Sequence_GetUavPowerRetryCount(void)
 {
     return seq_runner.uav_power_retry_count;
 }
 
+/* 功能：返回序列启动时锁定的当前空仓编号。 */
 uint8_t Sequence_GetSelectedBay(void)
 {
     return seq_runner.selected_bay;
 }
 
+/* 功能：返回降落流程启动时锁定的目标空仓编号。 */
 uint8_t Sequence_GetTargetEmptyBay(void)
 {
     return seq_runner.target_empty_bay;
 }
 
 /**
- * @brief 获取最近一次动作序列的最终执行结果。
+ * @brief 功能：获取最近一次动作序列的最终执行结果。
  * @return 序列执行结果；序列正在运行或尚未执行时返回NONE。
  */
 SequenceResult Sequence_GetLastResult(void)
@@ -1028,7 +1053,7 @@ SequenceResult Sequence_GetLastResult(void)
 }
 
 /**
- * @brief 获取最近一次动作序列结束时的步骤编号。
+ * @brief 功能：获取最近一次动作序列结束时的步骤编号。
  * @return 最后步骤编号；尚无有效结果时返回SEQUENCE_STEP_INVALID。
  */
 uint8_t Sequence_GetLastStep(void)
@@ -1037,7 +1062,7 @@ uint8_t Sequence_GetLastStep(void)
 }
 
 /**
- * @brief 获取最近一次动作序列的底层错误码。
+ * @brief 功能：获取最近一次动作序列的底层错误码。
  * @return 错误码；成功、取消或尚无错误时返回0。
  */
 uint16_t Sequence_GetLastError(void)
@@ -1045,6 +1070,7 @@ uint16_t Sequence_GetLastError(void)
     return seq_runner.last_error;
 }
 
+/* 功能：取消底层电机批次并终止当前序列，不自动启动恢复步骤。 */
 void Sequence_Stop(void)
 {
     if (!Sequence_IsBusy()) {

@@ -1,7 +1,7 @@
 #include "modbus_common.h"
 #include <stddef.h>
 
-/* CRC与字节序工具不依赖硬件，也不保存任何通信状态。 */
+/* 功能：计算Modbus RTU使用的CRC16，校验完整帧时可判断结果是否为0。 */
 uint16_t Modbus_CRC16(const uint8_t *data, uint16_t len)
 {
     uint16_t crc = 0xFFFFU;
@@ -21,6 +21,7 @@ uint16_t Modbus_CRC16(const uint8_t *data, uint16_t len)
     return crc;
 }
 
+/* 功能：按Modbus大端顺序从缓冲区读取一个16位寄存器值。 */
 uint16_t Modbus_GetU16BE(const uint8_t *data)
 {
     if (data == NULL) {
@@ -30,6 +31,7 @@ uint16_t Modbus_GetU16BE(const uint8_t *data)
     return (uint16_t)(((uint16_t)data[0] << 8) | data[1]);
 }
 
+/* 功能：按Modbus大端顺序把16位值写入缓冲区。 */
 void Modbus_PutU16BE(uint8_t *data, uint16_t value)
 {
     if (data == NULL) {
